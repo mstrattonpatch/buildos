@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#182E27">
+<title>BuildOS</title>
+<meta name="description" content="One connected platform for construction quality, project delivery, workforce compliance and commercial management.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='6' fill='%23182E27'/%3E%3Crect x='6' y='7' width='10' height='2.6' rx='1.3' fill='%23fff'/%3E%3Crect x='6' y='11.7' width='14' height='2.6' rx='1.3' fill='%23fff'/%3E%3Crect x='6' y='16.4' width='7' height='2.6' rx='1.3' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* BuildOS design tokens — from "Interface & visual identity v0.1".
+   Borders, not shadows, separate cards; shadow is reserved for floating UI. */
+:root {
+  --forest: #182e27;
+  --forest-2: #21403a;
+  --green: #27815f;
+  --green-text: #1f6b4d;
+  --green-tint: #e3f1ea;
+  --amber: #c27a2c;
+  --amber-text: #9a5a12;
+  --amber-tint: #f8eddd;
+  --red: #b94343;
+  --red-tint: #f7e3e1;
+  --blue: #2f5f8a;
+  --blue-tint: #e4edf5;
+  --canvas: #f4f5f2;
+  --surface: #ffffff;
+  --border: #dde1dc;
+  --muted: #5f6b66;
+  --ink: #16201c;
+
+  --r-input: 6px;
+  --r-card: 10px;
+  --shadow-float: 0 12px 32px rgba(22, 32, 28, 0.16), 0 2px 6px rgba(22, 32, 28, 0.08);
+
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, h4 { margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 28px; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 600; }
+h3 { font-size: 15px; font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--mono); font-size: 13px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.link { color: var(--blue); font-weight: 600; }
+.link:hover { text-decoration: underline; }
+.green-text { color: var(--green-text); }
+.amber-text { color: var(--amber-text); }
+.red-text { color: var(--red); }
+.right { text-align: right; }
+.row { display: flex; align-items: center; gap: 8px; }
+.row.wrap { flex-wrap: wrap; }
+.spacer { flex: 1; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.stack-lg { display: flex; flex-direction: column; gap: 20px; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---------------------------------------------------------------- buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 36px; padding: 0 14px; border-radius: var(--r-input);
+  border: 1px solid var(--border); background: var(--surface);
+  font-weight: 600; font-size: 13.5px; cursor: pointer; white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+.btn:hover { background: #f8f9f7; border-color: #c9cfc8; }
+.btn-primary { background: var(--green); border-color: var(--green); color: #fff; }
+.btn-primary:hover { background: #20704f; border-color: #20704f; }
+.btn-dark { background: var(--forest); border-color: var(--forest); color: #fff; }
+.btn-dark:hover { background: #10221c; border-color: #10221c; }
+.btn-danger { color: var(--red); border-color: #e7bcb8; }
+.btn-danger:hover { background: var(--red-tint); }
+.btn-ghost { border-color: transparent; background: transparent; color: var(--blue); }
+.btn-ghost:hover { background: var(--blue-tint); border-color: transparent; }
+.btn-lg { height: 48px; padding: 0 20px; font-size: 15px; }
+.btn-block { width: 100%; }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+.btn-primary[data-pending="true"] { background: #4c9a7c; border-color: #4c9a7c; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ----------------------------------------------------------------- badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  border: 1px solid transparent;
+}
+.badge svg { flex: none; }
+.badge-grey { background: #eef0ed; color: var(--muted); }
+.badge-outline { background: var(--surface); color: var(--ink); border-color: #b9c0b9; }
+.badge-blue { background: var(--blue-tint); color: var(--blue); }
+.badge-green { background: var(--green-tint); color: var(--green-text); }
+.badge-amber { background: var(--amber-tint); color: var(--amber-text); }
+.badge-red { background: var(--red-tint); color: var(--red); }
+.badge-red-solid { background: var(--red); color: #fff; }
+.badge-dashed { background: var(--surface); color: var(--muted); border: 1px dashed #a9b1aa; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; font-weight: 500;
+}
+.chip[data-active="true"] { border-color: var(--green); background: var(--green-tint); color: var(--green-text); }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; background: #eef0ed; font-size: 12px; font-weight: 500; }
+
+/* ------------------------------------------------------------------ cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); }
+.card-pad { padding: 18px 20px; }
+.card-head { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px; }
+.card-head h2 { font-size: 15.5px; }
+.card-body { padding: 0 20px 18px; }
+.grid { display: grid; gap: 16px; }
+.metrics { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.metric { display: block; padding: 14px 16px; border-radius: var(--r-card); background: var(--surface); border: 1px solid var(--border); transition: border-color 0.12s; }
+a.metric:hover { border-color: #b2bab3; }
+.metric .m-label { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.metric .m-value { font-size: 26px; font-weight: 700; margin: 4px 0 2px; letter-spacing: -0.02em; }
+.metric .m-note { font-size: 12px; display: flex; align-items: center; gap: 4px; color: var(--muted); }
+.metric .m-note.amber-text { color: var(--amber-text); font-weight: 600; }
+.metric .m-note.red-text { color: var(--red); font-weight: 600; }
+
+/* ----------------------------------------------------------------- tables */
+.table-wrap { overflow-x: auto; }
+table.register { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.register th {
+  text-align: left; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); background: #fafbf9; white-space: nowrap;
+}
+.register td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.register tr:last-child td { border-bottom: none; }
+.register tbody tr:hover { background: #fafbf9; }
+.register .num { text-align: right; font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.register a.rowlink { font-weight: 600; }
+.register a.rowlink:hover { text-decoration: underline; }
+.register tfoot td { font-weight: 700; background: #fafbf9; }
+
+/* ------------------------------------------------------------------ forms */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-size: 13px; font-weight: 600; }
+.field .req { color: var(--red); }
+.input, select.input, textarea.input {
+  height: 40px; padding: 0 12px; border-radius: var(--r-input); border: 1px solid #c9cfc8; background: var(--surface); width: 100%;
+}
+textarea.input { height: auto; min-height: 84px; padding: 10px 12px; resize: vertical; }
+.input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47, 95, 138, 0.15); }
+.input[aria-invalid="true"] { border-color: var(--red); }
+.field-error { display: flex; align-items: center; gap: 6px; color: var(--red); font-size: 12.5px; }
+.form-grid { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+.form-grid .full { grid-column: 1 / -1; }
+.notice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-input); font-size: 13px; }
+.notice-ok { background: var(--green-tint); color: var(--green-text); }
+.notice-error { background: var(--red-tint); color: var(--red); }
+.notice-info { background: #eef0ed; color: var(--muted); }
+.notice-warn { background: var(--amber-tint); color: var(--amber-text); }
+
+/* --------------------------------------------------------------- stepper */
+.stepper { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.step { padding: 4px 10px; border-radius: 4px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); color: var(--muted); background: var(--surface); }
+.step[data-state="done"] { background: var(--green-tint); color: var(--green-text); border-color: transparent; }
+.step[data-state="current"] { background: var(--forest); color: #fff; border-color: var(--forest); }
+.stepper .sep { color: #a9b1aa; }
+
+/* -------------------------------------------------------------- timeline */
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.timeline li { display: grid; grid-template-columns: 10px 1fr; gap: 10px; font-size: 13px; }
+.timeline .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: #a9b1aa; }
+.timeline .dot.green { background: var(--green); }
+.timeline .dot.blue { background: var(--blue); }
+.timeline .dot.red { background: var(--red); }
+.timeline .dot.amber { background: var(--amber); }
+
+/* ------------------------------------------------------------ empty state */
+.empty { padding: 28px 24px; text-align: left; }
+.empty .icon { width: 40px; height: 40px; border-radius: 8px; background: var(--green-tint); color: var(--green-text); display: grid; place-items: center; margin-bottom: 12px; }
+
+/* ------------------------------------------------------------- progress */
+.bar { position: relative; height: 6px; border-radius: 3px; background: #e7eae6; overflow: hidden; }
+.bar > .planned { position: absolute; inset: 0 auto 0 0; background: #c9cfc8; }
+.bar > .actual { position: absolute; inset: 0 auto 0 0; background: var(--green); }
+
+/* --------------------------------------------------------------- dropdown */
+details.menu { position: relative; }
+details.menu > summary { list-style: none; cursor: pointer; }
+details.menu > summary::-webkit-details-marker { display: none; }
+details.menu .menu-panel {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 240px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); box-shadow: var(--shadow-float); padding: 6px;
+}
+.menu-panel a, .menu-panel button.menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 6px; font-size: 13.5px;
+  border: none; background: none; cursor: pointer; text-align: left;
+}
+.menu-panel a:hover, .menu-panel button.menu-item:hover { background: var(--canvas); }
+.menu-panel .menu-label { padding: 8px 10px 4px; }
+
+.sample-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px dashed #a9b1aa; border-radius: 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+
+/* ================================================================= shell */
+.shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+.sidebar-col { background: var(--forest); }
+.sidebar {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--forest); color: #d7e1dc;
+  display: flex; flex-direction: column; padding: 14px 10px; gap: 4px;
+}
+.sidebar .brand { padding: 4px 8px 14px; }
+.sidebar .nav-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8fa59b; padding: 14px 10px 6px; }
+.sidebar a.nav {
+  display: flex; align-items: center; gap: 10px; padding: 0 10px; height: 36px; border-radius: 6px; font-size: 13.5px; font-weight: 500; color: #d7e1dc;
+}
+.sidebar a.nav:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.sidebar a.nav[aria-current="page"] { background: var(--green); color: #fff; }
+.sidebar a.nav .count { margin-left: auto; background: var(--amber); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px; }
+.sidebar a.nav .count.quiet { background: transparent; color: #8fa59b; }
+.sidebar .proj-card { margin: 6px 4px 8px; padding: 10px 12px; border-radius: 8px; background: var(--forest-2); }
+.sidebar .proj-card .label { color: #8fa59b; font-size: 10.5px; }
+.sidebar .recent-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--green); flex: none; }
+.sidebar .bottom { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  position: sticky; top: 0; z-index: 40; height: 60px; display: flex; align-items: center; gap: 12px;
+  padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.topbar .search { flex: 1; max-width: 420px; position: relative; }
+.topbar .search input { padding-left: 36px; padding-right: 44px; background: var(--canvas); border-color: transparent; height: 38px; }
+.topbar .search svg { position: absolute; left: 11px; top: 11px; color: var(--muted); }
+.topbar .search kbd { position: absolute; right: 8px; top: 9px; font-family: var(--mono); font-size: 11px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--muted); }
+.icon-btn { width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); display: grid; place-items: center; cursor: pointer; position: relative; }
+.icon-btn .pip { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--red); border: 2px solid #fff; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: #cfd8d2; color: var(--forest); font-weight: 700; font-size: 13px; display: grid; place-items: center; cursor: pointer; }
+.content { padding: 24px 28px 48px; display: flex; flex-direction: column; gap: 20px; max-width: 1440px; width: 100%; }
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-header .crumbs { margin-bottom: 4px; }
+.page-header .crumbs a:hover { text-decoration: underline; }
+.page-meta { margin-top: 6px; font-size: 13.5px; display: flex; gap: 18px; flex-wrap: wrap; }
+.page-meta b { color: var(--ink); font-weight: 600; }
+.bottom-tabs { display: none; }
+.select-plain { height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 30px 0 12px; font-weight: 600; background: var(--surface); max-width: 220px; }
+.proj-tabs { display: none; }
+
+/* icon rail 768–1279 */
+@media (max-width: 1279px) {
+  .shell { grid-template-columns: 72px 1fr; }
+  .sidebar { padding: 14px 8px; align-items: center; }
+  .sidebar .nav-text, .sidebar .nav-label, .sidebar .proj-card, .sidebar .brand-text, .sidebar .count { display: none; }
+  .sidebar a.nav { width: 48px; justify-content: center; padding: 0; }
+  .sidebar .bottom { width: 100%; display: flex; justify-content: center; }
+}
+/* bottom tabs <768 */
+@media (max-width: 767px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar-col { display: none; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  .topbar .search { min-width: 0; }
+  .topbar .search input { padding-right: 8px; }
+  .topbar .select-plain { max-width: 132px; }
+  .topbar .spacer { display: none; }
+  .topbar .search kbd, .topbar .hide-sm { display: none; }
+  .content { padding: 16px 16px 96px; }
+  .bottom-tabs {
+    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; bottom: 0; left: 0; right: 0; z-index: 45;
+    background: var(--surface); border-top: 1px solid var(--border); padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  .bottom-tabs a { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--muted); min-height: 48px; justify-content: center; }
+  .bottom-tabs a[aria-current="page"] { color: var(--green-text); }
+  .proj-tabs { display: flex; gap: 6px; overflow-x: auto; margin: -4px 0 0; padding-bottom: 4px; }
+  .proj-tabs a { flex: none; }
+  .form-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 23px; }
+}
+
+/* ================================================================ layouts */
+.cc-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+.two-col { display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+.po-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 1100px) { .cc-grid, .po-grid { grid-template-columns: 1fr; } }
+@media (max-width: 767px) { .two-col { grid-template-columns: 1fr; } }
+.key { display: inline-block; width: 14px; height: 6px; border-radius: 3px; }
+dl.kv { display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; margin: 0; font-size: 13.5px; }
+dl.kv dd { margin: 0; font-family: var(--mono); font-size: 13px; text-align: right; }
+.task-item { display: block; padding: 10px 12px 10px 14px; border: 1px solid var(--border); border-radius: 8px; border-left: 3px solid var(--blue); }
+.task-item[data-tone="red"] { border-left-color: var(--red); }
+.task-item[data-tone="amber"] { border-left-color: var(--amber); }
+.task-item:hover { background: #fafbf9; }
+.attn { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px; }
+.attn[data-tone="red"] { background: var(--red-tint); border-color: #eccbc7; }
+.attn .attn-icon { flex: none; }
+.attn .attn-cta { margin-left: auto; font-weight: 600; color: var(--blue); white-space: nowrap; }
+.attn[data-tone="red"] .attn-cta { color: var(--red); }
+.ready-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ready-row:last-child { border-bottom: none; }
+.ready-row .state { margin-left: auto; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.seg { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; }
+.photo-ph { background: #c5cec8; border-radius: 6px; min-height: 64px; display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 600; }
+.gantt { display: grid; grid-template-columns: 180px 1fr; font-size: 12.5px; }
+.gantt .g-head { display: grid; color: var(--muted); font-size: 11.5px; padding-bottom: 6px; }
+.gantt .g-head span[data-today="true"] { color: var(--ink); font-weight: 700; }
+.gantt .g-name { padding: 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
+.gantt .g-track { position: relative; height: 30px; border-left: 1px solid var(--border); }
+.gantt .g-bar { position: absolute; top: 9px; height: 12px; border-radius: 3px; }
+.gantt .g-base { position: absolute; top: 23px; height: 3px; border-radius: 2px; background: #c9cfc8; }
+.gantt .g-ms { position: absolute; top: 8px; width: 13px; height: 13px; transform: rotate(45deg); border-radius: 2px; }
+.gantt .g-today { position: absolute; top: 0; bottom: 0; width: 1.5px; background: var(--blue); opacity: 0.5; }
+@media (max-width: 767px) { .gantt { grid-template-columns: 110px 1fr; } }
+
+/* ============================================================== site app */
+.site-wrap { min-height: 100vh; display: flex; justify-content: center; background: #e7eae6; }
+.site { width: 100%; max-width: 430px; min-height: 100vh; background: var(--canvas); position: relative; padding-bottom: 96px; font-size: 16px; }
+.site-hero { background: var(--forest); color: #fff; padding: 18px 18px 20px; border-radius: 0 0 18px 18px; }
+.site-hero .pill { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.1); color: #fff; font-weight: 600; font-size: 14px; border: 1px solid rgba(255,255,255,.15); }
+.site-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.site-stats div { background: rgba(255,255,255,.08); border-radius: 10px; padding: 10px; text-align: center; }
+.site-stats b { display: block; font-size: 22px; }
+.site-stats span { font-size: 12px; color: #b9cac2; }
+.site-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.big-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.big-action { min-height: 92px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); padding: 14px; display: flex; flex-direction: column; justify-content: space-between; font-weight: 700; font-size: 15px; }
+.big-action.primary { background: var(--green); color: #fff; border-color: var(--green); }
+.list-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.list-card a, .list-card .li { display: flex; align-items: center; gap: 12px; padding: 14px; min-height: 64px; border-bottom: 1px solid var(--border); }
+.list-card > :last-child { border-bottom: none; }
+.li-icon { width: 38px; height: 38px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+.site-tabs { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: var(--surface); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 6px 4px calc(8px + env(safe-area-inset-bottom)); z-index: 30; }
+.site-tabs a { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); min-height: 48px; justify-content: center; }
+.site-tabs a[aria-current="page"] { color: var(--green-text); }
+.site-tabs .fab { width: 56px; height: 56px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; margin: -22px auto 0; box-shadow: var(--shadow-float); }
+.site-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.req-list { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.req-list .li { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.req-list .li:last-child { border-bottom: none; }
+.req-list .li b { margin-left: auto; font-size: 13.5px; display: inline-flex; gap: 4px; align-items: center; text-align: right; }
+.callout { border: 2px solid var(--amber); border-radius: 12px; background: var(--amber-tint); padding: 16px; }
+
+/* ================================================================ public */
+.pub-nav { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--border); }
+.pub-nav .inner, .pub .inner { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+.pub-nav .inner { height: 64px; display: flex; align-items: center; gap: 28px; }
+.pub-nav nav { display: flex; gap: 24px; font-size: 14px; font-weight: 500; }
+.pub-nav nav a:hover { color: var(--green-text); }
+.pub { background: var(--canvas); }
+.pub section { padding: 72px 0; }
+.pub .eyebrow { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--green-text); }
+.pub .pill-eyebrow { display: inline-flex; height: 26px; align-items: center; padding: 0 10px; border-radius: 999px; background: var(--green-tint); color: var(--green-text); font-size: 12px; font-weight: 600; }
+.pub h1.display { font-size: 56px; line-height: 1.04; letter-spacing: -0.035em; margin: 18px 0 20px; }
+.pub h2.section { font-size: 34px; line-height: 1.12; letter-spacing: -0.025em; }
+.pub .lede { font-size: 17px; line-height: 1.6; color: #3c4843; max-width: 520px; }
+.hero-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
+.mock { margin-bottom: 70px; }
+.mock { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-float); display: grid; grid-template-columns: 40px 1fr; overflow: visible; min-height: 300px; }
+.mock-rail { background: var(--forest); border-radius: 14px 0 0 14px; }
+.mock-body { padding: 20px; }
+.mock-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin-top: 8px; }
+.mock-row .s { margin-left: auto; font-weight: 600; white-space: nowrap; }
+.mock-phone { position: absolute; right: -24px; bottom: -96px; width: 160px; background: var(--surface); border: 6px solid var(--forest); border-radius: 20px; padding: 12px; box-shadow: var(--shadow-float); font-size: 12px; }
+.problem { background: var(--forest); color: #fff; }
+.problem .card-dark { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 16px 18px; display: flex; gap: 14px; font-size: 14.5px; }
+.pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px; }
+.flow { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-top: 24px; overflow: hidden; }
+.flow > div { padding: 18px; border-right: 1px solid var(--border); }
+.flow > div:last-child { border-right: none; background: var(--green-tint); }
+.cta-band { background: var(--green); color: #fff; border-radius: 16px; padding: 40px 44px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.pub-foot { border-top: 1px solid var(--border); background: var(--surface); }
+.pub-foot .inner { height: 72px; display: flex; align-items: center; gap: 24px; font-size: 13px; }
+@media (max-width: 900px) {
+  .hero-grid, .pillars, .flow { grid-template-columns: 1fr; }
+  .flow > div { border-right: none; border-bottom: 1px solid var(--border); }
+  .pub h1.display { font-size: 40px; }
+  .pub-nav nav { display: none; }
+  .mock-phone { right: 8px; }
+  .pub section { padding: 48px 0; }
+  .pub-foot .inner { height: auto; padding: 20px 24px; flex-wrap: wrap; }
+}
+
+/* ======================================================= single-file extras */
+.ic { flex: none; vertical-align: middle; }
+.chip-radio:has(input:checked) { border-color: var(--green); background: var(--green-tint); color: var(--green-text); }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 100; display: flex; align-items: center; gap: 10px; max-width: min(520px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 10px; background: var(--forest); color: #fff; font-weight: 500; box-shadow: var(--shadow-float); transition: opacity .4s, transform .4s; }
+.toast-error { background: var(--red); }
+.toast.out { opacity: 0; transform: translate(-50%, 8px); }
+@media (max-width: 767px) { .toast { bottom: 84px; } }
+noscript { display: block; padding: 40px; text-align: center; }
+
+</style>
+</head>
+<body>
+<div id="root"></div>
+<noscript>BuildOS needs JavaScript to run.</noscript>
+<script>
+"use strict";
+/* =====================================================================
+   BuildOS — single-file prototype
+   One connected construction platform: quality, programme, workforce &
+   safety and commercial sharing one project record. All data is sample
+   data, saved in this browser (localStorage). Money is stored in cents.
+   ===================================================================== */
+
+// ------------------------------------------------------------- utilities
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const sum = (xs, f) => xs.reduce((a, x) => a + f(x), 0);
+const uniq = (xs) => [...new Set(xs)];
+const pad = (n) => String(n).padStart(2, "0");
+/** Local calendar date, YYYY-MM-DD. */
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** Parse a date-only string as a local date (not UTC), anything else normally. */
+const D = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) : new Date(s));
+const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const daysBetween = (a, b) => Math.round((startOfDay(b) - startOfDay(a)) / 86400000);
+const todayYmd = () => ymd(new Date());
+
+function money(cents, o = {}) {
+  const dollars = cents / 100, abs = Math.abs(dollars);
+  const sign = dollars < 0 ? "-" : o.sign && dollars > 0 ? "+" : "";
+  if (o.compact) {
+    if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}m`;
+    if (abs >= 1e3) return `${sign}$${Math.round(abs / 1e3)}k`;
+  }
+  return `${sign}$${abs.toLocaleString("en-AU", { maximumFractionDigits: 0 })}`;
+}
+const moneyLimit = (c) => (c === undefined ? "none" : Number.isFinite(c) ? money(c) : "unlimited");
+const pct = (n, d = 1) => `${n.toFixed(d)}%`;
+const shortDate = (s) => D(s).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+const dayMonth = (s) => D(s).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+const longToday = () => new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" });
+const dateTime = (s) => new Date(s).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+const timeOf = (s) => new Date(s).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
+function timeAgo(s) {
+  const mins = Math.round((Date.now() - new Date(s)) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? "yesterday" : `${days} days ago`;
+}
+function dueLabel(s) {
+  if (!s) return "—";
+  const diff = daysBetween(new Date(), D(s));
+  if (diff === 0) return "Today";
+  if (diff < 0) return `${-diff}d ago`;
+  if (diff === 1) return "Tomorrow";
+  return shortDate(s);
+}
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const words = (s) => s.replace(/_/g, " ");
+
+// ------------------------------------------------------------------ icons
+const ICONS = {
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  checkcircle: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  circle: '<circle cx="12" cy="12" r="9"/>',
+  dashed: '<circle cx="12" cy="12" r="9" stroke-dasharray="4 3"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  cloudoff: '<path d="m2 2 20 20"/><path d="M5.78 5.78A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.31-.2"/><path d="M21.53 16.2A4.5 4.5 0 0 0 17.5 10h-1.79A7 7 0 0 0 9.6 5.06"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  xcircle: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  arrowleft: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  arrowright: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  listchecks: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  chart: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  clipboard: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  hardhat: '<path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><path d="M14 6a6 6 0 0 1 6 6v3"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  dollar: '<path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  notebook: '<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.38 5.63a1 1 0 0 0-3-3l-5.01 5.01a2 2 0 0 0-.51.85l-.84 2.87a.5.5 0 0 0 .62.62l2.87-.84a2 2 0 0 0 .85-.5z"/>',
+  package: '<path d="m16 16 2 2 4-4"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="M3.29 7 12 12l8.71-5"/><path d="M12 22V12"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  qr: '<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  mappin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  menu: '<path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/>',
+  rotate: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  phone: '<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>',
+  align: '<path d="M15 12H3"/><path d="M17 18H3"/><path d="M21 6H3"/>',
+  filewarn: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  octagon: '<path d="M12 16h.01"/><path d="M12 8v4"/><path d="M15.31 2a2 2 0 0 1 1.42.59l4.68 4.68A2 2 0 0 1 22 8.69v6.62a2 2 0 0 1-.59 1.42l-4.68 4.68a2 2 0 0 1-1.42.59H8.69a2 2 0 0 1-1.42-.59l-4.68-4.68A2 2 0 0 1 2 15.31V8.69a2 2 0 0 1 .59-1.42l4.68-4.68A2 2 0 0 1 8.69 2z"/>',
+};
+const icon = (n, size = 16, style = "") => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${style ? ` style="${style}"` : ""}>${ICONS[n] || ""}</svg>`;
+
+// ------------------------------------------------------------- seed data
+// Illustrative sample data, labelled "Sample data" in the UI. Dates are
+// generated relative to the day the data was created.
+function createSeed(now = new Date()) {
+  const day = (offset, hour = 9, minute = 0) => { const d = new Date(now); d.setDate(d.getDate() + offset); d.setHours(hour, minute, 0, 0); return d.toISOString(); };
+  const date = (offset) => { const d = new Date(now); d.setDate(d.getDate() + offset); return ymd(d); };
+  const minsAgo = (m) => new Date(now.getTime() - m * 60000).toISOString();
+  const $m = (x) => Math.round(x * 1e6 * 100);
+  const $d = (x) => Math.round(x * 100);
+  const o = "org_1";
+  const org = { id: o, name: "Demo Builders Pty Ltd", abn: "00 000 000 000" };
+
+  const users = [
+    { id: "u_dir", orgId: o, name: "Alex Chen", initials: "AC", role: "director", title: "Construction director" },
+    { id: "u_pm", orgId: o, name: "M. Stratton", initials: "MS", role: "project_manager", title: "Project manager" },
+    { id: "u_sup", orgId: o, name: "Dana Morris", initials: "DM", role: "site_supervisor", title: "Site supervisor" },
+    { id: "u_qm", orgId: o, name: "Priya Nair", initials: "PN", role: "quality_manager", title: "Quality manager" },
+    { id: "u_sub", orgId: o, name: "Jordan Lee", initials: "JL", role: "subcontractor_admin", title: "Contracts admin · AquaSeal", contractorId: "c_wp" },
+    { id: "u_wkr", orgId: o, name: "Sam Okafor", initials: "SO", role: "worker", title: "Concreter · Solid Pour", workerId: "w_co1" },
+  ];
+
+  const con = (id, name, trade, pl, wc) => ({
+    id, orgId: o, legalName: `${name} Pty Ltd`, tradingName: name, abn: "00 000 000 000", trade,
+    insurances: [{ type: "Public liability", expires: date(pl), verified: true }, { type: "Workers comp", expires: date(wc), verified: true }],
+  });
+  const contractors = [
+    con("c_wp", "AquaSeal Waterproofing", "Waterproofing", 220, 180), con("c_pl", "Riverbend Plumbing", "Plumbing", 140, 300),
+    con("c_ti", "Tile & Stone Co", "Tiling", 260, 200), con("c_co", "Solid Pour Concreting", "Concrete", 90, 160),
+    con("c_el", "Brightline Electrical", "Electrical", -3, 210), con("c_sc", "Highreach Scaffolding", "Scaffolding", 190, 12),
+    con("c_st", "Steelfix Reinforcing", "Reinforcement", 150, 240), con("c_ca", "Northside Carpentry", "Carpentry", 300, 280),
+    con("c_fo", "FormRight Formwork", "Formwork", 120, 150),
+  ];
+
+  const projects = [
+    { id: "p_riv", orgId: o, code: "P-2041", name: "Riverside Apartments", address: "14 Wharf Rd, Riverside NSW", client: "Harbourview Developments", type: "Residential", status: "construction", pmId: "u_pm", contractSum: $m(18.0), startDate: date(-260), pcDate: date(234), plannedProgress: 62, verifiedProgress: 55, nextMilestone: { name: "L4 slab pour", date: date(2) }, weather: "Fine, 24°C" },
+    { id: "p_har", orgId: o, code: "P-2038", name: "Harbour St Fit-out", address: "200 Harbour St, Sydney NSW", client: "Meridian Property Group", type: "Commercial", status: "construction", pmId: "u_pm", contractSum: $m(4.15), startDate: date(-150), pcDate: date(23), plannedProgress: 81, verifiedProgress: 70, nextMilestone: { name: "Practical completion", date: date(23) } },
+    { id: "p_nor", orgId: o, code: "P-2044", name: "Northgate Warehouse", address: "8 Logistics Dr, Northgate NSW", client: "Coastline Logistics", type: "Industrial", status: "construction", pmId: "u_pm", contractSum: $m(9.7), startDate: date(-90), pcDate: date(200), plannedProgress: 31, verifiedProgress: 31, nextMilestone: { name: "Portal frames", date: date(12) } },
+    { id: "p_elm", orgId: o, code: "P-2046", name: "Elm Grove Townhouses", address: "31 Elm Grove, Westfield NSW", client: "Elm Grove Living", type: "Residential", status: "construction", pmId: "u_pm", contractSum: $m(6.1), startDate: date(-40), pcDate: date(320), plannedProgress: 12, verifiedProgress: 12, nextMilestone: { name: "Slab on ground", date: date(8) } },
+  ];
+
+  const loc = (id, projectId, building, level, zone) => ({ id, projectId, building, level, zone });
+  const locations = [
+    loc("l_rb1", "p_riv", "B", "L1", "Units 101–108"), loc("l_rb2", "p_riv", "B", "L2", "Units 201–208"),
+    loc("l_rb3", "p_riv", "B", "L3", "Units 301–308"), loc("l_rb3c", "p_riv", "B", "L3", "Corridor"),
+    loc("l_rb4", "p_riv", "B", "L4", "Slab"), loc("l_h1", "p_har", "Tower", "L12", "North wing"),
+    loc("l_h2", "p_har", "Tower", "L12", "South wing"), loc("l_n1", "p_nor", "Main", "Ground", "Grid A–F"),
+    loc("l_e1", "p_elm", "Lot 1–6", "Ground", "Slab"),
+  ];
+
+  // workers & credentials
+  const workers = [], credentials = [];
+  const first = ["Liam", "Noah", "Mia", "Ava", "Leo", "Kai", "Zoe", "Eli", "Ivy", "Max", "Ruby", "Jack", "Ella", "Theo", "Nina", "Owen", "Isla", "Finn", "Luca", "Ari"];
+  const last = ["Tran", "Nguyen", "Smith", "Kelly", "Brown", "Singh", "Wilson", "Martin", "Park", "Rossi", "Ali", "Cooper", "Walsh", "Reid", "Shaw"];
+  let n = 0;
+  for (const [cid, size] of [["c_co", 9], ["c_st", 7], ["c_fo", 8], ["c_wp", 5], ["c_pl", 6], ["c_el", 6], ["c_sc", 4]]) {
+    for (let i = 1; i <= size; i++) {
+      const id = `w_${cid.slice(2)}${i}`;
+      const name = id === "w_co1" ? "Sam Okafor" : id === "w_sc2" ? "J. Tran" : `${first[n % first.length]} ${last[(n * 7) % last.length]}`;
+      n++;
+      // One concreter is missing the Riverside induction (drives a readiness item).
+      workers.push({ id, name, contractorId: cid, phone: "04xx xxx xxx", inductedProjectIds: id === "w_co9" ? ["p_nor"] : ["p_riv", "p_nor"] });
+      credentials.push({ id: `cr_${id}_wc`, workerId: id, type: "White Card", number: `WC${100000 + n}`, status: "verified", verifiedBy: "u_sup", verifiedMethod: "Sighted original" });
+    }
+  }
+  credentials.push(
+    { id: "cr_ewp_sam", workerId: "w_co1", type: "EWP licence", number: "HRW-EWP-2231", expires: date(7), status: "verified", verifiedBy: "u_sup", verifiedMethod: "SafeWork register" },
+    { id: "cr_ewp_tran", workerId: "w_sc2", type: "EWP licence", number: "HRW-EWP-1180", expires: date(6), status: "verified", verifiedBy: "u_sup", verifiedMethod: "SafeWork register" },
+    { id: "cr_fa_1", workerId: "w_co2", type: "First aid", number: "HLTAID011", expires: date(200), status: "verified" },
+    { id: "cr_dog_1", workerId: "w_st1", type: "Dogging licence", number: "HRW-DG-5521", expires: date(400), status: "awaiting_verification" },
+  );
+
+  // attendance: 37 on site at Riverside today from 6 companies
+  const attendance = [];
+  workers.filter((w) => w.contractorId !== "c_sc" && w.id !== "w_co1" && w.id !== "w_co9").slice(0, 37).forEach((w, i) => {
+    attendance.push({ id: `a_${w.id}`, projectId: "p_riv", workerId: w.id, kind: "check_in", at: day(0, 6, 15 + (i % 40)), method: i % 9 === 0 ? "kiosk" : "qr" });
+  });
+  for (let i = 0; i < 47; i++) attendance.push({ id: `a_x${i}`, projectId: i < 30 ? "p_nor" : "p_har", workerId: `w_ext${i}`, kind: "check_in", at: day(0, 6, 30), method: "qr" });
+
+  // programme
+  const task = (id, projectId, name, trade, contractorId, bs, bf, fs, ff, isMilestone, progress, status, extra = {}) => ({
+    id, projectId, name, trade, contractorId, baselineStart: date(bs), baselineFinish: date(bf), forecastStart: date(fs), forecastFinish: date(ff),
+    isMilestone, progress, status, predecessorIds: [], ...extra,
+  });
+  const tasks = [
+    task("t_r1", "p_riv", "L3 slab — pour & cure", "Concrete", "c_co", -40, -30, -40, -30, false, 100, "complete"),
+    task("t_r2", "p_riv", "L4 slab — reo & formwork", "Formwork", "c_fo", -6, 1, -6, 1, false, 80, "in_progress", { itpId: "itp_r07" }),
+    task("t_r3", "p_riv", "L4 slab pour", "Concrete", "c_co", 2, 2, 2, 2, true, 0, "blocked", { itpId: "itp_r07", swmsId: "swms_r03", predecessorIds: ["t_r2"] }),
+    task("t_r4", "p_riv", "L3 waterproofing", "Waterproofing", "c_wp", -3, 3, -1, 5, false, 45, "in_progress"),
+    task("t_r5", "p_riv", "L2 services rough-in", "Plumbing", "c_pl", 0, 10, 1, 11, false, 10, "in_progress"),
+    task("t_r6", "p_riv", "L1 framing", "Carpentry", "c_ca", 6, 14, 7, 16, false, 0, "not_started"),
+    task("t_r7", "p_riv", "L3 tiling", "Tiling", "c_ti", 6, 18, 8, 20, false, 0, "not_started", { predecessorIds: ["t_r4"] }),
+    task("t_h1", "p_har", "L12 ceilings close-up", "Carpentry", "c_ca", -10, 4, -10, 8, false, 60, "in_progress"),
+    task("t_h2", "p_har", "Practical completion", "—", undefined, 23, 23, 23, 23, true, 0, "not_started"),
+    task("t_n1", "p_nor", "Portal frames", "Steel", "c_st", 12, 30, 12, 30, true, 0, "not_started"),
+    task("t_e1", "p_elm", "Slab on ground", "Concrete", "c_co", 8, 8, 8, 8, true, 0, "not_started"),
+  ];
+
+  // defects
+  const defects = [];
+  let defNo = 90;
+  const def = (projectId, title, locationId, room, trade, contractorId, priority, due, status, raisedDaysAgo = 8, extra = {}) => {
+    defNo++;
+    defects.push({
+      id: `d_${defNo}`, orgId: o, projectId, ref: extra.ref || `DEF-${pad(defNo).padStart(4, "0")}`, title, description: title + ".",
+      category: "Workmanship", locationId, room, trade, contractorId, priority, dueDate: due === undefined ? undefined : date(due), status,
+      raisedBy: "u_sup", raisedAt: day(-raisedDaysAgo, 10), photos: [], evidencePhotos: [], ...extra,
+    });
+  };
+  def("p_riv", "Paint overspray on window frame", "l_rb1", "Unit 102", "Painting", undefined, "low", undefined, "open", 3, { ref: "DEF-0099" });
+  def("p_riv", "GPO not level", "l_rb2", "Unit 203", "Electrical", "c_el", "low", 8, "assigned", 6, { ref: "DEF-0104" });
+  def("p_riv", "Missing fire collar at riser", "l_rb2", "Riser 1", "Plumbing", "c_pl", "high", 5, "assigned", 4, { ref: "DEF-0110" });
+  def("p_riv", "Exposed reo at slab edge", "l_rb3", "East edge", "Concrete", "c_co", "medium", 2, "rectifying", 9, { ref: "DEF-0115" });
+  def("p_riv", "Skirting gap over 3mm", "l_rb2", "Unit 205", "Carpentry", "c_ca", "low", 9, "assigned", 2, { ref: "DEF-0118" });
+  def("p_riv", "Cracked tile at lift lobby", "l_rb2", "Lift lobby", "Tiling", undefined, "medium", undefined, "open", 1, { ref: "DEF-0120" });
+  def("p_riv", "Puddle flange not lapped at floor waste", "l_rb3", "Unit 302", "Waterproofing", "c_wp", "high", -1, "assigned", 7, { ref: "DEF-0125" });
+  def("p_riv", "Bond breaker missing at wall junction", "l_rb3", "Unit 306", "Waterproofing", "c_wp", "high", -4, "rectifying", 10, { ref: "DEF-0128" });
+  def("p_riv", "Upturn height below spec", "l_rb3", "Unit 301", "Waterproofing", "c_wp", "medium", 6, "assigned", 2, { ref: "DEF-0131" });
+  def("p_riv", "Penetration not sealed, riser 2", "l_rb3c", "Riser 2", "Plumbing", "c_pl", "high", 3, "ready_for_verification", 5, { ref: "DEF-0139", rectificationNote: "Sealed with fire-rated sealant, collar fitted.", evidencePhotos: ["", ""] });
+  def("p_riv", "Membrane lap short at shower hob", "l_rb3", "Unit 304 · Ensuite", "Waterproofing", "c_wp", "high", -2, "assigned", 6, { ref: "DEF-0142" });
+  def("p_riv", "Chipped bench edge", "l_rb1", "Unit 104", "Joinery", "c_ca", "low", -10, "closed", 20, { ref: "DEF-0091", rectificationNote: "Edge replaced.", evidencePhotos: [""], verifiedBy: "u_sup" });
+  defNo = 200;
+  [["Ceiling tile damaged, meeting room 3", -3, "assigned"], ["Door closer not adjusted", 2, "assigned"], ["Fire stopping incomplete at L12 riser", -1, "rectifying"],
+    ["Carpet seam visible at reception", 4, "assigned"], ["Downlight not aligned to grid", 6, "open"], ["Glazing film bubbled", 3, "ready_for_verification"],
+    ["Joinery handle missing, kitchenette", 7, "assigned"], ["Paint touch-up at column C4", 5, "assigned"], ["Signage misaligned at lift", 10, "open"],
+  ].forEach(([t, due, s], i) => def("p_har", t, i % 2 ? "l_h1" : "l_h2", "", "Fit-out", s === "open" ? undefined : "c_ca", "medium", due, s, 5,
+    s === "ready_for_verification" ? { evidencePhotos: [""], rectificationNote: "Film replaced." } : {}));
+  def("p_nor", "Holding-down bolt projection short", "l_n1", "Grid C3", "Steel", "c_st", "high", -2, "assigned");
+  def("p_nor", "Slab joint sawcut late", "l_n1", "Grid E", "Concrete", "c_co", "medium", 5, "assigned");
+  def("p_nor", "Stormwater pit lid missing", "l_n1", "Hardstand", "Civil", undefined, "high", undefined, "open");
+  def("p_nor", "Bracing cleat misaligned", "l_n1", "Grid B2", "Steel", "c_st", "medium", 9, "assigned");
+  def("p_elm", "Set-out peg disturbed", "l_e1", "Lot 3", "Survey", undefined, "medium", undefined, "open");
+  def("p_elm", "Termite collar missing", "l_e1", "Lot 2", "Plumbing", "c_pl", "high", 4, "assigned");
+  def("p_elm", "Vapour barrier torn", "l_e1", "Lot 5", "Concrete", "c_co", "medium", 3, "assigned");
+
+  const itps = [
+    { id: "itp_r07", projectId: "p_riv", ref: "ITP-07", title: "L4 slab — concrete", templateVersion: 3, taskId: "t_r3", points: [
+      { id: "ip1", name: "Reinforcement", check: "Bar size, spacing and cover checked against S-201 rev C", type: "hold", status: "submitted", evidence: 4 },
+      { id: "ip2", name: "Formwork", check: "Dimensions and stability", type: "inspection", status: "released", evidence: 1, releasedBy: "u_sup", releasedAt: day(-1, 15) },
+      { id: "ip3", name: "Pre-pour services & embeds", check: "Services, sleeves and embeds confirmed", type: "hold", status: "released", evidence: 1, releasedBy: "u_pm", releasedAt: day(-1, 16) },
+      { id: "ip4", name: "Structural engineer", check: "Engineer site inspection", type: "witness", status: "pending", evidence: 0 },
+      { id: "ip5", name: "Concrete delivery", check: "Record batch dockets and slump tests", type: "test", status: "pending", evidence: 0 },
+      { id: "ip6", name: "Finish & curing", check: "Finish tolerance and curing regime", type: "inspection", status: "pending", evidence: 0 },
+    ] },
+    { id: "itp_r06", projectId: "p_riv", ref: "ITP-06", title: "L3 slab — concrete", templateVersion: 3, taskId: "t_r1", points: [
+      { id: "ip1", name: "Reinforcement", check: "Bar size, spacing and cover", type: "hold", status: "released", evidence: 1, releasedBy: "u_pm", releasedAt: minsAgo(18) },
+    ] },
+    { id: "itc_r14", projectId: "p_riv", ref: "ITC-14", title: "L3 waterproofing flood test · Units 301–306", templateVersion: 1, points: [
+      { id: "ip1", name: "Flood test 24h", check: "No drop in water level after 24 hours", type: "test", status: "submitted", evidence: 2 },
+    ] },
+    { id: "itp_h03", projectId: "p_har", ref: "ITP-03", title: "L12 fire stopping", templateVersion: 2, points: [
+      { id: "ip1", name: "Penetrations sealed", check: "All penetrations sealed with approved system", type: "hold", status: "rejected", evidence: 1 },
+    ] },
+  ];
+
+  const swms = [
+    { id: "swms_r03", projectId: "p_riv", ref: "SWMS-03", title: "Concrete placement", activity: "Concrete pumping and placement", contractorId: "c_co", version: 3, status: "approved", highRiskCategories: ["Work near mobile plant", "Fall > 2m"], acknowledgedBy: ["w_co2", "w_co3", "w_co4", "w_co5", "w_co6"] },
+    { id: "swms_r04", projectId: "p_riv", ref: "SWMS-04", title: "Wet area waterproofing", activity: "Membrane application", contractorId: "c_wp", version: 1, status: "approved", highRiskCategories: ["Hazardous chemicals"], acknowledgedBy: ["w_wp1", "w_wp2", "w_wp3", "w_wp4", "w_wp5"] },
+    { id: "swms_r05", projectId: "p_riv", ref: "SWMS-05", title: "Scaffold alteration", activity: "Scaffold modification", contractorId: "c_sc", version: 2, status: "in_review", highRiskCategories: ["Fall > 2m"], acknowledgedBy: [] },
+    { id: "swms_n02", projectId: "p_nor", ref: "SWMS-02", title: "Formwork", activity: "Formwork erection", contractorId: "c_fo", version: 2, status: "submitted", highRiskCategories: ["Fall > 2m"], acknowledgedBy: [] },
+    { id: "swms_n03", projectId: "p_nor", ref: "SWMS-03", title: "Steel erection", activity: "Portal frame erection", contractorId: "c_st", version: 1, status: "submitted", highRiskCategories: ["Fall > 2m", "Work near mobile plant"], acknowledgedBy: [] },
+  ];
+
+  const doc = (projectId, number, title, category, revision, status, up) => ({ id: `doc_${projectId}_${number}_${revision}`, projectId, number, title, category, revision, status, uploadedBy: "u_pm", uploadedAt: day(up, 11) });
+  const documents = [
+    doc("p_riv", "A-101", "General arrangement — L1", "Architectural", "3", "current", -60),
+    doc("p_riv", "A-102", "General arrangement — L2–L4", "Architectural", "3", "current", -60),
+    doc("p_riv", "A-102", "General arrangement — L2–L4", "Architectural", "4", "in_review", -1),
+    doc("p_riv", "S-201", "Slab reinforcement — L4", "Structural", "C", "current", -30),
+    doc("p_riv", "S-201", "Slab reinforcement — L4", "Structural", "D", "in_review", 0),
+    doc("p_riv", "H-301", "Hydraulic layout — L3", "Services", "2", "current", -45),
+    doc("p_riv", "SPEC-07", "Waterproofing specification", "Specification", "1", "current", -200),
+    doc("p_riv", "SMP-01", "Site safety management plan", "Safety", "2", "current", -120),
+    doc("p_nor", "A-102", "Floor plan", "Architectural", "4", "current", 0),
+    doc("p_har", "A-501", "Reflected ceiling plan — L12", "Architectural", "5", "current", -14),
+  ];
+
+  // budgets: lines sum to each project's forecast final cost
+  const budgetLines = [];
+  const cats = [["01-PRE", "Preliminaries", 0.11], ["02-CON", "Concrete", 0.19], ["03-STL", "Reinforcement & steel", 0.12], ["04-FRM", "Formwork", 0.08],
+    ["05-HYD", "Plumbing & hydraulics", 0.1], ["06-ELE", "Electrical", 0.1], ["07-WPF", "Waterproofing", 0.04], ["08-FIN", "Finishes", 0.16], ["09-LAB", "Own labour", 0.1]];
+  for (const [pid, ffc, cr, ar] of [["p_riv", 16.95, 0.78, 0.58], ["p_har", 4.31, 0.96, 0.82], ["p_nor", 8.86, 0.55, 0.3], ["p_elm", 5.52, 0.4, 0.1]]) {
+    for (const [code, description, w] of cats) {
+      const ff = Math.round($m(ffc) * w);
+      budgetLines.push({ id: `bl_${pid}_${code}`, projectId: pid, costCode: code, description, originalBudget: Math.round(ff * (pid === "p_har" ? 0.97 : 1.004)), committed: Math.round(ff * cr), actual: Math.round(ff * ar), forecastFinal: ff });
+    }
+  }
+
+  const vari = (projectId, ref, title, amount, status, raised) => {
+    const ok = status === "approved" || status === "included_in_claim";
+    return { id: `v_${projectId}_${ref}`, orgId: o, projectId, ref, title, reason: "Client instruction", amount, approvedAmount: ok ? amount : undefined, timeImpactDays: 0, status, raisedAt: day(raised), approvedBy: ok ? "u_dir" : undefined, approvedAt: ok ? day(raised + 5) : undefined };
+  };
+  const variations = [
+    vari("p_riv", "VAR-009", "Additional balcony waterproofing", $d(120000), "approved", -60),
+    vari("p_riv", "VAR-010", "Client-requested kitchen upgrade, L3", $d(186500), "approved", -40),
+    vari("p_riv", "VAR-011", "Façade louvre change", $d(93500), "included_in_claim", -30),
+    vari("p_riv", "VAR-012", "Extra steel — L4 transfer beam", $d(48200), "under_review", -3),
+    vari("p_riv", "VAR-013", "Rock excavation, lift pit", $d(162000), "submitted", -1),
+    vari("p_har", "VAR-004", "Additional data points", $d(100000), "approved", -50),
+    vari("p_har", "VAR-005", "Reception joinery redesign", $d(214000), "submitted", -6),
+    vari("p_nor", "VAR-002", "Hardstand extension", $d(100000), "approved", -20),
+    vari("p_nor", "VAR-003", "Additional roller door", $d(215800), "under_review", -4),
+  ];
+
+  const claims = [
+    { id: "pc_r09", projectId: "p_riv", ref: "PC-09", periodEnd: date(-26), dueDate: date(-12), claimed: $d(1240000), certified: $d(1190000), paid: $d(1190000), status: "paid" },
+    { id: "pc_r10", projectId: "p_riv", ref: "PC-10", periodEnd: date(4), dueDate: date(4), claimed: $d(960000), status: "draft" },
+    { id: "pc_h09", projectId: "p_har", ref: "PC-09", periodEnd: date(-5), dueDate: date(2), claimed: $d(512000), status: "submitted" },
+    { id: "pc_h08", projectId: "p_har", ref: "PC-08", periodEnd: date(-35), dueDate: date(-9), claimed: $d(410000), certified: $d(310000), paid: 0, status: "certified" },
+    { id: "pc_n04", projectId: "p_nor", ref: "PC-04", periodEnd: date(-4), dueDate: date(10), claimed: $d(598000), certified: $d(598000), status: "certified" },
+    { id: "pc_e02", projectId: "p_elm", ref: "PC-02", periodEnd: date(-3), dueDate: date(11), claimed: $d(100000), status: "submitted" },
+  ];
+
+  const diary = [
+    { id: "di_r1", projectId: "p_riv", date: date(-1), weather: "Fine, 24°C", workersOnSite: 37, companiesOnSite: 6, authorId: "u_sup", submitted: true, notes: "L4 reo 80% placed. Waterproofer on L3 units 301–306. Pump delivery confirmed for Thursday.", delays: "Crane down 40 min for wind." },
+    { id: "di_e1", projectId: "p_elm", date: date(-1), weather: "Showers, 19°C", workersOnSite: 11, companiesOnSite: 3, authorId: "u_sup", submitted: true, notes: "Set-out complete for lots 1–6." },
+  ];
+
+  const audit = [
+    { id: "ae1", projectId: "p_riv", recordType: "itp_point", recordId: "itp_r06", action: "Hold point released", detail: "ITP-06 L3 slab", actorId: "u_pm", at: minsAgo(18) },
+    { id: "ae2", projectId: "p_har", recordType: "itp_point", recordId: "itp_h03", action: "Inspection failed", detail: "Fire stopping L12", actorId: "u_qm", at: minsAgo(62) },
+    { id: "ae3", projectId: "p_nor", recordType: "document", recordId: "doc_p_nor_A-102_4", action: "A-102 rev 4 issued for construction", actorId: "u_pm", at: minsAgo(130) },
+    { id: "ae4", projectId: "p_elm", recordType: "diary", recordId: "di_e1", action: "Site diary submitted", actorId: "u_sup", at: day(-1, 16, 40) },
+    { id: "ae5", projectId: "p_riv", recordType: "defect", recordId: "d_100", action: "Evidence added", detail: "DEF-0139 · 2 photos", actorId: "u_sub", at: day(-1, 11, 47) },
+  ];
+
+  return { version: 1, createdAt: now.toISOString(), org, users, projects, locations, contractors, workers, credentials, tasks, defects, itps, swms, documents, attendance, budgetLines, variations, claims, diary, audit, seq: { defect: 216, audit: 100, attendance: 1000 } };
+}
+
+// --------------------------------------------------------- persistence
+const DB_KEY = "buildos_db_v1", USER_KEY = "buildos_user";
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* storage unavailable */ } },
+};
+let DB = (() => { try { const s = store.get(DB_KEY); if (s) return JSON.parse(s); } catch { /* corrupt — reseed */ } return createSeed(); })();
+function save() {
+  if (!store.set(DB_KEY, JSON.stringify(DB))) toast("Couldn't save on this device — storage is full or blocked. Changes last until you reload.", "error");
+}
+function resetData() { DB = createSeed(); save(); }
+const nextSeq = (k) => (DB.seq[k] = (DB.seq[k] || 0) + 1);
+
+// ------------------------------------------------------- permissions
+// Role-based rules (blueprint §9). In this prototype they run in the
+// browser; in production the same rules must run on the backend.
+const GRANTS = {
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit"],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit"],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "swms.review", "diary.submit"],
+  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold"],
+  subcontractor_admin: ["defect.rectify", "variation.create"],
+  worker: ["defect.create"],
+};
+const VARIATION_LIMIT = { project_manager: 5000000, director: Infinity };
+const ROLE_LABEL = { director: "Director", project_manager: "Project manager", site_supervisor: "Site supervisor", quality_manager: "Quality manager", subcontractor_admin: "Subcontractor admin", worker: "Worker" };
+class RuleError extends Error {}
+const can = (u, p) => GRANTS[u.role].includes(p);
+const assertCan = (u, p) => { if (!can(u, p)) throw new RuleError(`${ROLE_LABEL[u.role]}s can't do that (${p.replace(".", " → ")}).`); };
+
+// ---------------------------------------------------------- workflows
+const DEFECT_STEPS = [["open", "Open"], ["assigned", "Assigned"], ["rectifying", "Rectifying"], ["ready_for_verification", "Verify"], ["closed", "Closed"]];
+
+function transitionDefect(d, a, u) {
+  const from = d.status;
+  const bad = () => new RuleError(`Can't ${words(a.type)} a defect that is ${words(from)}.`);
+  const ownerOrSite = () => {
+    const owner = u.role === "subcontractor_admin" && u.contractorId === d.contractorId;
+    if (!owner && u.role !== "site_supervisor" && u.role !== "project_manager") throw new RuleError("Only the assigned contractor or the site team can record rectification.");
+  };
+  switch (a.type) {
+    case "submit": assertCan(u, "defect.create"); if (from !== "draft") throw bad();
+      if (!d.locationId) throw new RuleError("Choose a location before submitting.");
+      return { status: "open" };
+    case "assign": assertCan(u, "defect.assign"); if (from !== "open" && from !== "assigned") throw bad();
+      if (!a.contractorId) throw new RuleError("Choose a responsible contractor.");
+      if (!a.dueDate) throw new RuleError("A due date is needed before this can be assigned.");
+      return { status: "assigned", contractorId: a.contractorId, dueDate: a.dueDate };
+    case "start_rectification": if (from !== "assigned") throw bad(); ownerOrSite(); return { status: "rectifying" };
+    case "submit_for_verification": if (from !== "rectifying" && from !== "assigned") throw bad(); ownerOrSite();
+      if (!a.note.trim()) throw new RuleError("Describe the rectification before submitting.");
+      if (!a.evidencePhotos.length) throw new RuleError("Add at least one completion photo as evidence.");
+      return { status: "ready_for_verification", rectificationNote: a.note.trim(), evidencePhotos: [...d.evidencePhotos, ...a.evidencePhotos] };
+    case "verify": assertCan(u, "defect.verify"); if (from !== "ready_for_verification") throw bad();
+      // Closing needs evidence and an authorised reviewer, not just a status change.
+      if (!d.evidencePhotos.length || !d.rectificationNote) throw new RuleError("Completion evidence is missing — can't close.");
+      return { status: "closed", verifiedBy: u.id };
+    case "reject": assertCan(u, "defect.verify"); if (from !== "ready_for_verification") throw bad();
+      if (!a.reason.trim()) throw new RuleError("Give a reason so the contractor knows what to fix.");
+      return { status: "rectifying" };
+  }
+  throw new RuleError("Unknown action.");
+}
+const isOverdue = (d, today = new Date()) => !!d.dueDate && d.status !== "closed" && d.status !== "draft" && D(d.dueDate) < startOfDay(today);
+
+const VAR_FROM = { approve: ["submitted", "under_review"], reject: ["submitted", "under_review"], include_in_claim: ["approved"] };
+function transitionVariation(v, a, u) {
+  if (!VAR_FROM[a.type]?.includes(v.status)) throw new RuleError(`Can't ${words(a.type)} a variation that is ${words(v.status)}.`);
+  assertCan(u, "variation.approve");
+  if (a.type === "approve") {
+    const limit = VARIATION_LIMIT[u.role] ?? 0;
+    if (v.amount > limit) throw new RuleError(`This exceeds your delegated limit of ${moneyLimit(limit)}. A director must approve it.`);
+    return { status: "approved", approvedAmount: v.amount, approvedBy: u.id, approvedAt: new Date().toISOString() };
+  }
+  if (a.type === "reject") { if (!a.reason.trim()) throw new RuleError("A reason is required to reject a variation."); return { status: "rejected" }; }
+  return { status: "included_in_claim" };
+}
+
+function commercialPosition(p, vars, lines) {
+  const approvedVariations = sum(vars.filter((v) => v.status === "approved" || v.status === "included_in_claim"), (v) => v.approvedAmount ?? v.amount);
+  const variationExposure = sum(vars.filter((v) => ["draft", "submitted", "under_review"].includes(v.status)), (v) => v.amount);
+  const revisedContract = p.contractSum + approvedVariations;
+  const forecastFinalCost = sum(lines, (l) => l.forecastFinal);
+  const forecastMargin = revisedContract - forecastFinalCost;
+  return {
+    originalContract: p.contractSum, approvedVariations, variationExposure, revisedContract,
+    budget: sum(lines, (l) => l.originalBudget), committed: sum(lines, (l) => l.committed), actual: sum(lines, (l) => l.actual),
+    forecastFinalCost, forecastMargin, forecastMarginPct: revisedContract ? (forecastMargin / revisedContract) * 100 : 0,
+  };
+}
+
+function credentialReq(type, c, today, mandatory) {
+  if (!c) return { label: type, detail: "Not uploaded", severity: mandatory ? "blocking" : "warning" };
+  if (c.expires && D(c.expires) < startOfDay(today)) return { label: type, detail: `Expired ${dayMonth(c.expires)}`, severity: "blocking" };
+  if (c.status !== "verified") return { label: type, detail: "Awaiting verification", severity: mandatory ? "blocking" : "warning" };
+  const days = c.expires ? daysBetween(today, D(c.expires)) : Infinity;
+  if (days <= 30) return { label: type, detail: `Expires ${dayMonth(c.expires)}`, severity: "warning" };
+  return { label: type, detail: "Verified", severity: "ok" };
+}
+/** Exact requirements for a worker to sign in — never a generic "not compliant". */
+function siteRequirements(w, projectId, today = new Date()) {
+  const mine = DB.credentials.filter((c) => c.workerId === w.id);
+  const reqs = [credentialReq("White Card", mine.find((c) => c.type === "White Card"), today, true)];
+  const inducted = w.inductedProjectIds.includes(projectId);
+  reqs.push({ label: "Site induction", detail: inducted ? "Complete" : "Not yet inducted to this site", severity: inducted ? "ok" : "blocking" });
+  for (const c of mine.filter((c) => c.type !== "White Card")) reqs.push(credentialReq(c.type, c, today, false));
+  for (const s of DB.swms.filter((s) => s.projectId === projectId && s.contractorId === w.contractorId && s.status === "approved")) {
+    const ack = s.acknowledgedBy.includes(w.id);
+    reqs.push({ label: `SWMS · ${s.title} v${s.version}`, detail: ack ? "Acknowledged" : "Needs signing", severity: ack ? "ok" : "blocking" });
+  }
+  return reqs;
+}
+const canSignIn = (reqs) => reqs.every((r) => r.severity !== "blocking");
+
+// ------------------------------------------------------------- queries
+// Scoped by organisation; subcontractors only see their own company's records.
+const userById = (id) => DB.users.find((u) => u.id === id);
+const listProjects = (u) => DB.projects.filter((p) => p.orgId === u.orgId);
+const getProject = (u, id) => DB.projects.find((p) => p.id === id && p.orgId === u.orgId) || null;
+const contractorOf = (id) => (id ? DB.contractors.find((c) => c.id === id) : undefined);
+const locationOf = (id) => DB.locations.find((l) => l.id === id);
+const projName = (id) => DB.projects.find((p) => p.id === id)?.name ?? "";
+const listDefects = (u, pid) => DB.defects.filter((d) => d.orgId === u.orgId && (!pid || d.projectId === pid) && (u.role !== "subcontractor_admin" || d.contractorId === u.contractorId));
+const getDefect = (u, id) => listDefects(u).find((d) => d.id === id) || null;
+const openDefects = (u, pid) => listDefects(u, pid).filter((d) => d.status !== "closed" && d.status !== "draft");
+const overdueDefects = (u, pid) => listDefects(u, pid).filter((d) => isOverdue(d));
+const listVariations = (u, pid) => (can(u, "commercial.view") ? DB.variations.filter((v) => v.orgId === u.orgId && (!pid || v.projectId === pid)) : []);
+function projectCommercial(u, pid) {
+  const p = getProject(u, pid);
+  if (!p || !can(u, "commercial.view")) return null;
+  return commercialPosition(p, DB.variations.filter((v) => v.projectId === pid), DB.budgetLines.filter((l) => l.projectId === pid));
+}
+function onSiteNow(pid) {
+  const latest = new Map(), today = todayYmd();
+  for (const e of DB.attendance) {
+    if ((pid && e.projectId !== pid) || ymd(new Date(e.at)) !== today) continue;
+    const k = `${e.projectId}:${e.workerId}`, prev = latest.get(k);
+    if (!prev || prev.at <= e.at) latest.set(k, e);
+  }
+  return [...latest.values()].filter((e) => e.kind === "check_in");
+}
+const companiesOnSite = (pid) => new Set(onSiteNow(pid).map((e) => DB.workers.find((w) => w.id === e.workerId)?.contractorId ?? e.workerId)).size;
+function awaitingSignOff(pid) {
+  const itps = DB.itps.filter((i) => !pid || i.projectId === pid);
+  const points = itps.flatMap((i) => i.points.filter((p) => p.status === "submitted").map((p) => ({ itp: i, point: p })));
+  const defects = DB.defects.filter((d) => (!pid || d.projectId === pid) && d.status === "ready_for_verification");
+  const holdsBlocking = itps.flatMap((i) => i.points.filter((p) => p.type === "hold" && (p.status === "submitted" || p.status === "rejected")));
+  return { points, defects, holdsBlocking, total: points.length + defects.length };
+}
+function workerRequirements(wid, pid) {
+  const w = DB.workers.find((x) => x.id === wid);
+  if (!w) return null;
+  const reqs = siteRequirements(w, pid);
+  return { worker: w, reqs, eligible: canSignIn(reqs) };
+}
+function locationLabel(d) {
+  const l = locationOf(d.locationId);
+  return l ? `${l.building} · ${l.level} · ${d.room || l.zone}` : "—";
+}
+const auditFor = (id) => DB.audit.filter((a) => a.recordId === id);
+
+/** Readiness for a milestone (blueprint §11). Shows facts; never authorises. */
+function readiness(pid, taskId) {
+  const t = DB.tasks.find((x) => x.id === taskId && x.projectId === pid);
+  if (!t) return null;
+  const base = `#/app/projects/${pid}`, items = [];
+  const pred = DB.tasks.filter((x) => t.predecessorIds.includes(x.id));
+  const predOk = pred.every((x) => x.progress >= 80);
+  items.push({ label: "Programme task & pump booking", state: predOk ? "ready" : "action", detail: predOk ? "Ready" : "Predecessor behind", href: `${base}/programme` });
+  const itp = DB.itps.find((i) => i.id === t.itpId);
+  for (const p of itp?.points.filter((p) => p.type === "hold" || p.type === "witness") ?? []) {
+    const rel = p.status === "released";
+    items.push({ label: `${itp.ref} ${p.name.toLowerCase()} ${p.type === "hold" ? "hold point" : "witness point"}`, state: rel ? "ready" : p.type === "hold" ? "blocking" : "action", detail: rel ? "Released" : p.type === "hold" ? "Blocking" : "Not booked", href: `${base}/quality/itp/${itp.id}` });
+  }
+  const locs = DB.locations.filter((l) => l.projectId === pid && t.name.startsWith(l.level));
+  const open = DB.defects.filter((d) => locs.some((l) => l.id === d.locationId) && d.status !== "closed" && d.status !== "draft");
+  items.push({ label: `Open defects on ${locs[0]?.level ?? "area"}`, state: open.length ? "action" : "ready", detail: open.length ? `${open.length} open` : "None", href: `${base}/quality` });
+  if (t.contractorId) {
+    const crew = DB.workers.filter((w) => w.contractorId === t.contractorId), missing = crew.filter((w) => !w.inductedProjectIds.includes(pid));
+    items.push({ label: `${contractorOf(t.contractorId)?.trade ?? "Crew"} crew credentials`, state: missing.length ? "action" : "ready", detail: missing.length ? `${missing.length} of ${crew.length} missing induction` : "All inducted", href: `${base}/workforce` });
+  }
+  const s = DB.swms.find((x) => x.id === t.swmsId);
+  if (s) items.push({ label: `SWMS · ${s.title} v${s.version}`, state: s.status === "approved" ? "ready" : "blocking", detail: s.status === "approved" ? "Approved" : "Blocking", href: `${base}/safety` });
+  return { task: t, items };
+}
+
+function search(u, q) {
+  const n = q.trim().toLowerCase();
+  if (!n) return [];
+  const hit = (...xs) => xs.some((x) => x?.toLowerCase().includes(n));
+  const out = [];
+  for (const p of listProjects(u)) if (hit(p.name, p.code, p.address)) out.push(["Project", p.name, p.code, `#/app/projects/${p.id}`]);
+  for (const d of listDefects(u)) if (hit(d.ref, d.title, d.trade)) out.push(["Defect", `${d.ref} · ${d.title}`, projName(d.projectId), `#/app/projects/${d.projectId}/quality/defects/${d.id}`]);
+  for (const d of DB.documents) if (hit(d.number, d.title)) out.push(["Document", `${d.number} rev ${d.revision} · ${d.title}`, projName(d.projectId), `#/app/projects/${d.projectId}/documents`]);
+  for (const w of DB.workers) if (hit(w.name)) out.push(["Worker", w.name, contractorOf(w.contractorId)?.tradingName ?? "", `#/app/people`]);
+  for (const v of listVariations(u)) if (hit(v.ref, v.title)) out.push(["Variation", `${v.ref} · ${v.title}`, projName(v.projectId), `#/app/projects/${v.projectId}/commercial`]);
+  return out.slice(0, 40);
+}
+
+// --------------------------------------------- derived views (one source)
+function myTasks(u) {
+  const out = [];
+  if (can(u, "variation.approve")) for (const v of listVariations(u).filter((v) => v.status === "submitted" || v.status === "under_review"))
+    out.push({ title: `Approve ${v.ref} · ${v.title}`, sub: `${projName(v.projectId)} · ${money(v.amount)}`, href: `#/app/projects/${v.projectId}/commercial`, tone: "red" });
+  if (can(u, "itp.release_hold")) for (const i of DB.itps) for (const p of i.points.filter((p) => p.status === "submitted"))
+    out.push({ title: `${p.type === "hold" ? "Release hold point" : "Review"} · ${i.ref} ${p.name}`, sub: `${projName(i.projectId)} · ${p.evidence} photos attached`, href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: p.type === "hold" ? "red" : "blue" });
+  if (can(u, "defect.verify")) for (const d of listDefects(u).filter((d) => d.status === "ready_for_verification"))
+    out.push({ title: `Verify ${d.ref} · ${d.title}`, sub: `${projName(d.projectId)} · ${contractorOf(d.contractorId)?.tradingName ?? ""}`, href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "blue" });
+  if (can(u, "swms.review")) for (const s of DB.swms.filter((s) => s.status === "submitted" || s.status === "in_review"))
+    out.push({ title: `Review SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · ${contractorOf(s.contractorId)?.tradingName}`, href: `#/app/projects/${s.projectId}/safety`, tone: "blue" });
+  if (can(u, "commercial.view")) for (const c of DB.claims.filter((c) => c.status === "submitted"))
+    out.push({ title: `Assess progress claim ${c.ref}`, sub: `${projName(c.projectId)} · response due ${dayMonth(c.dueDate)}`, href: `#/app/projects/${c.projectId}/commercial`, tone: "amber" });
+  if (u.role === "subcontractor_admin") for (const d of listDefects(u).filter((d) => d.status === "assigned" || d.status === "rectifying"))
+    out.push({ title: `Rectify ${d.ref} · ${d.title}`, sub: projName(d.projectId), href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "amber" });
+  if (u.role === "worker") {
+    const r = workerRequirements(u.workerId, "p_riv");
+    for (const x of r.reqs.filter((x) => x.severity !== "ok")) out.push({ title: `${x.label} — ${x.detail}`, sub: "Riverside Apartments", href: "#/site/sign-in", tone: x.severity === "blocking" ? "red" : "amber" });
+  }
+  const rank = { red: 0, amber: 1, blue: 2 };
+  return out.sort((a, b) => rank[a.tone] - rank[b.tone]);
+}
+function complianceExpiring(within = 30) {
+  const out = [], today = new Date();
+  for (const c of DB.contractors) for (const ins of c.insurances) {
+    const days = daysBetween(today, D(ins.expires));
+    if (days <= within) out.push({ who: c.tradingName, what: ins.type, sub: "Certificate of currency", days });
+  }
+  for (const cr of DB.credentials) {
+    if (!cr.expires) continue;
+    const days = daysBetween(today, D(cr.expires));
+    if (days <= within) out.push({ who: DB.workers.find((w) => w.id === cr.workerId)?.name ?? "Worker", what: cr.type, sub: "High-risk work licence", days });
+  }
+  return out.sort((a, b) => a.days - b.days);
+}
+function notifications(u) {
+  const out = [], od = overdueDefects(u);
+  if (od.length) out.push({ title: `${od.length} defects overdue`, sub: "Across active projects", href: "#/app/reports?view=overdue", tone: "amber" });
+  for (const c of complianceExpiring(14)) out.push({ title: `${c.who} — ${c.what}`, sub: c.days < 0 ? "Expired" : `Expires in ${c.days} days`, href: "#/app/people", tone: c.days < 0 ? "red" : "amber" });
+  for (const i of DB.itps) for (const p of i.points.filter((p) => p.status === "rejected")) out.push({ title: `Inspection rejected · ${i.ref} ${p.name}`, sub: projName(i.projectId), href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: "red" });
+  for (const p of DB.projects) { const d = daysBetween(new Date(), D(p.nextMilestone.date)); if (d >= 0 && d <= 7) out.push({ title: `${p.nextMilestone.name} in ${d} days`, sub: p.name, href: `#/app/projects/${p.id}/programme`, tone: "blue" }); }
+  return out;
+}
+
+// ----------------------------------------------------------- mutations
+function audit(e, u) { DB.audit.unshift({ ...e, id: `ae_${nextSeq("audit")}`, actorId: u.id, at: new Date().toISOString() }); }
+
+function createDefect(u, inp) {
+  assertCan(u, "defect.create");
+  if (!getProject(u, inp.projectId)) throw new RuleError("Project not found.");
+  if (!inp.title.trim()) throw new RuleError("Say what's wrong.");
+  if (!inp.locationId && !inp.draft) throw new RuleError("Choose a location.");
+  const n = nextSeq("defect");
+  const assign = !inp.draft && !!(inp.contractorId && inp.dueDate && can(u, "defect.assign"));
+  const d = {
+    id: `d_${n}`, orgId: u.orgId, projectId: inp.projectId, ref: `DEF-${String(n).padStart(4, "0")}`, title: inp.title.trim(), description: inp.title.trim(),
+    category: "Workmanship", locationId: inp.locationId, room: inp.room || undefined, trade: inp.trade || "General",
+    contractorId: assign ? inp.contractorId : undefined, priority: inp.priority || "medium", dueDate: inp.dueDate || undefined,
+    status: inp.draft ? "draft" : assign ? "assigned" : "open", raisedBy: u.id, raisedAt: new Date().toISOString(), photos: inp.photos, evidencePhotos: [],
+  };
+  DB.defects.unshift(d);
+  audit({ projectId: d.projectId, recordType: "defect", recordId: d.id, action: inp.draft ? "Draft saved" : "Defect raised", detail: `${d.ref} · ${d.title}`, to: d.status }, u);
+  if (assign) audit({ projectId: d.projectId, recordType: "defect", recordId: d.id, action: "Assigned", detail: contractorOf(d.contractorId)?.tradingName }, u);
+  return inp.draft ? `${d.ref} saved as a draft.` : `${d.ref} raised${assign ? " and assigned" : ""}.`;
+}
+const DEFECT_LABEL = { submit: "Submitted", assign: "Assigned", start_rectification: "Rectification started", submit_for_verification: "Submitted for verification", verify: "Verified and closed", reject: "Repair rejected" };
+function actOnDefect(u, id, a) {
+  const d = getDefect(u, id);
+  if (!d) throw new RuleError("Defect not found.");
+  const from = d.status;
+  Object.assign(d, transitionDefect(d, a, u));
+  const detail = a.type === "reject" ? a.reason : a.type === "submit_for_verification" ? `${a.evidencePhotos.length} photos` : a.type === "assign" ? contractorOf(a.contractorId)?.tradingName : undefined;
+  audit({ projectId: d.projectId, recordType: "defect", recordId: d.id, action: DEFECT_LABEL[a.type], from, to: d.status, detail }, u);
+  return `${d.ref}: ${DEFECT_LABEL[a.type].toLowerCase()}.`;
+}
+function actOnVariation(u, id, a) {
+  const v = listVariations(u).find((x) => x.id === id);
+  if (!v) throw new RuleError("Variation not found.");
+  const from = v.status;
+  Object.assign(v, transitionVariation(v, a, u));
+  audit({ projectId: v.projectId, recordType: "variation", recordId: v.id, action: `Variation ${words(v.status)}`, detail: v.ref, from, to: v.status }, u);
+  return `${v.ref} ${words(v.status)}.`;
+}
+function releaseHoldPoint(u, itpId, pointId, decision, comment) {
+  assertCan(u, "itp.release_hold");
+  const itp = DB.itps.find((i) => i.id === itpId), p = itp?.points.find((x) => x.id === pointId);
+  if (!p) throw new RuleError("Inspection point not found.");
+  if (p.status !== "submitted") throw new RuleError("Only a submitted point can be released or rejected.");
+  if (decision === "release" && !p.evidence) throw new RuleError("No evidence attached — can't release.");
+  if (decision === "reject" && !comment.trim()) throw new RuleError("Give a reason for rejecting.");
+  p.status = decision === "release" ? "released" : "rejected";
+  if (decision === "release") { p.releasedBy = u.id; p.releasedAt = new Date().toISOString(); }
+  // Quality acceptance ≠ physical progress: unblock the task, don't complete it.
+  const t = DB.tasks.find((x) => x.id === itp.taskId);
+  if (t && t.status === "blocked" && !itp.points.some((x) => x.type === "hold" && x.status !== "released")) t.status = "not_started";
+  audit({ projectId: itp.projectId, recordType: "itp_point", recordId: itp.id, action: decision === "release" ? "Hold point released" : "Inspection rejected", detail: `${itp.ref} · ${p.name}${comment ? ` — ${comment}` : ""}` }, u);
+  return `${itp.ref} ${p.name}: ${decision === "release" ? "released" : "rejected"}.`;
+}
+function reviewSwms(u, id, decision, comment) {
+  assertCan(u, "swms.review");
+  const s = DB.swms.find((x) => x.id === id);
+  if (!s || (s.status !== "submitted" && s.status !== "in_review")) throw new RuleError("This SWMS isn't awaiting review.");
+  if (decision === "changes" && !comment.trim()) throw new RuleError("Say what needs to change.");
+  s.status = decision === "approve" ? "approved" : "changes_requested";
+  audit({ projectId: s.projectId, recordType: "swms", recordId: s.id, action: decision === "approve" ? "SWMS approved" : "SWMS changes requested", detail: `${s.title} v${s.version}` }, u);
+  return `${s.ref} ${decision === "approve" ? "approved" : "returned for changes"}.`;
+}
+function acknowledgeSwms(u, id) {
+  if (!u.workerId) throw new RuleError("Only workers acknowledge a SWMS.");
+  const s = DB.swms.find((x) => x.id === id);
+  if (!s || s.status !== "approved") throw new RuleError("This SWMS isn't approved yet.");
+  if (!s.acknowledgedBy.includes(u.workerId)) s.acknowledgedBy.push(u.workerId);
+  audit({ projectId: s.projectId, recordType: "swms", recordId: s.id, action: "SWMS acknowledged", detail: `${s.title} v${s.version}` }, u);
+  return `Acknowledged ${s.title} v${s.version}.`;
+}
+function signInToSite(u, pid) {
+  if (!u.workerId) throw new RuleError("Only workers sign in to site.");
+  const r = workerRequirements(u.workerId, pid);
+  const missing = r.reqs.filter((x) => x.severity === "blocking");
+  if (missing.length) throw new RuleError(`Can't sign in yet: ${missing.map((m) => `${m.label} — ${m.detail.toLowerCase()}`).join("; ")}.`);
+  // A check-in is an attendance fact, not an approved timesheet.
+  DB.attendance.push({ id: `a_${nextSeq("attendance")}`, projectId: pid, workerId: u.workerId, kind: "check_in", at: new Date().toISOString(), method: "qr" });
+  audit({ projectId: pid, recordType: "attendance", recordId: u.workerId, action: "Signed in to site", detail: "QR · Gate 1" }, u);
+  return "You're signed in. Have a safe day.";
+}
+function signOutOfSite(u, pid) {
+  DB.attendance.push({ id: `a_${nextSeq("attendance")}`, projectId: pid, workerId: u.workerId, kind: "check_out", at: new Date().toISOString(), method: "qr" });
+  audit({ projectId: pid, recordType: "attendance", recordId: u.workerId, action: "Signed out of site" }, u);
+  return "Signed out.";
+}
+function submitDiary(u, pid, inp) {
+  assertCan(u, "diary.submit");
+  if (!inp.notes.trim()) throw new RuleError("Add a note about today's work.");
+  // Submitted records are never silently overwritten.
+  if (DB.diary.some((e) => e.projectId === pid && e.date === todayYmd() && e.submitted)) throw new RuleError("Today's diary is already submitted.");
+  const id = `di_${nextSeq("audit")}`;
+  DB.diary.unshift({ id, projectId: pid, date: todayYmd(), weather: inp.weather || "—", notes: inp.notes.trim(), delays: inp.delays.trim() || undefined, workersOnSite: onSiteNow(pid).length, companiesOnSite: companiesOnSite(pid), authorId: u.id, submitted: true });
+  audit({ projectId: pid, recordType: "diary", recordId: id, action: "Site diary submitted" }, u);
+  return "Diary submitted. Attendance was pulled in automatically.";
+}
+
+// ===================================================== UI components
+// One status language shared by every module: icon + word, never colour alone.
+const STATUS = {
+  draft: ["grey", "dashed", "Draft"], open: ["outline", "circle", "Open"], assigned: ["outline", "circle", "Assigned"],
+  not_started: ["grey", "dashed", "Not started"], pending: ["grey", "dashed", "Pending"],
+  rectifying: ["blue", "clock", "Rectifying"], in_progress: ["blue", "clock", "In progress"], in_review: ["blue", "clock", "In review"],
+  under_review: ["blue", "clock", "Under review"], submitted: ["blue", "clock", "Submitted"], ready_for_verification: ["blue", "clock", "In review"],
+  awaiting_verification: ["blue", "clock", "Awaiting verification"], approved: ["green", "check", "Approved"], released: ["green", "check", "Released"],
+  verified: ["green", "check", "Verified"], current: ["green", "check", "Current"], complete: ["green", "check", "Complete"],
+  certified: ["green", "check", "Certified"], paid: ["green", "check", "Paid"], included_in_claim: ["green", "check", "In claim"],
+  closed: ["green", "check", "Closed"], superseded: ["grey", "dashed", "Superseded"], overdue: ["amber", "alert", "Overdue"],
+  expiring: ["amber", "alert", "Expiring"], changes_requested: ["amber", "alert", "Changes requested"], rejected: ["red", "xcircle", "Rejected"],
+  expired: ["red", "xcircle", "Expired"], blocked: ["red-solid", "lock", "Blocked"], hold: ["red-solid", "lock", "Hold point"], offline: ["dashed", "cloudoff", "Offline"],
+};
+const badge = (status, label) => { const [t, i, l] = STATUS[status] || ["grey", "circle", status]; return `<span class="badge badge-${t}">${icon(i, 13, "stroke-width:2.6")}${esc(label ?? l)}</span>`; };
+const sampleTag = () => `<span class="sample-tag" title="Illustrative figures">Sample data</span>`;
+const logo = (light = false, size = 26) => `<span class="row" style="gap:9px;font-weight:700;font-size:17px;color:${light ? "#fff" : "var(--ink)"}"><svg width="${size}" height="${size}" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" fill="${light ? "#27815F" : "#182E27"}"/><rect x="6" y="7" width="10" height="2.6" rx="1.3" fill="#fff"/><rect x="6" y="11.7" width="14" height="2.6" rx="1.3" fill="#fff" opacity=".85"/><rect x="6" y="16.4" width="7" height="2.6" rx="1.3" fill="#fff" opacity=".7"/></svg><span class="brand-text">BuildOS</span></span>`;
+function metric(label, value, note, tone, href) {
+  const n = note ? `<div class="m-note ${tone === "amber" ? "amber-text" : tone === "red" ? "red-text" : ""}">${tone === "amber" ? icon("alert", 12) : tone === "red" ? icon("lock", 12) : ""}${esc(note)}</div>` : "";
+  const body = `<div class="m-label">${esc(label)}</div><div class="m-value">${esc(value)}</div>${n}`;
+  return href ? `<a class="metric" href="${href}">${body}</a>` : `<div class="metric">${body}</div>`;
+}
+const emptyState = (ic, title, body, action = "") => `<div class="empty"><div class="icon">${icon(ic, 20)}</div><h3>${esc(title)}</h3><p class="muted small" style="margin:4px 0 14px;max-width:420px">${esc(body)}</p>${action}</div>`;
+function pageHeader({ crumbs, title, meta, actions }) {
+  return `<div class="page-header"><div style="min-width:0">${crumbs ? `<nav class="crumbs small muted" aria-label="Breadcrumb">${crumbs.map(([h, l], i) => `${i ? " › " : ""}<a href="${h}">${esc(l)}</a>`).join("")}</nav>` : ""}<h1>${title}</h1>${meta ? `<div class="page-meta muted">${meta}</div>` : ""}</div>${actions ? `<div class="row wrap page-actions">${actions}</div>` : ""}</div>`;
+}
+const stepper = (steps, current) => { const idx = steps.findIndex(([s]) => s === current); return `<ol class="stepper" aria-label="Workflow">${steps.map(([s, l], i) => `<li class="row" style="gap:6px">${i ? '<span class="sep">›</span>' : ""}<span class="step" data-state="${i < idx ? "done" : i === idx ? "current" : "todo"}">${l}</span></li>`).join("")}</ol>`; };
+const taskList = (items) => items.length ? `<div class="stack" style="gap:8px">${items.map((t) => `<a href="${t.href}" class="task-item" data-tone="${t.tone}"><div style="font-weight:600;font-size:13.5px">${esc(t.title)}</div><div class="muted small">${esc(t.sub)}</div></a>`).join("")}</div>` : `<p class="muted small">Nothing waiting on you. Nice.</p>`;
+const photoTile = (src, extra = "") => `<div class="photo-ph" style="${src ? `background:center/cover url(${src});` : ""}${extra}"></div>`;
+const crumbsFor = (p) => [["#/app/projects", "Projects"], [`#/app/projects/${p.id}`, p.name]];
+/** A form whose submit is handled by ACTIONS[act]. Errors show inline; success re-renders with a toast. */
+const form = (act, inner, attrs = "") => `<form data-act="${act}" ${attrs} novalidate>${inner}<div class="form-msg"></div></form>`;
+const hidden = (n, v) => `<input type="hidden" name="${n}" value="${esc(v)}">`;
+
+// --------------------------------------------------------------- gantt
+function taskTone(t) {
+  if (t.status === "blocked") return ["var(--red)", "blocked"];
+  if (t.status === "complete") return ["#9fb8ab", "complete"];
+  if (t.forecastFinish > t.baselineFinish) return ["var(--amber)", "at risk"];
+  if (t.status === "in_progress") return ["var(--green)", "in progress"];
+  return [t.forecastStart <= todayYmd() ? "var(--blue)" : "#c9cfc8", "starting"];
+}
+function gantt(tasks, fromOffset = -2, days = 14) {
+  const start = startOfDay(new Date()); start.setDate(start.getDate() + fromOffset);
+  const idx = (s) => Math.round((D(s) - start) / 86400000);
+  const P = (i) => `${(Math.max(0, Math.min(days, i)) / days) * 100}%`;
+  const today = -fromOffset;
+  const cols = Array.from({ length: days }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
+  const head = cols.map((d, i) => `<span data-today="${i === today}" style="visibility:${d.getDay() % 6 ? "visible" : "hidden"}">${days > 20 ? (d.getDay() === 1 ? d.getDate() : "") : `${d.toLocaleDateString("en-AU", { weekday: "narrow" })} ${d.getDate()}`}</span>`).join("");
+  const rows = tasks.map((t) => {
+    const s = idx(t.forecastStart), f = idx(t.forecastFinish) + 1, bs = idx(t.baselineStart), bf = idx(t.baselineFinish) + 1, [c, l] = taskTone(t);
+    const bars = t.isMilestone ? `<span class="g-ms" style="left:calc(${P(s + 0.5)} - 6px);background:${c}"></span>`
+      : `${f > 0 && s < days ? `<span class="g-bar" style="left:${P(s)};width:calc(${P(f)} - ${P(s)});background:${c}"></span>` : ""}${bf > 0 && bs < days ? `<span class="g-base" style="left:${P(bs)};width:calc(${P(bf)} - ${P(bs)})"></span>` : ""}`;
+    return `<div class="g-name" style="font-weight:${t.isMilestone ? 700 : 500}" title="${esc(t.name)}">${esc(t.name)}</div><div class="g-track" aria-label="${esc(t.name)}: ${l}"><span class="g-today" style="left:${P(today + 0.5)}"></span>${bars}</div>`;
+  }).join("");
+  return `<div class="gantt"><div></div><div class="g-head" style="grid-template-columns:repeat(${days},1fr)">${head}</div>${rows}</div>`;
+}
+const ganttKey = () => `<div class="row wrap small muted" style="gap:14px;margin-top:12px"><span class="row" style="gap:5px"><i class="key" style="background:var(--green)"></i>In progress</span><span class="row" style="gap:5px"><i class="key" style="background:var(--amber)"></i>At risk (forecast past baseline)</span><span class="row" style="gap:5px"><i class="key" style="background:var(--blue)"></i>Starting</span><span class="row" style="gap:5px"><i class="key" style="background:var(--red);width:9px;height:9px;transform:rotate(45deg)"></i>Milestone blocked</span><span class="row" style="gap:5px"><i class="key" style="background:#c9cfc8;height:3px"></i>Baseline</span></div>`;
+
+// ===================================================== public website
+const publicNav = () => `<header class="pub-nav"><div class="inner"><a href="#/">${logo()}</a><nav aria-label="Site"><a href="#/" data-scroll="platform">Platform</a><a href="#/" data-scroll="industries">Industries</a><a href="#/" data-scroll="integrations">Integrations</a><a href="#/pricing">Pricing</a><a href="#/security">Security</a></nav><div class="spacer"></div><a href="#/login" style="font-weight:600;font-size:14px">Log in</a><a href="#/demo" class="btn btn-dark">Book a demo</a></div></header>`;
+const publicFooter = () => `<footer class="pub-foot"><div class="inner">${logo(false, 20)}<div class="spacer"></div><a href="#/" data-scroll="platform">Platform</a><a href="#/pricing">Pricing</a><a href="#/security">Security &amp; privacy</a><a href="#/demo">Contact</a><div class="spacer"></div><span class="muted">© [Company name] · ABN [—]</span></div></footer>`;
+const pub = (inner) => `<div class="pub">${publicNav()}<main>${inner}</main>${publicFooter()}</div>`;
+
+function pageHome() {
+  const pillars = [
+    ["clipboard", "var(--green-tint)", "var(--green-text)", "Quality", "Defects pinned to drawings, template-driven ITPs with hold and witness points, NCRs and audit-ready handover packs.", ["Defects", "ITPs", "NCRs", "Handover"]],
+    ["align", "var(--blue-tint)", "var(--blue)", "Projects & commercial", "Programmes, drawings with revision control, site diaries, budgets, purchase orders, variations and progress claims.", ["Programme", "Documents", "Variations", "Claims"]],
+    ["shield", "var(--amber-tint)", "var(--amber-text)", "Workforce & safety", "Worker credential wallets, inductions, SWMS review and acknowledgement, QR site sign-in and live muster lists.", ["Credentials", "SWMS", "Site access", "Permits"]],
+  ];
+  const flow = [["Programme", "Pour is scheduled", "The task carries its ITP, SWMS and crew."], ["Workforce", "Crew signs in", "Credentials and inductions checked at the gate."], ["Quality", "Hold point released", "Photos and sign-off recorded against the task."], ["Site diary", "Day is logged", "Attendance and inspections pre-fill the diary."], ["Commercial", "Claim backed by evidence", "The assessor sees the site record beside the claim."]];
+  return pub(`
+  <section><div class="inner hero-grid">
+    <div>
+      <span class="pill-eyebrow">Quality · Projects · Workforce · Commercial</span>
+      <h1 class="display">Everything on site.<br>Everything under control.</h1>
+      <p class="lede">One connected platform for construction quality, project delivery, workforce compliance and commercial management. Enter it once, on site or in the office, and every team sees the same truth.</p>
+      <div class="row wrap" style="margin-top:28px;gap:12px"><a href="#/demo" class="btn btn-primary btn-lg">Book a demo ${icon("arrowright")}</a><a href="#/login" class="btn btn-lg">Explore the platform</a></div>
+      <p class="small muted" style="margin-top:20px">Built in Australia for builders, head contractors and subcontractors.</p>
+    </div>
+    <div class="mock" aria-label="Product preview: Level 4 slab pour readiness">
+      <div class="mock-rail"></div>
+      <div class="mock-body">
+        <div class="row"><b>Level 4 slab pour — readiness</b><span class="spacer"></span><span class="badge badge-amber">${icon("alert", 12)}2 items outstanding</span></div>
+        <div class="mock-row"><b>Programme</b> · Pour scheduled Thu 6:00am<span class="s green-text">${icon("check", 12)} On track</span></div>
+        <div class="mock-row"><b>ITP-07</b> · Reinforcement hold point<span class="s red-text">${icon("lock", 11)} Hold · awaiting release</span></div>
+        <div class="mock-row"><b>Defects</b> · 0 open on Level 4<span class="s green-text">${icon("check", 12)} Clear</span></div>
+        <div class="mock-row"><b>Concreter crew</b> · 1 of 9 missing induction<span class="s amber-text">${icon("alert", 11)} Action</span></div>
+        <div class="mock-row"><b>SWMS</b> · Concrete placement v3</div>
+      </div>
+      <div class="mock-phone"><div class="muted" style="font-size:10.5px">ITP-07 · Hold point</div><b style="display:block;margin:4px 0 8px">Bar spacing &amp; cover checked</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><div class="photo-ph" style="min-height:40px"></div><div class="photo-ph" style="min-height:40px;background:#a9b8ae"></div></div><div class="muted" style="font-size:10.5px;margin:6px 0 8px">4 photos · 40mm cover measured</div><div class="btn btn-primary" style="height:30px;font-size:11.5px;width:100%">Release hold point</div></div>
+    </div>
+  </div></section>
+  <section class="problem"><div class="inner hero-grid" style="gap:40px">
+    <div><span class="eyebrow" style="color:#8fd1b3">The problem</span><h2 class="section" style="margin-top:10px;color:#fff">Three systems. The same data typed in three times. Nobody sees the whole job.</h2></div>
+    <div class="stack" style="gap:10px">${["A subbie's crew, their SWMS, their defects and their progress claim live in four different places.", "The office approves a claim without seeing the failed inspection on site.", "BuildOS keeps one project record, so every module reads from and writes to the same thing."].map((t, i) => `<div class="card-dark"><span class="mono" style="color:#8fd1b3">0${i + 1}</span><span>${esc(t)}</span></div>`).join("")}</div>
+  </div></section>
+  <section id="platform"><div class="inner">
+    <div class="row" style="align-items:flex-end"><h2 class="section" style="max-width:520px">Three pillars, one connected platform</h2><span class="spacer"></span><a href="#/login" class="link">See every feature →</a></div>
+    <div class="pillars">${pillars.map(([ic, tint, col, t, b, tags]) => `<div class="card stack" style="padding:24px"><span class="li-icon" style="background:${tint};color:${col}">${icon(ic, 20)}</span><h3 style="font-size:18px">${t}</h3><p class="muted">${b}</p><div class="row wrap" style="gap:6px">${tags.map((x) => `<span class="tag">${x}</span>`).join("")}</div></div>`).join("")}</div>
+  </div></section>
+  <section style="padding-top:0"><div class="inner">
+    <span class="eyebrow">How it connects</span><h2 class="section" style="margin-top:8px">From the pour to the progress claim</h2>
+    <div class="flow">${flow.map(([k, t, b], i) => `<div><div class="mono" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${i === 4 ? "var(--green-text)" : "var(--muted)"}">Step ${i + 1} · ${k}</div><h3 style="margin:8px 0 6px">${t}</h3><p class="small muted">${b}</p></div>`).join("")}</div>
+  </div></section>
+  <section id="integrations" style="padding-top:0"><div class="inner two-col">
+    <div class="card" style="padding:28px"><h2 style="font-size:24px">Built to stand up in a dispute</h2>
+      <div class="two-col" style="margin-top:18px;gap:18px"><div><b>Full audit history</b><p class="small muted">Who changed what, and when.</p></div><div><b>Separated companies</b><p class="small muted">Subbies see their records, never your margin.</p></div><div><b>Private files</b><p class="small muted">Short-lived links, never public URLs.</p></div><div><b>Data location</b><p class="small muted">[Hosting region to confirm]</p></div></div>
+      <a class="link small" href="#/security" style="display:inline-block;margin-top:16px">Read about security →</a></div>
+    <div class="card" style="padding:28px"><h2 style="font-size:24px">Works with what you already run</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px">${["[Accounting]", "[Microsoft 365]", "[Google Workspace]", "[Payroll]", "Calendars", "CSV / XLSX"].map((x) => `<div class="mono" style="border:1px solid var(--border);border-radius:8px;height:52px;display:grid;place-items:center;font-size:12px;text-align:center">${x}</div>`).join("")}</div>
+      <p class="small muted" style="margin-top:14px">Starting with reliable CSV/XLSX import and one accounting integration.</p></div>
+  </div></section>
+  <section id="industries" style="padding-top:0"><div class="inner"><div class="cta-band">
+    <div style="flex:1;min-width:260px"><h2 style="font-size:30px;color:#fff">See your next project in BuildOS</h2><p style="margin-top:8px;color:#d8efe4">30-minute walkthrough with your own project structure. Plans from [PRICE] per month.</p></div>
+    <a href="#/demo" class="btn btn-lg" style="color:var(--ink)">Book a demo</a><a href="#/pricing" class="btn btn-lg" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">View pricing</a>
+  </div></div></section>`);
+}
+function pagePricing() {
+  const plans = [["Starter", "Small builders and subcontractors", ["Core projects & documents", "Defects with photos", "Basic scheduling", "Limited active projects"]], ["Professional", "Growing construction companies", ["Everything in Starter", "ITPs, NCRs & hold points", "Workforce, SWMS & site access", "Timesheets & commercial workflows"], true], ["Enterprise", "Large builders and multi-site operators", ["Advanced permissions", "Integrations & portfolio analytics", "Audit controls", "Enterprise support"]]];
+  return pub(`<section><div class="inner"><span class="eyebrow">Pricing</span><h1 class="display" style="font-size:44px">Priced per company, not per click.</h1>
+    <p class="lede">Subcontractors and invited workers don't need a paid seat to sign in, upload credentials or rectify their defects. No fee per defect, inspection or SWMS.</p>
+    <div class="pillars">${plans.map(([n, w, items, f]) => `<div class="card stack" style="padding:26px;${f ? "border:2px solid var(--green)" : ""}"><h2>${n}</h2><p class="muted small">${w}</p><div style="font-size:28px;font-weight:700">[PRICE]<span class="muted small" style="font-weight:500"> / month</span></div><ul class="stack" style="list-style:none;padding:0;margin:0">${items.map((i) => `<li class="row"><span class="green-text">${icon("check")}</span>${i}</li>`).join("")}</ul><a href="#/demo" class="btn ${f ? "btn-primary" : ""}">Talk to us</a></div>`).join("")}</div>
+    <p class="small muted" style="margin-top:18px">Plan structure is a starting point to test with customers — prices to be confirmed.</p></div></section>`);
+}
+function pageSecurity() {
+  const items = [["Separate organisation spaces", "Every record carries an organisation ID and every request is checked against it, so one customer's data can't leak into another's."], ["Permissions enforced, not hidden", "Role and project permissions are checked on every action — not just by hiding buttons."], ["Tamper-evident history", "Inspection sign-offs, financial approvals and submitted compliance records keep a full history of who changed what, and when."], ["Private files", "Photos and documents live in private storage and are served through short-lived signed links, never public URLs."], ["Corrections, not deletions", "Submitted records are corrected through revisions or amendments rather than silently overwritten."], ["Privacy", "We are assessing Australian Privacy Act obligations, data hosting location and sub-processors. [Hosting region to confirm]"]];
+  return pub(`<section><div class="inner"><span class="eyebrow">Security &amp; privacy</span><h1 class="display" style="font-size:44px">Records you can rely on in a dispute.</h1><div class="pillars">${items.map(([t, b]) => `<div class="card" style="padding:24px"><h3>${t}</h3><p class="muted" style="margin-top:8px">${b}</p></div>`).join("")}</div></div></section>`);
+}
+function pageDemo() {
+  return pub(`<section><div class="inner hero-grid" style="align-items:start">
+    <div><span class="eyebrow">Book a demo</span><h1 class="display" style="font-size:44px">30 minutes, your own project structure.</h1><p class="lede">We'll walk through a concrete pour from programme to progress claim using your buildings, trades and cost codes.</p><p class="small muted" style="margin-top:16px">Want to look around first? <a href="#/login" class="link">Explore the prototype</a>.</p></div>
+    <div class="card card-pad">${form("demo", `<div class="stack"><label class="field"><span>Name <span class="req">*</span></span><input class="input" name="name" autocomplete="name"></label><label class="field"><span>Work email <span class="req">*</span></span><input class="input" type="email" name="email" autocomplete="email"></label><label class="field"><span>Company</span><input class="input" name="company" autocomplete="organization"></label><label class="field"><span>What do you build?</span><select class="input" name="type"><option>Commercial</option><option>Residential</option><option>Civil</option><option>Fit-out</option><option>Subcontractor</option></select></label><button class="btn btn-primary btn-lg" type="submit">Book a demo</button></div>`)}</div>
+  </div></section>`);
+}
+const LANDS = { director: "Control centre — portfolio & exposure", project_manager: "Project overview — today's attention list", site_supervisor: "Site app — today, inspections, on site", quality_manager: "Quality register and ITPs", subcontractor_admin: "Their defects, SWMS, crew compliance", worker: "Sign in, my credentials, my SWMS — no paid seat" };
+function pageLogin() {
+  return `<div style="min-height:100vh;display:grid;place-items:center;padding:16px"><div class="card" style="width:100%;max-width:520px"><div class="card-pad stack-lg">
+    <a href="#/">${logo()}</a>
+    <div><h1 style="font-size:24px">Explore the prototype</h1><p class="muted" style="margin-top:6px">Pick a role. Each one lands on the screen built for it, and the app checks what that role is allowed to do.</p></div>
+    <div class="stack" style="gap:8px">${DB.users.map((u) => `<button type="button" data-login="${u.id}" class="btn btn-block" style="height:auto;padding:12px 14px;justify-content:flex-start;text-align:left"><span class="avatar" style="width:34px;height:34px;font-size:12px;flex:none">${u.initials}</span><span style="flex:1;min-width:0"><span style="display:block">${ROLE_LABEL[u.role]} · <span class="muted" style="font-weight:500">${esc(u.name)}</span></span><span class="muted small" style="font-weight:400;white-space:normal">${LANDS[u.role]}</span></span>${icon("arrowright")}</button>`).join("")}</div>
+    <p class="small muted">Prototype sign-in only. All data is sample data saved in this browser.</p>
+  </div></div></div>`;
+}
+
+// ===================================================== internal app shell
+const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/people", "People & contractors", "users"], ["#/app/reports", "Reports", "chart"]];
+const projectNav = (id, money) => { const b = `#/app/projects/${id}`; return [[b, "Overview", "home", true], [`${b}/programme`, "Programme", "calendar"], [`${b}/quality`, "Quality", "clipboard", false, "defects"], [`${b}/safety`, "Safety", "shield"], [`${b}/workforce`, "Workforce & time", "hardhat"], [`${b}/documents`, "Documents", "file"], ...(money ? [[`${b}/commercial`, "Commercial", "dollar"]] : []), [`${b}/diary`, "Site diary", "notebook"], [`${b}/reports`, "Reports", "chart"], [`${b}/handover`, "Handover", "package"]]; };
+const isActive = (cur, href, exact) => { const h = href.slice(1); return exact ? cur === h : cur === h || cur.startsWith(h + "/"); };
+function navLink([href, label, ic, exact, countKey], cur, counts) {
+  const c = countKey ? counts[countKey] : 0;
+  return `<a class="nav" href="${href}" title="${label}"${isActive(cur, href, exact) ? ' aria-current="page"' : ""}>${icon(ic, 17)}<span class="nav-text">${label}</span>${c ? `<span class="count ${countKey === "defects" ? "quiet" : ""}">${c}</span>` : ""}</a>`;
+}
+function appShell(u, route, inner) {
+  const projects = listProjects(u), pid = route.match(/^\/app\/projects\/([^/?]+)/)?.[1];
+  const project = projects.find((p) => p.id === pid);
+  const counts = { tasks: myTasks(u).length, defects: project ? openDefects(u, project.id).length : 0 };
+  const side = project
+    ? `<a class="nav" href="#/app" title="Company overview">${icon("arrowleft", 16)}<span class="nav-text small">Company overview</span></a>
+       <div class="proj-card"><div class="label">Project</div><div style="color:#fff;font-weight:600;font-size:13.5px">${esc(project.name)}</div><div class="mono" style="font-size:11.5px;color:#8fa59b">${project.code}</div></div>
+       ${projectNav(project.id, can(u, "commercial.view")).map((n) => navLink(n, route, counts)).join("")}
+       <div class="bottom"><a class="nav" href="#/app/settings" title="Settings">${icon("settings", 17)}<span class="nav-text">Project settings</span></a></div>`
+    : `<div class="nav-label">Company</div>${companyNav.map((n) => navLink(n, route, counts)).join("")}
+       <div class="nav-label">Recent projects</div>${projects.map((p) => `<a class="nav" href="#/app/projects/${p.id}" title="${esc(p.name)}"><span class="recent-dot"></span><span class="nav-text">${esc(p.name)}</span></a>`).join("")}
+       <div class="bottom"><a class="nav" href="#/app/settings" title="Company settings">${icon("settings", 17)}<span class="nav-text">Company settings</span></a></div>`;
+  const qBase = `#/app/projects/${project?.id ?? projects[0].id}`;
+  const notes = notifications(u);
+  const tabs = [["#/app", "Overview", "grid", true], [project ? `#/app/projects/${project.id}` : "#/app/projects", "Project", "home", !!project], [`${qBase}/quality`, "Quality", "clipboard"], ["#/app/tasks", "My tasks", "listchecks"], ["#/site", "Site app", "phone"]];
+  return `<div class="shell">
+    <div class="sidebar-col"><aside class="sidebar" aria-label="Main navigation"><a href="#/app" class="brand">${logo(true)}</a>${side}</aside></div>
+    <div class="main">
+      <header class="topbar">
+        <label><span class="sr-only">Switch project</span><select class="select-plain" data-switch>${`<option value="">All projects</option>`}${projects.map((p) => `<option value="${p.id}"${p.id === pid ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>
+        <form class="search" data-search role="search">${icon("search")}<label class="sr-only" for="q">Search</label><input id="q" name="q" class="input" placeholder="Search projects, defects, drawings, workers…"><kbd>/</kbd></form>
+        <div class="spacer"></div>
+        <details class="menu"><summary class="btn btn-primary">${icon("plus")} <span class="hide-sm">New</span></summary><div class="menu-panel">
+          <div class="menu-label label">Quick create</div>
+          <a href="${qBase}/quality/new">${icon("clipboard")} Defect</a><a href="${qBase}/quality">${icon("file")} Inspection</a><a href="${qBase}/diary">${icon("notebook")} Site diary entry</a><a href="${qBase}/programme">${icon("calendar")} Task</a>${can(u, "variation.create") ? `<a href="${qBase}/commercial">${icon("dollar")} Variation</a>` : ""}
+        </div></details>
+        <details class="menu"><summary class="icon-btn" aria-label="Notifications (${notes.length})">${icon("bell", 17)}${notes.length ? '<span class="pip"></span>' : ""}</summary><div class="menu-panel" style="width:340px;max-width:90vw">
+          <div class="menu-label label">Notifications</div>${notes.map((n) => `<a href="${n.href}" style="align-items:flex-start"><span style="width:8px;height:8px;border-radius:4px;margin-top:6px;flex:none;background:var(--${n.tone})"></span><span><b style="font-weight:600">${esc(n.title)}</b><br><span class="muted small">${esc(n.sub)}</span></span></a>`).join("") || '<p class="muted small" style="padding:8px 10px">All clear.</p>'}
+        </div></details>
+        <details class="menu"><summary class="avatar" aria-label="Account">${u.initials}</summary><div class="menu-panel" style="width:290px;max-width:90vw">
+          <div style="padding:8px 10px"><b>${esc(u.name)}</b><div class="muted small">${esc(u.title)} · ${esc(DB.org.name)}</div></div>
+          <div class="menu-label label">View as (demo)</div>
+          ${DB.users.map((x) => `<button class="menu-item" type="button" data-login="${x.id}"${x.id === u.id ? ' aria-current="true" style="background:var(--canvas)"' : ""}><span class="avatar" style="width:26px;height:26px;font-size:10.5px">${x.initials}</span><span>${ROLE_LABEL[x.role]} <span class="muted small">· ${esc(x.name)}</span></span></button>`).join("")}
+          <hr style="border:0;border-top:1px solid var(--border);margin:6px 0">
+          <a href="#/site">${icon("phone")} Open site app</a><a href="#/">${icon("home")} Public website</a>
+          <button class="menu-item" type="button" data-reset>${icon("rotate")} Reset sample data</button>
+          <button class="menu-item" type="button" data-signout>${icon("logout")} Sign out</button>
+        </div></details>
+      </header>
+      <main class="content">${inner}</main>
+    </div>
+    <nav class="bottom-tabs" aria-label="Primary">${tabs.map(([h, l, ic, ex]) => `<a href="${h}"${isActive(route, h, ex) ? ' aria-current="page"' : ""}>${icon(ic, 20)}${l}</a>`).join("")}</nav>
+  </div>`;
+}
+
+// ===================================================== control centre
+function pageControlCentre(u) {
+  const projects = listProjects(u), showMoney = can(u, "commercial.view"), so = awaitingSignOff(), comp = complianceExpiring(30);
+  const swmsToReview = DB.swms.filter((s) => s.status === "submitted" || s.status === "in_review").length;
+  const out = DB.claims.filter((c) => ["submitted", "assessed", "certified"].includes(c.status)), owed = (c) => (c.certified ?? c.claimed) - (c.paid ?? 0);
+  const pastDue = out.filter((c) => D(c.dueDate) < startOfDay(new Date()));
+  const pos = projects.map((p) => ({ p, c: projectCommercial(u, p.id) }));
+  const tot = pos.reduce((a, { c }) => c ? { o: a.o + c.originalContract, ap: a.ap + c.approvedVariations, cm: a.cm + c.committed, ac: a.ac + c.actual, ex: a.ex + c.variationExposure } : a, { o: 0, ap: 0, cm: 0, ac: 0, ex: 0 });
+  const tasks = myTasks(u);
+  const rows = pos.map(({ p, c }) => {
+    const behind = p.plannedProgress - p.verifiedProgress;
+    return `<tr><td><a class="rowlink" href="#/app/projects/${p.id}">${esc(p.name)}</a><div class="muted small"><span class="mono" style="font-size:12px">${p.code}</span> · ${p.type}</div></td>
+      <td><div class="bar" style="margin-top:6px"><span class="planned" style="width:${p.plannedProgress}%"></span><span class="actual" style="width:${p.verifiedProgress}%"></span></div><div class="small ${behind > 0 ? "amber-text" : "green-text"}" style="margin-top:5px">${p.verifiedProgress}% verified · ${behind > 0 ? `${behind}% behind` : "on track"}</div></td>
+      ${showMoney && c ? `<td class="num">${money(c.revisedContract, { compact: true })}</td><td class="num ${c.forecastFinalCost > c.revisedContract ? "red-text" : ""}">${money(c.forecastFinalCost, { compact: true })}</td><td class="num ${c.forecastMarginPct < 0 ? "red-text" : ""}">${pct(c.forecastMarginPct)}</td>` : ""}
+      <td class="small">${esc(p.nextMilestone.name)} · ${dayMonth(p.nextMilestone.date)}</td></tr>`;
+  }).join("");
+  return `${pageHeader({ title: `<span class="row" style="gap:12px">Company overview ${sampleTag()}</span>`, meta: `<span>${longToday()} · ${projects.length} active projects</span>`, actions: `<a class="btn" href="#/app/reports">Export</a><a class="btn btn-dark" href="#/app/projects">New project</a>` })}
+  <div class="metrics">
+    ${metric("Workers on site now", onSiteNow().length, `${comp.filter((c) => c.days <= 14).length} compliance warnings`, "amber", "#/app/people")}
+    ${metric("Open defects", openDefects(u).length, `${overdueDefects(u).length} overdue`, "amber", "#/app/reports")}
+    ${metric("Awaiting sign-off", so.total, `${so.holdsBlocking.length} hold points blocking`, "red", "#/app/tasks")}
+    ${metric("Safety actions", swmsToReview, `${swmsToReview} SWMS to review`, null, "#/app/tasks")}
+    ${showMoney ? metric("Claims outstanding", money(sum(out, owed), { compact: true }), `${money(sum(pastDue, owed), { compact: true })} past due date`) : ""}
+  </div>
+  <div class="cc-grid">
+    <div class="stack-lg" style="min-width:0">
+      <section class="card"><div class="card-head"><h2>Portfolio</h2><div class="spacer"></div><span class="row small muted" style="gap:14px"><span class="row" style="gap:5px"><i class="key" style="background:#c9cfc8"></i> Planned</span><span class="row" style="gap:5px"><i class="key" style="background:var(--green)"></i> Verified on site</span></span></div>
+        <div class="table-wrap"><table class="register"><thead><tr><th>Project</th><th style="min-width:170px">Progress</th>${showMoney ? '<th class="right">Contract</th><th class="right">Forecast cost</th><th class="right">Margin</th>' : ""}<th>Next milestone</th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${showMoney ? `<p class="small muted" style="padding:10px 20px 14px;border-top:1px solid var(--border)">Margin = contract incl. approved variations − forecast final cost, before overheads. Unapproved variations are shown separately as exposure.</p>` : ""}
+      </section>
+      <div class="two-col">
+        ${showMoney ? `<section class="card"><div class="card-head"><h2>Commercial position</h2></div><div class="card-body"><dl class="kv"><dt>Original contracts</dt><dd>${money(tot.o, { compact: true })}</dd><dt>Approved variations</dt><dd>${money(tot.ap, { compact: true, sign: true })}</dd><dt>Committed costs</dt><dd>${money(tot.cm, { compact: true })}</dd><dt>Actual costs to date</dt><dd>${money(tot.ac, { compact: true })}</dd></dl><div class="row amber-text small" style="margin-top:12px;font-weight:600">${icon("alert", 14)} Variation exposure (unapproved)<span class="spacer"></span><span class="mono">${money(tot.ex, { compact: true })}</span></div></div></section>` : ""}
+        <section class="card"><div class="card-head"><h2>Compliance expiring</h2><div class="spacer"></div><a class="link small" href="#/app/people">View all</a></div><div class="card-body stack" style="gap:10px">${comp.slice(0, 4).map((c) => `<a href="#/app/people" class="row" style="align-items:flex-start"><div style="min-width:0"><div style="font-weight:600;font-size:13.5px">${esc(c.who)} — ${esc(c.what)}</div><div class="muted small">${c.sub}</div></div><span class="spacer"></span><span class="badge ${c.days < 0 ? "badge-red" : "badge-amber"}">${c.days < 0 ? "Expired" : `${c.days} days`}</span></a>`).join("")}</div></section>
+      </div>
+    </div>
+    <div class="stack-lg">
+      <section class="card"><div class="card-head"><h2>My tasks</h2><div class="spacer"></div><span class="small muted">${tasks.length} open</span></div><div class="card-body">${taskList(tasks.slice(0, 4))}<a class="link small" href="#/app/tasks" style="display:inline-block;margin-top:12px">See all tasks →</a></div></section>
+      <section class="card"><div class="card-head"><h2>Recent activity</h2></div><div class="card-body"><ul class="timeline">${DB.audit.slice(0, 6).map((a) => `<li><span class="dot ${/fail|reject/i.test(a.action) ? "red" : /released|approved|closed|verified/i.test(a.action) ? "green" : "blue"}"></span><div><b style="font-weight:600">${esc(a.action)}</b>${a.detail ? ` · ${esc(a.detail)}` : ""}<div class="muted small">${esc(projName(a.projectId))} · ${timeAgo(a.at)}</div></div></li>`).join("")}</ul></div></section>
+    </div>
+  </div>`;
+}
+
+// ===================================================== project overview
+function pageProject(u, p) {
+  const base = `#/app/projects/${p.id}`, showMoney = can(u, "commercial.view"), c = projectCommercial(u, p.id);
+  const open = openDefects(u, p.id), od = overdueDefects(u, p.id), so = awaitingSignOff(p.id), here = onSiteNow(p.id);
+  const tasks = DB.tasks.filter((t) => t.projectId === p.id);
+  const ms = tasks.filter((t) => t.isMilestone && t.status !== "complete").sort((a, b) => a.forecastStart.localeCompare(b.forecastStart))[0];
+  const ready = ms ? readiness(p.id, ms.id) : null;
+  const claim = DB.claims.filter((x) => x.projectId === p.id && x.status === "draft").sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+  const diary = DB.diary.find((x) => x.projectId === p.id);
+  // "What needs my attention today" — assembled from every module.
+  const attn = [];
+  for (const { itp, point } of so.points.filter((x) => x.point.type === "hold")) {
+    const t = tasks.find((t) => t.id === itp.taskId);
+    attn.push(["red", "lock", `<b>${itp.ref} ${esc(point.name.toLowerCase())} hold point</b> not released${t ? ` — ${esc(t.name.toLowerCase())} is ${shortDate(t.forecastStart)}` : ""}`, "Review", `${base}/quality/itp/${itp.id}`]);
+  }
+  for (const v of listVariations(u, p.id).filter((v) => v.status === "under_review" || v.status === "submitted")) attn.push(["amber", "alert", `<b>${v.ref} ${esc(v.title)}</b> · ${money(v.amount)} awaiting approval`, "Approve", `${base}/commercial`]);
+  const byTrade = {};
+  for (const d of od) (byTrade[d.trade] ||= []).push(d);
+  for (const [trade, list] of Object.entries(byTrade)) attn.push(["amber", "alert", `<b>${list.length} ${esc(trade.toLowerCase())} defect${list.length > 1 ? "s" : ""}</b> overdue`, "Open", `${base}/quality?status=overdue&trade=${encodeURIComponent(trade)}`]);
+  for (const s of DB.swms.filter((s) => s.projectId === p.id && s.status === "approved")) {
+    const missing = DB.workers.filter((w) => w.contractorId === s.contractorId && w.inductedProjectIds.includes(p.id) && !s.acknowledgedBy.includes(w.id)).length;
+    if (missing) attn.push(["blue", "clock", `<b>SWMS · ${esc(s.title)} v${s.version}</b> needs worker acknowledgement (${missing})`, "Chase", `${base}/safety`]);
+  }
+  for (const d of DB.documents.filter((x) => x.projectId === p.id && x.status === "in_review")) attn.push(["blue", "file", `<b>${d.number} rev ${d.revision}</b> uploaded — review before it becomes current`, "Review", `${base}/documents`]);
+  const cnt = (s) => ready?.items.filter((i) => i.state === s).length ?? 0;
+  const tone = { red: "var(--red)", amber: "var(--amber)", blue: "var(--blue)" };
+  return `<section class="card card-pad"><div class="page-header"><div>
+      <div class="row wrap" style="gap:10px"><h1>${esc(p.name)}</h1><span class="badge badge-green"><span style="width:7px;height:7px;border-radius:4px;background:var(--green)"></span>Construction</span>${sampleTag()}</div>
+      <div class="page-meta"><span>${esc(p.address)}</span><span>Client: <b>${esc(p.client)}</b></span><span>PM: <b>${esc(userById(p.pmId)?.name)}</b></span>${showMoney ? `<span>Contract: <b>${money(c.revisedContract, { compact: true })}</b></span>` : ""}<span>PC: <b>${D(p.pcDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}</b></span></div>
+    </div><div class="row wrap"><a class="btn" href="${base}/reports">Weekly report</a><a class="btn btn-dark" href="${base}/diary">Today's site diary</a></div></div></section>
+  <div class="metrics">
+    ${metric("Programme", `${p.verifiedProgress}%`, `${p.plannedProgress}% planned`, p.plannedProgress > p.verifiedProgress ? "amber" : null, `${base}/programme`)}
+    ${metric("Open defects", open.length, `${od.length} overdue`, od.length ? "amber" : null, `${base}/quality`)}
+    ${metric("Awaiting sign-off", so.total, `${so.holdsBlocking.length} hold point${so.holdsBlocking.length === 1 ? "" : "s"}`, so.holdsBlocking.length ? "red" : null, `${base}/quality`)}
+    ${metric("On site now", here.length, `${companiesOnSite(p.id)} companies`, null, `${base}/workforce`)}
+    ${showMoney ? metric("Budget variance", money(c.budget - c.forecastFinalCost, { compact: true, sign: true }), "Budget − forecast final cost", null, `${base}/commercial`) + metric("Next claim", claim?.ref ?? "—", claim ? `Due ${dayMonth(claim.dueDate)}` : "None drafted", null, `${base}/commercial`) : ""}
+  </div>
+  <div class="po-grid">
+    <section class="card"><div class="card-head"><h2>Needs your attention today</h2><div class="spacer"></div><span class="small muted">${attn.length} items</span></div><div class="card-body stack" style="gap:8px">
+      ${attn.map(([t, ic, body, cta, href]) => `<a href="${href}" class="attn"${t === "red" ? ' data-tone="red"' : ""}><span class="attn-icon" style="color:${tone[t]}">${icon(ic)}</span><span>${body}</span><span class="attn-cta">${cta}</span></a>`).join("") || '<p class="muted">Nothing needs you right now.</p>'}
+    </div></section>
+    ${ready ? `<section class="card"><div class="card-head"><h2>Readiness · ${esc(ready.task.name)}</h2><div class="spacer"></div><span class="small muted">${shortDate(ready.task.forecastStart)}</span></div><div class="card-body">
+      <div class="seg"><span style="flex:${cnt("ready")};background:var(--green)"></span><span style="flex:${cnt("action")};background:var(--amber)"></span><span style="flex:${cnt("blocking")};background:var(--red)"></span></div>
+      <p class="small muted" style="margin:8px 0 4px">${cnt("ready")} of ${ready.items.length} ready · ${cnt("action")} need${cnt("action") === 1 ? "s" : ""} action · ${cnt("blocking")} blocking</p>
+      ${ready.items.map((it) => `<a href="${it.href}" class="ready-row"><span>${esc(it.label)}</span><span class="state ${it.state === "ready" ? "green-text" : it.state === "blocking" ? "red-text" : "amber-text"}">${icon(it.state === "ready" ? "check" : it.state === "blocking" ? "lock" : "alert", 13)}${esc(it.detail)}</span></a>`).join("")}
+      <p class="small muted" style="margin-top:10px">Readiness shows the facts. Authorising the pour stays with the responsible person.</p>
+    </div></section>` : ""}
+  </div>
+  <div class="po-grid">
+    <section class="card"><div class="card-head"><h2>Two-week lookahead</h2><div class="spacer"></div><a class="link small" href="${base}/programme">Open programme →</a></div><div class="card-body">${gantt(tasks.filter((t) => t.status !== "complete"))}${ganttKey()}</div></section>
+    <section class="card"><div class="card-head"><h2>Latest site diary</h2><div class="spacer"></div>${diary ? `<span class="small muted">${shortDate(diary.date)}</span>` : ""}</div><div class="card-body">
+      ${diary ? `<div class="row wrap small muted" style="gap:16px;margin-bottom:8px"><span>${esc(diary.weather)}</span><span>${diary.workersOnSite} workers</span><span>${diary.companiesOnSite} companies</span>${badge("submitted")}</div><p>${esc(diary.notes)}${diary.delays ? ` Delay: ${esc(diary.delays)}` : ""}</p><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px"><div class="photo-ph"></div><div class="photo-ph"></div><div class="photo-ph" style="background:#dfe5e1;color:var(--muted)">+9 photos</div></div>`
+        : `<p class="muted">No diary yet. <a class="link" href="${base}/diary">Start today's entry</a></p>`}
+    </div></section>
+  </div>`;
+}
+
+// ===================================================== quality
+function filterDefects(u, pid, f) {
+  return listDefects(u, pid).filter((d) => {
+    const l = locationOf(d.locationId);
+    if (f.level && l?.level !== f.level) return false;
+    if (f.trade && d.trade !== f.trade) return false;
+    if (f.contractor && d.contractorId !== f.contractor) return false;
+    if (f.status === "overdue") { if (!isOverdue(d)) return false; }
+    else if (f.status === "open") { if (d.status === "closed" || d.status === "draft") return false; }
+    else if (f.status && d.status !== f.status) return false;
+    if (f.q && !`${d.ref} ${d.title}`.toLowerCase().includes(f.q.toLowerCase())) return false;
+    return true;
+  });
+}
+function pageQuality(u, p, f) {
+  const base = `#/app/projects/${p.id}`, rows = filterDefects(u, p.id, f), all = listDefects(u, p.id), so = awaitingSignOff(p.id);
+  const itps = DB.itps.filter((i) => i.projectId === p.id), pts = itps.flatMap((i) => i.points), rel = pts.filter((x) => x.status === "released").length;
+  const levels = uniq(all.map((d) => locationOf(d.locationId)?.level).filter(Boolean)).sort();
+  const trades = uniq(all.map((d) => d.trade)).sort();
+  const cons = uniq(all.map((d) => d.contractorId).filter(Boolean)).map(contractorOf);
+  const qs = (patch) => { const s = new URLSearchParams(Object.entries({ ...f, ...patch }).filter(([, v]) => v)).toString(); return `${base}/quality${s ? `?${s}` : ""}`; };
+  const chipLabel = (k, v) => k === "contractor" ? contractorOf(v)?.tradingName : k === "level" ? `Level ${v.replace("L", "")}` : k === "trade" ? `Trade: ${v}` : k === "status" ? `Status: ${words(v)}` : `“${v}”`;
+  const sel = (name, label, opts) => `<label><span class="sr-only">${label}</span><select name="${name}" class="input" style="height:34px;width:auto;padding-right:28px"><option value="">${label}: any</option>${opts.map(([v, l]) => `<option value="${esc(v)}"${f[name] === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+  const table = rows.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>ID</th><th>Title</th><th>Location</th><th>Contractor</th><th>Due</th><th>Status</th></tr></thead><tbody>${rows.map((d) => { const late = isOverdue(d), h = `${base}/quality/defects/${d.id}`; return `<tr><td><a class="mono link" href="${h}">${d.ref}</a></td><td><a class="rowlink" href="${h}">${esc(d.title)}</a><div class="muted small">${esc(d.trade)} · ${d.priority} priority</div></td><td class="small">${esc(locationLabel(d))}</td><td class="small">${contractorOf(d.contractorId) ? esc(contractorOf(d.contractorId).tradingName) : '<span class="muted">Unassigned</span>'}</td><td class="small ${late ? "amber-text" : ""}" style="font-weight:${late ? 700 : 400};white-space:nowrap">${dueLabel(d.dueDate)}</td><td>${badge(late ? "overdue" : d.status)}</td></tr>`; }).join("")}</tbody></table></div>`
+    : emptyState("clipboard", "No defects match", "Try removing a filter, or raise a new defect from site in a few seconds.", `<a class="btn" href="${base}/quality">Clear filters</a>`);
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Quality &amp; inspections", actions: `<button class="btn" type="button" data-export="${p.id}">${icon("download", 15)} Export register</button>${can(u, "defect.create") ? `<a class="btn btn-dark" href="${base}/quality/new">New defect</a>` : ""}` })}
+  <div class="metrics">
+    ${metric("Open defects", openDefects(u, p.id).length, null, null, `${base}/quality?status=open`)}
+    ${metric("Overdue defects", overdueDefects(u, p.id).length, "Past due date", "amber", `${base}/quality?status=overdue`)}
+    ${metric("Awaiting approval", so.total, "Inspections & verifications", null, `${base}/quality?status=ready_for_verification`)}
+    ${metric("ITP completion", `${pts.length ? Math.round((rel / pts.length) * 100) : 0}%`, `${rel} of ${pts.length} points released`)}
+    ${metric("Hold points blocking", so.holdsBlocking.length, "Work must not proceed", so.holdsBlocking.length ? "red" : null)}
+  </div>
+  <section class="card">
+    <div class="card-head" style="flex-wrap:wrap"><h2>Defect register</h2><span class="muted small">${rows.length} shown</span><div class="spacer"></div><div class="row wrap" style="gap:6px">${Object.entries(f).filter(([, v]) => v).map(([k, v]) => `<a class="chip" href="${qs({ [k]: "" })}">${esc(chipLabel(k, v))} ${icon("x", 13)}</a>`).join("")}</div></div>
+    <form class="row wrap" data-filter="${base}/quality" style="padding:0 20px 14px;gap:8px">
+      <input name="q" value="${esc(f.q)}" class="input" placeholder="Search ID or title" aria-label="Search" style="width:200px;height:34px">
+      ${sel("level", "Level", levels.map((l) => [l, l]))}${sel("trade", "Trade", trades.map((t) => [t, t]))}${sel("contractor", "Contractor", cons.map((c) => [c.id, c.tradingName]))}${sel("status", "Status", [["open", "All open"], ["overdue", "Overdue"], ["draft", "Draft"], ["assigned", "Assigned"], ["rectifying", "Rectifying"], ["ready_for_verification", "In review"], ["closed", "Closed"]])}
+      <button class="btn" type="submit" style="height:34px">+ Filter</button>
+    </form>${table}
+  </section>
+  <section class="card" id="inspections"><div class="card-head"><h2>Inspection &amp; test plans</h2><div class="spacer"></div><span class="small muted">From company templates</span></div>
+    <div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Title</th><th>Points</th><th>Hold points</th><th>Status</th></tr></thead><tbody>${itps.map((i) => {
+      const holds = i.points.filter((x) => x.type === "hold"), openH = holds.filter((x) => x.status !== "released"), h = `${base}/quality/itp/${i.id}`;
+      const st = i.points.some((x) => x.status === "rejected") ? "rejected" : i.points.some((x) => x.status === "submitted") ? "in_review" : i.points.some((x) => x.status === "pending") ? "open" : "complete";
+      return `<tr><td><a class="mono link" href="${h}">${i.ref}</a></td><td><a class="rowlink" href="${h}">${esc(i.title)}</a><div class="muted small">Template v${i.templateVersion}</div></td><td class="small">${i.points.filter((x) => x.status === "released").length} / ${i.points.length} released</td><td>${!holds.length ? '<span class="muted small">—</span>' : openH.length ? badge("hold", `${openH.length} hold`) : badge("released")}</td><td>${badge(st)}</td></tr>`;
+    }).join("")}</tbody></table></div>
+  </section>`;
+}
+
+function defectFormHtml(u, p, mobile = false) {
+  const locs = DB.locations.filter((l) => l.projectId === p.id);
+  const cons = mobile ? DB.contractors.filter((c) => ["Waterproofing", "Tiling", "Plumbing", "Concrete"].includes(c.trade)) : DB.contractors;
+  const big = mobile ? ' style="height:48px;font-size:16px"' : "";
+  const assign = can(u, "defect.assign");
+  return form("createDefect", `${hidden("projectId", p.id)}<div class="stack" style="gap:14px">
+    <div class="row" style="justify-content:space-between"><span class="label">Photos first</span><span data-online-pill>${navigator.onLine ? `<span class="badge badge-green">${icon("check", 12)}Online</span>` : badge("offline")}</span></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
+      <div class="photo-ph" data-preview="0" style="min-height:${mobile ? 170 : 150}px">Take or add a photo</div>
+      <div style="display:grid;gap:8px"><div class="photo-ph" data-preview="1" style="min-height:0;background:#dfe5e1"></div>
+        <label class="photo-ph" style="min-height:0;background:#fff;border:1.5px dashed #a9b1aa;color:var(--muted);cursor:pointer">${icon("plus", 22)}<span class="sr-only">Add photos</span><input type="file" name="photos" accept="image/*" capture="environment" multiple hidden data-photo-input></label></div>
+    </div>
+    <span class="small muted" data-photo-count></span>
+    <label class="field"><span>What's wrong? <span class="req">*</span></span><input name="title" class="input" placeholder="e.g. Membrane lap short at shower hob"${big}></label>
+    <div class="field"><span>Location <span class="req">*</span></span>
+      <div class="row"><select name="locationId" class="input" aria-label="Location"${big}><option value="">Building › Level › Zone</option>${locs.map((l) => `<option value="${l.id}">${esc(`${l.building} › ${l.level} › ${l.zone}`)}</option>`).join("")}</select><button type="button" class="icon-btn" style="width:48px;height:${mobile ? 48 : 40}px;flex:none" title="Scan room QR code" data-qr>${icon("qr", 18)}</button></div>
+      <input name="room" class="input" placeholder="Room / unit (optional)"${big}></div>
+    <label class="field"><span>Trade</span><select name="trade" class="input"${big}><option value="">General</option>${uniq(DB.contractors.map((c) => c.trade)).map((t) => `<option>${esc(t)}</option>`).join("")}</select></label>
+    ${assign ? `<fieldset class="field" style="border:0;padding:0;margin:0"><legend style="font-size:13px;font-weight:600;margin-bottom:6px">Responsible contractor</legend><div class="row wrap" style="gap:6px">${cons.map((c) => `<label class="chip chip-radio" style="height:${mobile ? 44 : 32}px;cursor:pointer"><input type="radio" name="contractorId" value="${c.id}" class="sr-only">${esc(mobile ? c.tradingName.split(" ")[0] : c.tradingName)}</label>`).join("")}</div></fieldset>` : ""}
+    <div class="form-grid" style="grid-template-columns:1fr 1fr"><label class="field"><span>Priority</span><select name="priority" class="input"${big}><option value="low">Low</option><option value="medium">Medium</option><option value="high" selected>High</option><option value="critical">Critical</option></select></label><label class="field"><span>Due</span><input type="date" name="dueDate" class="input" min="${todayYmd()}"${big}></label></div>
+    ${assign ? '<p class="small muted" style="margin-top:-6px">Pick a contractor and due date to assign it now; otherwise it\'s raised as Open.</p>' : ""}
+    <div class="row" style="gap:10px"><button type="submit" name="mode" value="draft" class="btn ${mobile ? "btn-lg" : ""}" style="flex:${mobile ? 1 : "none"}">Save draft</button><button type="submit" name="mode" value="submit" class="btn btn-primary ${mobile ? "btn-lg" : ""}" style="flex:${mobile ? 1.4 : "none"}">${assign ? "Raise &amp; assign" : "Raise defect"}</button></div>
+  </div>`, `data-done="${mobile ? "#/site" : `#/app/projects/${p.id}/quality`}"`);
+}
+function pageNewDefect(u, p) {
+  assertCan(u, "defect.create");
+  return `${pageHeader({ crumbs: [[`#/app/projects/${p.id}`, p.name], [`#/app/projects/${p.id}/quality`, "Quality"]], title: "New defect" })}<section class="card card-pad" style="max-width:680px">${defectFormHtml(u, p)}</section>`;
+}
+
+function pageDefect(u, p, id) {
+  const d = getDefect(u, id);
+  if (!d || d.projectId !== p.id) return notFound();
+  const base = `#/app/projects/${p.id}`, late = isOverdue(d), isSub = u.role === "subcontractor_admin" && u.contractorId === d.contractorId, site = u.role === "site_supervisor" || u.role === "project_manager";
+  const kv = (k, v) => `<dt class="muted">${k}</dt><dd style="text-align:left;font-family:inherit">${v}</dd>`;
+  const task = DB.tasks.find((t) => t.id === d.taskId), itp = DB.itps.find((i) => i.id === d.itpId);
+  const panels = [];
+  const H = hidden("defectId", d.id);
+  if (d.status === "draft" && can(u, "defect.create")) panels.push(`<section class="card card-pad"><h2 style="margin-bottom:6px">Draft</h2><p class="muted small" style="margin-bottom:12px">Drafts aren't in the open register yet. Submit it when the details are right.</p>${form("defect", H + hidden("type", "submit") + '<button class="btn btn-primary">Submit defect</button>')}</section>`);
+  if ((d.status === "open" || d.status === "assigned") && can(u, "defect.assign")) panels.push(`<section class="card card-pad"><h2 style="margin-bottom:12px">${d.status === "open" ? "Assign" : "Reassign"}</h2>${form("defect", `${H}${hidden("type", "assign")}<div class="stack"><label class="field"><span>Responsible contractor <span class="req">*</span></span><select name="contractorId" class="input"><option value="">Select…</option>${DB.contractors.map((c) => `<option value="${c.id}"${c.id === d.contractorId ? " selected" : ""}>${esc(c.tradingName)}</option>`).join("")}</select></label><label class="field"><span>Due date <span class="req">*</span></span><input type="date" name="dueDate" class="input" value="${d.dueDate ?? ""}" min="${todayYmd()}"></label><button class="btn btn-primary">Assign</button></div>`)}</section>`);
+  if (d.status === "assigned" && (isSub || site)) panels.push(`<section class="card card-pad"><h2 style="margin-bottom:6px">Start rectification</h2><p class="muted small" style="margin-bottom:12px">Let the site team know the crew is on it.</p>${form("defect", H + hidden("type", "start_rectification") + '<button class="btn">Mark as rectifying</button>')}</section>`);
+  if ((d.status === "rectifying" || d.status === "assigned") && (isSub || site)) panels.push(`<section class="card card-pad"><h2 style="margin-bottom:12px">Submit for verification</h2>${form("defect", `${H}${hidden("type", "submit_for_verification")}<div class="stack"><label class="field"><span>What was done <span class="req">*</span></span><textarea name="note" class="input" placeholder="e.g. Membrane relapped 150mm up hob, cured 24h"></textarea></label><label class="field"><span>Completion photos <span class="req">*</span></span><input type="file" name="evidence" accept="image/*" multiple class="input" style="padding-top:7px"></label><button class="btn btn-dark">Submit for review</button></div>`)}</section>`);
+  if (d.status === "ready_for_verification" && can(u, "defect.verify")) panels.push(`<section class="card card-pad"><h2 style="margin-bottom:6px">Verify repair</h2><p class="muted small" style="margin-bottom:12px">Closing needs your sign-off on the evidence. Rejecting sends it back to rectification.</p>
+    ${form("defect", H + hidden("type", "verify") + '<button class="btn btn-primary">Verify &amp; close</button>', `data-confirm="Verify and close ${d.ref}? This is recorded against your name."`)}
+    <div style="margin-top:14px">${form("defect", `${H}${hidden("type", "reject")}<div class="stack"><label class="field"><span>Reason for rejecting</span><textarea name="reason" class="input" placeholder="What still needs fixing?"></textarea></label><button class="btn btn-danger">Request changes</button></div>`)}</div></section>`);
+  if (d.status === "closed") panels.push(`<section class="card card-pad"><h2 style="margin-bottom:6px">Closed</h2><p class="muted small">Verified by ${esc(userById(d.verifiedBy)?.name ?? "reviewer")}. The record stays in the register for audit and the defect liability period.</p></section>`);
+  if (!panels.length) panels.push(`<section class="card card-pad"><p class="muted small">Nothing for you to do here as ${ROLE_LABEL[u.role].toLowerCase()}.</p></section>`);
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/quality`, "Quality"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${d.ref}</span>${esc(d.title)}`, meta: `<span class="row" style="gap:8px">${late ? badge("overdue") : ""}${badge(d.status)}</span>` })}
+  <section class="card card-pad">${stepper(DEFECT_STEPS, d.status === "draft" ? "open" : d.status)}</section>
+  <div class="cc-grid">
+    <div class="stack-lg" style="min-width:0">
+      <section class="card"><div class="card-head"><h2>Details</h2></div><div class="card-body">
+        <dl class="kv" style="grid-template-columns:180px 1fr">${kv("Location", esc(locationLabel(d)))}${kv("Trade", esc(d.trade))}${kv("Responsible contractor", esc(contractorOf(d.contractorId)?.tradingName ?? "Unassigned"))}${kv("Priority", cap(d.priority))}${kv("Due", `<span class="${late ? "amber-text" : ""}">${dueLabel(d.dueDate)}</span>`)}${kv("Raised", `${esc(userById(d.raisedBy)?.name)} · ${dateTime(d.raisedAt)}`)}${task ? kv("Programme task", `<a class="link" href="${base}/programme">${esc(task.name)}</a>`) : ""}${itp ? kv("ITP", `<a class="link" href="${base}/quality/itp/${itp.id}">${itp.ref}</a>`) : ""}</dl>
+        <h3 style="margin:18px 0 8px">Photos</h3>${d.photos.length ? `<div class="photo-grid">${d.photos.map((s) => photoTile(s, "min-height:96px")).join("")}</div>` : '<p class="muted small">No photos attached.</p>'}
+        ${d.rectificationNote ? `<h3 style="margin:18px 0 8px">Rectification</h3><p>${esc(d.rectificationNote)}</p><div class="photo-grid" style="margin-top:8px">${d.evidencePhotos.map((s) => photoTile(s, "min-height:96px;background-color:#a9c3b6")).join("")}</div>` : ""}
+      </div></section>
+      <section class="card"><div class="card-head"><h2>History</h2></div><div class="card-body"><ul class="timeline">
+        ${auditFor(d.id).filter((a) => a.action !== "Defect raised").map((a) => `<li><span class="dot ${/closed|verified/i.test(a.action) ? "green" : /reject/i.test(a.action) ? "red" : "blue"}"></span><div><b style="font-weight:600">${esc(a.action)}</b> by ${esc(userById(a.actorId)?.name)}${a.detail ? ` · ${esc(a.detail)}` : ""} · <span class="muted">${dateTime(a.at)}</span>${a.from && a.to && a.from !== a.to ? `<div class="muted small">${words(a.from)} → ${words(a.to)}</div>` : ""}</div></li>`).join("")}
+        <li><span class="dot"></span><div><b style="font-weight:600">Defect raised</b> by ${esc(userById(d.raisedBy)?.name)} · <span class="muted">${dateTime(d.raisedAt)}</span></div></li>
+      </ul></div></section>
+    </div>
+    <aside class="stack-lg">${panels.join("")}</aside>
+  </div>`;
+}
+
+function pageItp(u, p, id) {
+  const itp = DB.itps.find((i) => i.id === id && i.projectId === p.id);
+  if (!itp) return notFound();
+  const base = `#/app/projects/${p.id}`, task = DB.tasks.find((t) => t.id === itp.taskId), mayRelease = can(u, "itp.release_hold");
+  const TYPE = { hold: "Hold point", witness: "Witness point", inspection: "Inspection", test: "Test" };
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/quality`, "Quality"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${itp.ref}</span>${esc(itp.title)}`, meta: `<span>Template v${itp.templateVersion} — template changes don't silently alter this active ITP</span>${task ? `<span>Task: <a class="link" href="${base}/programme">${esc(task.name)}</a></span>` : ""}` })}
+  ${itp.points.some((x) => x.type === "hold" && x.status !== "released") ? `<div class="notice notice-error">${icon("lock")}<span><b>Hold point open.</b> Work covered by this hold must not proceed until a designated person releases it. BuildOS flags the hold and records who released it — it doesn't replace contractual requirements.</span></div>` : ""}
+  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Point</th><th>Type</th><th>Acceptance check</th><th>Evidence</th><th>Status</th><th style="min-width:250px">Sign-off</th></tr></thead><tbody>
+  ${itp.points.map((pt) => `<tr><td style="font-weight:600">${esc(pt.name)}</td><td>${pt.type === "hold" ? badge("hold", "Hold") : `<span class="tag">${TYPE[pt.type]}</span>`}</td><td class="small">${esc(pt.check)}</td><td class="small">${pt.evidence ? `${pt.evidence} photo${pt.evidence > 1 ? "s" : ""}` : '<span class="muted">None</span>'}</td><td>${badge(pt.status)}</td><td>
+    ${pt.status === "released" ? `<span class="small muted">Released by ${esc(userById(pt.releasedBy)?.name)} · ${pt.releasedAt ? dateTime(pt.releasedAt) : ""}</span>` : ""}
+    ${pt.status === "submitted" && mayRelease ? form("hold", `${hidden("itpId", itp.id)}${hidden("pointId", pt.id)}<div class="stack" style="gap:8px"><input name="comment" class="input" placeholder="Comment (required to reject)" style="height:34px"><div class="row"><button class="btn btn-primary" name="decision" value="release">${pt.type === "hold" ? "Release hold point" : "Accept"}</button><button class="btn btn-danger" name="decision" value="reject">Reject</button></div></div>`, `data-confirm="${pt.type === "hold" ? "Release this hold point" : "Accept this point"}? Your name and the time are recorded." data-confirm-for="release"`) : ""}
+    ${pt.status === "submitted" && !mayRelease ? '<span class="small muted">Awaiting an authorised reviewer</span>' : ""}
+    ${pt.status === "pending" ? '<span class="small muted">Not yet submitted from site</span>' : ""}
+    ${pt.status === "rejected" ? '<span class="small red-text">Rejected — rework and resubmit</span>' : ""}
+  </td></tr>`).join("")}</tbody></table></div></section>
+  <p class="small muted">Releasing a hold point records quality acceptance. It doesn't mark the programme task complete — quality acceptance and physical progress are separate facts.</p>`;
+}
+
+// ===================================================== other project modules
+function pageProgramme(u, p) {
+  const tasks = DB.tasks.filter((t) => t.projectId === p.id).sort((a, b) => a.forecastStart.localeCompare(b.forecastStart));
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Programme &amp; tasks", meta: `<span>Planned <b>${p.plannedProgress}%</b></span><span>Verified on site <b>${p.verifiedProgress}%</b></span><span>PC <b>${dayMonth(p.pcDate)}</b></span>` })}
+  <section class="card"><div class="card-head"><h2>Six-week view</h2><div class="spacer"></div><span class="small muted">Forecast vs baseline · numbers mark Mondays</span></div><div class="card-body">${gantt(tasks, -7, 42)}${ganttKey()}</div></section>
+  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Task</th><th>Contractor</th><th>Baseline finish</th><th>Forecast finish</th><th class="right">Slip</th><th class="right">Progress</th><th>Quality</th><th>Status</th></tr></thead><tbody>
+  ${tasks.map((t) => { const slip = daysBetween(D(t.baselineFinish), D(t.forecastFinish)), itp = DB.itps.find((i) => i.id === t.itpId); return `<tr><td style="font-weight:${t.isMilestone ? 700 : 500}">${t.isMilestone ? "◆ " : ""}${esc(t.name)}<div class="muted small">${esc(t.trade)}</div></td><td class="small">${esc(contractorOf(t.contractorId)?.tradingName ?? "—")}</td><td class="small">${dayMonth(t.baselineFinish)}</td><td class="small">${dayMonth(t.forecastFinish)}</td><td class="num ${slip > 0 ? "amber-text" : ""}">${slip > 0 ? `+${slip}d` : "—"}</td><td class="num">${t.progress}%</td><td class="small">${itp ? `<a class="link" href="#/app/projects/${p.id}/quality/itp/${itp.id}">${itp.ref}</a>` : "—"}</td><td>${badge(t.status)}</td></tr>`; }).join("")}
+  </tbody></table></div></section>
+  <p class="small muted">Physical progress, ITP sign-off and claim entitlement are tracked separately: a task can be complete while its ITP is unsigned.</p>`;
+}
+
+function pageCommercial(u, p) {
+  const c = projectCommercial(u, p.id);
+  if (!c) return notFound("Commercial records aren't available to your role.");
+  const lines = DB.budgetLines.filter((l) => l.projectId === p.id), vars = listVariations(u, p.id), claims = DB.claims.filter((x) => x.projectId === p.id);
+  return `${pageHeader({ crumbs: crumbsFor(p), title: `<span class="row" style="gap:12px">Commercial &amp; finance ${sampleTag()}</span>`, meta: `<span>All figures excl. GST. Your variation approval limit: <b>${moneyLimit(VARIATION_LIMIT[u.role])}</b></span>` })}
+  <div class="metrics">
+    ${metric("Original contract", money(c.originalContract, { compact: true }))}${metric("Approved variations", money(c.approvedVariations, { compact: true, sign: true }))}${metric("Approved contract value", money(c.revisedContract, { compact: true }))}
+    ${metric("Committed costs", money(c.committed, { compact: true }), `${pct((c.committed / c.forecastFinalCost) * 100, 0)} of forecast`)}${metric("Actual costs", money(c.actual, { compact: true }))}${metric("Forecast final cost", money(c.forecastFinalCost, { compact: true }))}
+    ${metric("Forecast gross margin", pct(c.forecastMarginPct), money(c.forecastMargin, { compact: true }), c.forecastMargin < 0 ? "red" : null)}${metric("Variation exposure", money(c.variationExposure, { compact: true }), "Unapproved — not in contract value", "amber")}
+  </div>
+  <p class="small muted" style="margin-top:-8px">Margin = approved contract value − forecast final cost, before company overheads. Unapproved variations never increase the contract sum; they appear only as exposure.</p>
+  <section class="card" id="variations"><div class="card-head" style="flex-wrap:wrap"><h2>Variations</h2><div class="spacer"></div><span class="small muted">Draft → Submitted → Under review → Approved / Rejected → In claim</span></div>
+    <div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Description</th><th>Raised</th><th class="right">Proposed</th><th class="right">Approved</th><th>Status</th><th style="min-width:240px">Action</th></tr></thead><tbody>
+    ${vars.map((v) => `<tr id="${v.id}"><td class="mono">${v.ref}</td><td>${esc(v.title)}<div class="muted small">${esc(v.reason)}</div></td><td class="small">${dayMonth(v.raisedAt)}</td><td class="num">${money(v.amount)}</td><td class="num">${v.approvedAmount !== undefined ? money(v.approvedAmount) : "—"}</td><td>${badge(v.status)}</td><td>
+      ${(v.status === "submitted" || v.status === "under_review") && can(u, "variation.approve") ? form("variation", `${hidden("variationId", v.id)}<div class="stack" style="gap:6px"><input name="reason" class="input" placeholder="Reason (to reject)" style="height:32px"><div class="row"><button class="btn btn-primary" name="type" value="approve">Approve</button><button class="btn btn-danger" name="type" value="reject">Reject</button></div></div>`, `data-confirm="Approve ${v.ref} for ${money(v.amount)}? This updates the approved contract value." data-confirm-for="approve"`)
+        : v.status === "approved" && can(u, "variation.approve") ? form("variation", `${hidden("variationId", v.id)}<button class="btn" name="type" value="include_in_claim">Include in next claim</button>`)
+        : `<span class="small muted">${v.approvedBy ? `Approved by ${esc(userById(v.approvedBy)?.name)}` : "—"}</span>`}
+    </td></tr>`).join("")}</tbody></table></div></section>
+  <section class="card"><div class="card-head"><h2>Budget by cost code</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Code</th><th>Description</th><th class="right">Budget</th><th class="right">Committed</th><th class="right">Actual</th><th class="right">Forecast final</th><th class="right">Variance</th></tr></thead><tbody>
+    ${lines.map((l) => { const v = l.originalBudget - l.forecastFinal; return `<tr><td class="mono">${l.costCode}</td><td>${esc(l.description)}</td><td class="num">${money(l.originalBudget)}</td><td class="num">${money(l.committed)}</td><td class="num">${money(l.actual)}</td><td class="num">${money(l.forecastFinal)}</td><td class="num ${v < 0 ? "red-text" : ""}">${money(v, { sign: true })}</td></tr>`; }).join("")}
+    </tbody><tfoot><tr><td></td><td>Total</td><td class="num">${money(c.budget)}</td><td class="num">${money(c.committed)}</td><td class="num">${money(c.actual)}</td><td class="num">${money(c.forecastFinalCost)}</td><td class="num">${money(c.budget - c.forecastFinalCost, { sign: true })}</td></tr></tfoot></table></div></section>
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Progress claims</h2><div class="spacer"></div><span class="small muted">Submitted, certified and paid are tracked separately</span></div><div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Period end</th><th>Due</th><th class="right">Claimed</th><th class="right">Certified</th><th class="right">Paid</th><th>Status</th></tr></thead><tbody>
+    ${claims.map((x) => `<tr><td class="mono">${x.ref}</td><td class="small">${dayMonth(x.periodEnd)}</td><td class="small ${D(x.dueDate) < startOfDay(new Date()) && x.status !== "paid" ? "amber-text" : ""}">${dayMonth(x.dueDate)}</td><td class="num">${money(x.claimed)}</td><td class="num">${x.certified !== undefined ? money(x.certified) : "—"}</td><td class="num">${x.paid !== undefined ? money(x.paid) : "—"}</td><td>${badge(x.status)}</td></tr>`).join("")}
+    </tbody></table></div></section>
+  <div class="notice notice-warn">${icon("alert")}<span>A completed task or signed ITP doesn't automatically entitle a contractor to payment. Security-of-payment deadlines need specialist legal review before they're automated.</span></div>`;
+}
+
+function pageSafety(u, p) {
+  const sw = DB.swms.filter((s) => s.projectId === p.id);
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance" })}
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>SWMS register</h2><div class="spacer"></div><span class="small muted">Submit → review → approve → workers acknowledge the current version</span></div>
+  <div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Activity</th><th>Contractor</th><th>High-risk work</th><th>Acknowledged</th><th>Status</th><th style="min-width:250px">Review</th></tr></thead><tbody>
+  ${sw.map((s) => { const crew = DB.workers.filter((w) => w.contractorId === s.contractorId && w.inductedProjectIds.includes(p.id)); return `<tr><td class="mono">${s.ref} v${s.version}</td><td><b style="font-weight:600">${esc(s.title)}</b><div class="muted small">${esc(s.activity)}</div></td><td class="small">${esc(contractorOf(s.contractorId)?.tradingName)}</td><td class="small">${esc(s.highRiskCategories.join(", "))}</td><td class="small">${s.status === "approved" ? `${s.acknowledgedBy.length} of ${crew.length} workers` : "—"}</td><td>${badge(s.status)}</td><td>${(s.status === "submitted" || s.status === "in_review") && can(u, "swms.review") ? form("swms", `${hidden("swmsId", s.id)}<div class="stack" style="gap:6px"><input name="comment" class="input" placeholder="Comment (required for changes)" style="height:32px"><div class="row"><button class="btn btn-primary" name="decision" value="approve">Approve</button><button class="btn btn-danger" name="decision" value="changes">Request changes</button></div></div>`) : '<span class="muted small">—</span>'}</td></tr>`; }).join("")}
+  </tbody></table></div></section>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+    <section class="card">${emptyState("filewarn", "Permits to work", "Configurable permit types and approvers per project. A permit is never issued just because a form is complete. Planned for phase 3.")}</section>
+    <section class="card">${emptyState("octagon", "Incidents & observations", "Hazard, near-miss and incident reports with investigation and corrective actions. Planned for phase 3.")}</section>
+    <section class="card">${emptyState("listchecks", "Toolbox talks", "Record talks and attendance, linked to the day's site diary. Planned for phase 3.")}</section>
+  </div>`;
+}
+
+function pageWorkforce(u, p) {
+  const here = onSiteNow(p.id), hereIds = new Set(here.map((e) => e.workerId));
+  const workers = DB.workers.filter((w) => w.inductedProjectIds.includes(p.id) || hereIds.has(w.id) || DB.tasks.some((t) => t.projectId === p.id && t.contractorId === w.contractorId));
+  const rows = workers.map((w) => ({ w, r: workerRequirements(w.id, p.id), inAt: here.find((e) => e.workerId === w.id)?.at })).sort((a, b) => a.r.eligible - b.r.eligible);
+  const comps = uniq(workers.map((w) => w.contractorId)).map(contractorOf);
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Workforce &amp; site access" })}
+  <div class="metrics">${metric("On site now", here.length, `${companiesOnSite(p.id)} companies`)}${metric("Can't sign in", rows.filter((x) => !x.r.eligible).length, "Exact requirement shown below", "amber")}${metric("Companies engaged", comps.length)}</div>
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Site register &amp; eligibility</h2><div class="spacer"></div><span class="small muted">A check-in is attendance, not an approved timesheet</span></div>
+  <div class="table-wrap"><table class="register"><thead><tr><th>Worker</th><th>Company</th><th>On site</th><th>Requirements</th></tr></thead><tbody>
+  ${rows.map(({ w, r, inAt }) => { const issues = r.reqs.filter((x) => x.severity !== "ok"); return `<tr><td style="font-weight:600">${esc(w.name)}</td><td class="small">${esc(contractorOf(w.contractorId)?.tradingName)}</td><td class="small">${inAt ? badge("current", `In ${timeOf(inAt)}`) : '<span class="muted">Not on site</span>'}</td><td class="small">${issues.length ? `<div class="row wrap" style="gap:6px">${issues.map((x) => badge(x.severity === "blocking" ? "rejected" : "expiring", `${x.label} — ${x.detail}`)).join("")}</div>` : badge("verified", "All requirements met")}</td></tr>`; }).join("")}
+  </tbody></table></div></section>
+  <section class="card"><div class="card-head"><h2>Contractor compliance</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Company</th><th>Trade</th><th>Public liability</th><th>Workers comp</th></tr></thead><tbody>
+  ${comps.map((c) => `<tr><td style="font-weight:600">${esc(c.tradingName)}<div class="muted small">ABN ${c.abn}</div></td><td class="small">${esc(c.trade)}</td>${c.insurances.map((ins) => insBadge(ins)).map((b) => `<td>${b}</td>`).join("")}</tr>`).join("")}
+  </tbody></table></div></section>
+  <p class="small muted">Timesheets (separate payroll and charge-out rates, supervisor approval) are planned for phase 3.</p>`;
+}
+function insBadge(ins, withType = false) {
+  const d = daysBetween(new Date(), D(ins.expires)), t = withType ? `${ins.type} · ` : "";
+  return badge(d < 0 ? "expired" : d <= 30 ? "expiring" : "verified", d < 0 ? `${t}Expired ${dayMonth(ins.expires)}` : d <= 30 ? `${t}Expires ${dayMonth(ins.expires)}` : `${t}Current to ${dayMonth(ins.expires)}`);
+}
+
+function pageDocuments(u, p) {
+  const docs = DB.documents.filter((d) => d.projectId === p.id).sort((a, b) => a.number.localeCompare(b.number) || b.revision.localeCompare(a.revision));
+  const pending = docs.filter((d) => d.status === "in_review");
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Documents &amp; drawings" })}
+  ${pending.length ? `<div class="notice notice-warn">${icon("alert")}<span>${pending.map((d) => `${d.number} rev ${d.revision}`).join(", ")} ${pending.length > 1 ? "are" : "is"} in review. The previous revision stays current until review is complete, then it's labelled superseded and kept for audit.</span></div>` : ""}
+  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Number</th><th>Title</th><th>Category</th><th>Rev</th><th>Uploaded</th><th>Status</th></tr></thead><tbody>
+  ${docs.map((d) => `<tr${d.status === "superseded" ? ' style="opacity:.6"' : ""}><td class="mono">${d.number}</td><td>${esc(d.title)}</td><td class="small">${d.category}</td><td class="mono">${d.revision}</td><td class="small">${esc(userById(d.uploadedBy)?.name)} · ${dayMonth(d.uploadedAt)}</td><td>${badge(d.status)}</td></tr>`).join("")}
+  </tbody></table></div></section>
+  <p class="small muted">File storage, previews and drawing markup come with the backend build.</p>`;
+}
+
+function pageDiary(u, p) {
+  const entries = DB.diary.filter((x) => x.projectId === p.id), done = entries.some((e) => e.date === todayYmd());
+  const insp = DB.audit.filter((a) => a.projectId === p.id && a.recordType === "itp_point" && ymd(new Date(a.at)) === todayYmd()).length;
+  const formHtml = done ? `<p class="muted">Today's diary is submitted. Changes go in as amendments, so the original record is never overwritten.</p>`
+    : can(u, "diary.submit") ? form("diary", `${hidden("projectId", p.id)}<div class="stack"><label class="field"><span>Weather &amp; conditions</span><input name="weather" class="input" value="${esc(p.weather ?? "")}"></label><label class="field"><span>Work completed &amp; areas <span class="req">*</span></span><textarea name="notes" class="input" placeholder="What happened on site today?"></textarea></label><label class="field"><span>Delays &amp; disruptions</span><input name="delays" class="input" placeholder="Cause and duration"></label><button class="btn btn-dark">Submit diary</button></div>`)
+    : `<p class="muted">Only the site team can submit the diary.</p>`;
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Site diary", meta: `<span>${longToday()}</span>` })}
+  <div class="po-grid">
+    <section class="card card-pad"><h2 style="margin-bottom:4px">Today</h2><p class="muted small" style="margin-bottom:14px">Pulled in automatically: <b>${onSiteNow(p.id).length} workers</b> checked in, <b>${insp}</b> inspection sign-offs today.</p>${formHtml}</section>
+    <section class="card"><div class="card-head"><h2>Previous entries</h2></div><div class="card-body stack">
+      ${entries.map((e) => `<div style="border-bottom:1px solid var(--border);padding-bottom:12px"><div class="row wrap small muted" style="gap:12px"><b style="color:var(--ink)">${shortDate(e.date)}</b><span>${esc(e.weather)}</span><span>${e.workersOnSite} workers · ${e.companiesOnSite} companies</span>${badge("submitted")}</div><p style="margin-top:6px">${esc(e.notes)}</p>${e.delays ? `<p class="small amber-text" style="margin-top:4px">Delay: ${esc(e.delays)}</p>` : ""}<p class="small muted" style="margin-top:4px">By ${esc(userById(e.authorId)?.name)}</p></div>`).join("") || '<p class="muted">No entries yet.</p>'}
+    </div></section>
+  </div>`;
+}
+const pagePlaceholder = (p, title, ic, body) => `${pageHeader({ crumbs: crumbsFor(p), title })}<section class="card">${emptyState(ic, "Coming in a later phase", body)}</section>`;
+
+// ===================================================== company pages
+function pageProjects(u) {
+  return `${pageHeader({ title: `<span class="row" style="gap:12px">Projects ${sampleTag()}</span>`, meta: `<span>${listProjects(u).length} active</span>` })}
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${listProjects(u).map((p) => { const c = projectCommercial(u, p.id); return `<a href="#/app/projects/${p.id}" class="card card-pad stack" style="gap:10px"><div><h2>${esc(p.name)}</h2><div class="muted small"><span class="mono" style="font-size:12px">${p.code}</span> · ${p.type} · ${esc(p.address)}</div></div><div class="bar"><span class="planned" style="width:${p.plannedProgress}%"></span><span class="actual" style="width:${p.verifiedProgress}%"></span></div><div class="row wrap small muted" style="gap:14px"><span>${p.verifiedProgress}% verified</span><span>${openDefects(u, p.id).length} open defects</span>${c ? `<span>${money(c.revisedContract, { compact: true })}</span>` : ""}<span>PM ${esc(userById(p.pmId)?.name)}</span></div><div class="small">Next: <b>${esc(p.nextMilestone.name)}</b> · ${dayMonth(p.nextMilestone.date)}</div></a>`; }).join("")}</div>
+  <p class="small muted">Guided project setup (details → commercial → team → programme → quality &amp; safety → documents) arrives with the database build.</p>`;
+}
+const pageTasks = (u) => `${pageHeader({ title: "My tasks", meta: `<span>${myTasks(u).length} open · everything assigned to you as ${ROLE_LABEL[u.role].toLowerCase()}, across every module</span>` })}<section class="card card-pad">${taskList(myTasks(u))}</section>`;
+function pagePeople() {
+  return `${pageHeader({ title: "People &amp; contractors", meta: `<span>${DB.contractors.length} companies · ${DB.workers.length} workers — one central profile, reused across projects</span>` })}
+  <section class="card"><div class="card-head"><h2>Contractors</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Company</th><th>Trade</th><th>Workers</th><th>Insurances</th></tr></thead><tbody>
+  ${DB.contractors.map((c) => `<tr><td style="font-weight:600">${esc(c.tradingName)}<div class="muted small">${esc(c.legalName)} · ABN ${c.abn}</div></td><td class="small">${esc(c.trade)}</td><td class="small">${DB.workers.filter((w) => w.contractorId === c.id).length}</td><td><div class="row wrap" style="gap:6px">${c.insurances.map((i) => insBadge(i, true)).join("")}</div></td></tr>`).join("")}
+  </tbody></table></div></section>
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Worker credential wallets</h2><div class="spacer"></div><span class="small muted">Uploaded ≠ verified: each credential shows its verification state</span></div><div class="table-wrap"><table class="register"><thead><tr><th>Worker</th><th>Company</th><th>Credentials</th></tr></thead><tbody>
+  ${DB.workers.map((w) => `<tr><td style="font-weight:600">${esc(w.name)}</td><td class="small">${esc(contractorOf(w.contractorId)?.tradingName)}</td><td><div class="row wrap" style="gap:6px">${DB.credentials.filter((c) => c.workerId === w.id).map((c) => { const d = c.expires ? daysBetween(new Date(), D(c.expires)) : Infinity; return badge(d < 0 ? "expired" : c.status !== "verified" ? c.status : d <= 30 ? "expiring" : "verified", `${c.type}${c.expires ? ` · ${dayMonth(c.expires)}` : ""}`); }).join("")}</div></td></tr>`).join("")}
+  </tbody></table></div></section>`;
+}
+function pageReports(u, q) {
+  const view = q.view || "defects", rows = listDefects(u).filter((d) => d.status !== "closed" && d.status !== "draft" && (view !== "overdue" || isOverdue(d)));
+  return `${pageHeader({ title: "Reports", meta: "<span>Company-wide registers. Open defects = every defect not closed or draft, across all active projects.</span>", actions: `<a class="chip" data-active="${view === "defects"}" href="#/app/reports">All open defects</a><a class="chip" data-active="${view === "overdue"}" href="#/app/reports?view=overdue">Overdue only</a>` })}
+  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>ID</th><th>Title</th><th>Project</th><th>Location</th><th>Contractor</th><th>Due</th><th>Status</th></tr></thead><tbody>
+  ${rows.map((d) => `<tr><td><a class="mono link" href="#/app/projects/${d.projectId}/quality/defects/${d.id}">${d.ref}</a></td><td>${esc(d.title)}</td><td class="small">${esc(projName(d.projectId))}</td><td class="small">${esc(locationLabel(d))}</td><td class="small">${esc(contractorOf(d.contractorId)?.tradingName ?? "—")}</td><td class="small">${dueLabel(d.dueDate)}</td><td>${badge(isOverdue(d) ? "overdue" : d.status)}</td></tr>`).join("")}
+  </tbody></table></div></section>`;
+}
+function pageSearch(u, q) {
+  const r = search(u, q.q || "");
+  return `${pageHeader({ title: q.q ? `Results for “${esc(q.q)}”` : "Search", meta: "<span>Projects, defects, documents, workers and variations — only what your role can see.</span>" })}
+  <section class="card">${r.length ? `<div class="table-wrap"><table class="register"><tbody>${r.map(([k, t, s, h]) => `<tr><td style="width:110px"><span class="tag">${k}</span></td><td><a class="rowlink" href="${h}">${esc(t)}</a></td><td class="small muted">${esc(s)}</td></tr>`).join("")}</tbody></table></div>` : emptyState("search", q.q ? "Nothing found" : "Search everything", q.q ? "Try a record ID like DEF-0142, a drawing number like A-102, or a worker's name." : "Type in the search bar above.")}</section>`;
+}
+function pageSettings() {
+  return `${pageHeader({ title: "Company settings", meta: `<span>${esc(DB.org.name)} · ABN ${DB.org.abn}</span>` })}
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Team &amp; roles</h2><div class="spacer"></div><span class="small muted">Checked on every action, not just hidden buttons</span></div><div class="table-wrap"><table class="register"><thead><tr><th>Person</th><th>Role</th><th>Variation approval limit</th></tr></thead><tbody>
+  ${DB.users.map((x) => `<tr><td style="font-weight:600">${esc(x.name)}<div class="muted small">${esc(x.title)}</div></td><td>${ROLE_LABEL[x.role]}</td><td class="mono">${VARIATION_LIMIT[x.role] === undefined ? "—" : moneyLimit(VARIATION_LIMIT[x.role])}</td></tr>`).join("")}
+  </tbody></table></div></section>
+  <section class="card card-pad stack"><h2>Data on this device</h2><p class="muted small">Everything in this prototype is sample data saved in this browser only. Nothing is sent anywhere.</p><div><button class="btn btn-danger" type="button" data-reset>${icon("rotate", 15)} Reset sample data</button></div></section>`;
+}
+const notFound = (msg = "That page or record doesn't exist, or your role can't see it.") => `<section class="card">${emptyState("search", "Not found", msg, '<a class="btn" href="#/app">Back to overview</a>')}</section>`;
+
+// ===================================================== mobile site app
+const siteTabs = (route) => { const t = (h, l, ic) => `<a href="${h}"${route === h.slice(1) ? ' aria-current="page"' : ""}>${icon(ic, 21)}${l}</a>`; return `<nav class="site-tabs" aria-label="Site app">${t("#/site", "Today", "calendar")}${t("#/app/tasks", "Tasks", "listchecks")}<a href="#/site/defect" aria-label="Raise defect"><span class="fab">${icon("plus", 26)}</span></a>${t("#/app/projects/p_riv/documents", "Drawings", "file")}${t("#/site/sign-in", "Me", "user")}</nav>`; };
+const siteWrap = (inner) => `<div class="site-wrap"><div class="site">${inner}</div></div>`;
+function pageSiteToday(u, route) {
+  const p = listProjects(u)[0];
+  const todays = DB.itps.filter((i) => i.projectId === p.id).flatMap((i) => i.points.filter((pt) => pt.status === "submitted" || (pt.status === "pending" && pt.type !== "test")).slice(0, 1).map((pt) => ({ i, pt })));
+  return siteWrap(`<header class="site-hero">
+    <div class="row" style="justify-content:space-between"><a href="#/app/projects/${p.id}" class="pill">${esc(p.name)} ▾</a><span class="small row" style="gap:6px;color:#b9cac2"><span style="width:8px;height:8px;border-radius:4px;background:#5fd39f"></span>Saved on device</span></div>
+    <p class="small" style="margin-top:14px;color:#b9cac2">${longToday()} · ${esc(p.weather)}</p><h1 style="font-size:26px;color:#fff">Today on site</h1>
+    <div class="site-stats"><div><b>${onSiteNow(p.id).length}</b><span>On site</span></div><div><b>${todays.length}</b><span>Inspections</span></div><div><b style="color:#f1b56b">${overdueDefects(u, p.id).length}</b><span>Overdue</span></div></div>
+  </header>
+  <div class="site-body">
+    <div class="big-actions"><a href="#/site/defect" class="big-action primary">${icon("camera", 22)}Raise defect</a><a href="#/app/projects/${p.id}/quality" class="big-action">${icon("clipboard", 22)}Inspect</a><a href="#/site/sign-in" class="big-action">${icon("qr", 22)}Site sign-in</a><a href="#/app/projects/${p.id}/diary" class="big-action">${icon("notebook", 22)}Site diary</a></div>
+    <div class="label">Inspections today</div>
+    <div class="list-card">${todays.map(({ i, pt }) => `<a href="#/app/projects/${p.id}/quality/itp/${i.id}"><span class="li-icon" style="background:${pt.type === "hold" ? "var(--red-tint)" : "var(--blue-tint)"};color:${pt.type === "hold" ? "var(--red)" : "var(--blue)"}">${icon(pt.type === "hold" ? "lock" : "clock", 18)}</span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">${esc(pt.type === "hold" ? `${i.title.split("—")[0].trim()} ${pt.name.toLowerCase()}` : i.title.split("·")[0].trim())}</b><span class="muted small">${i.ref} · ${pt.type === "hold" ? "Hold point" : pt.type} · ${pt.status === "submitted" ? "awaiting release" : "to do"}</span></span><span class="muted">${icon("chevron", 18)}</span></a>`).join("") || '<div class="li muted">No inspections today.</div>'}</div>
+  </div>${siteTabs(route)}`);
+}
+function pageSiteDefect(u) {
+  const p = listProjects(u)[0];
+  return siteWrap(`<div class="site-top"><a href="#/site" class="link">Cancel</a><b>New defect</b><span style="width:52px"></span></div><div class="site-body">${can(u, "defect.create") ? defectFormHtml(u, p, true) : '<p class="muted">Your role can\'t raise defects.</p>'}</div>`);
+}
+function pageSiteSignIn(u, route) {
+  const p = listProjects(u)[0];
+  if (!u.workerId) return siteWrap(`<div class="site-body" style="padding-top:40px"><h1 style="font-size:24px">Worker sign-in</h1><p class="muted">This screen is what a worker sees after scanning the gate QR code — no paid account needed.</p><button class="btn btn-primary btn-lg btn-block" type="button" data-login="u_wkr" data-next="/site/sign-in">View as worker (Sam)</button><a class="link" href="#/site">← Back to site app</a></div>${siteTabs(route)}`);
+  const r = workerRequirements(u.workerId, p.id), w = r.worker;
+  const onSite = onSiteNow(p.id).some((e) => e.workerId === w.id);
+  const unacked = DB.swms.filter((s) => s.projectId === p.id && s.contractorId === w.contractorId && s.status === "approved" && !s.acknowledgedBy.includes(w.id));
+  return siteWrap(`<div class="site-body" style="padding-top:22px">
+    <div><div class="muted small row" style="gap:4px">${icon("mappin", 14)}${esc(p.name)} · Gate 1</div><h1 style="font-size:26px">Hi ${esc(w.name.split(" ")[0])}</h1></div>
+    ${unacked.map((s) => `<div class="callout stack" style="gap:10px"><div class="row" style="gap:10px"><span style="color:var(--amber)">${icon("alert", 22)}</span><b style="font-size:17px">One step before sign-in</b></div><p>Read and acknowledge the <b>${esc(s.title)} SWMS (v${s.version})</b>. It changed since you last signed it.</p><details><summary class="link" style="cursor:pointer">Read the SWMS</summary><div class="small stack" style="margin-top:8px;gap:6px"><p><b>Activity:</b> ${esc(s.activity)}</p><p><b>High-risk work:</b> ${esc(s.highRiskCategories.join(", "))}</p><p><b>Key controls:</b> exclusion zone around the pump boom; spotter for truck movements; edge protection checked before pour; harness when within 2m of an open edge.</p></div></details>${form("swmsAck", hidden("swmsId", s.id) + '<button class="btn btn-dark btn-lg btn-block">I\'ve read it — acknowledge</button>')}</div>`).join("")}
+    <div class="label">Your site requirements</div>
+    <div class="req-list">${r.reqs.map((x) => `<div class="li"><span>${esc(x.label)}</span><b class="${x.severity === "ok" ? "green-text" : x.severity === "warning" ? "amber-text" : "red-text"}">${icon(x.severity === "ok" ? "check" : x.severity === "warning" ? "alert" : "xcircle", 14)}${esc(x.detail)}</b></div>`).join("")}</div>
+    ${r.reqs.some((x) => x.severity === "warning" && /licence/i.test(x.label)) ? '<button class="btn btn-lg btn-block" type="button" data-upload-licence>Upload renewed licence</button>' : ""}
+    ${onSite ? `<div class="notice notice-ok">${icon("checkcircle")}You're signed in to site.</div>${form("siteOut", hidden("projectId", p.id) + '<button class="btn btn-lg btn-block">Sign out of site</button>')}`
+      : form("siteIn", hidden("projectId", p.id) + `<button class="btn ${r.eligible ? "btn-primary" : ""} btn-lg btn-block"${r.eligible ? "" : " disabled"}>Sign in to site</button>`)}
+    <p class="small muted" style="text-align:center">No account needed · linked to ${esc(contractorOf(w.contractorId)?.tradingName)}</p>
+  </div>${siteTabs(route)}`);
+}
+
+// ===================================================== session & routing
+const currentUser = () => userById(store.get(USER_KEY) || "") || null;
+const HOME = { u_dir: "/app", u_pm: "/app/projects/p_riv", u_sup: "/site", u_qm: "/app/projects/p_riv/quality", u_sub: "/app/projects/p_riv/quality", u_wkr: "/site/sign-in" };
+const go = (path) => { if (location.hash === "#" + path) render(); else location.hash = path; };
+
+function parseRoute() {
+  const raw = decodeURIComponent(location.hash.slice(1)) || "/";
+  const [path, qs] = raw.split("?");
+  return { path: path.replace(/\/+$/, "") || "/", query: Object.fromEntries(new URLSearchParams(qs || "")) };
+}
+
+function resolve(path, query) {
+  const pub = { "/": [pageHome, "Everything on site. Everything under control."], "/pricing": [pagePricing, "Pricing"], "/security": [pageSecurity, "Security & privacy"], "/demo": [pageDemo, "Book a demo"], "/login": [pageLogin, "Log in"] };
+  if (pub[path]) return { html: pub[path][0](), title: pub[path][1] };
+  const u = currentUser();
+  if (!u) { go("/login"); return null; }
+  if (path === "/site") return { html: pageSiteToday(u, path), title: "Site app" };
+  if (path === "/site/defect") return { html: pageSiteDefect(u), title: "New defect" };
+  if (path === "/site/sign-in") return { html: pageSiteSignIn(u, path), title: "Site sign-in" };
+  const company = { "/app": [pageControlCentre, "Company overview"], "/app/projects": [pageProjects, "Projects"], "/app/tasks": [pageTasks, "My tasks"], "/app/people": [pagePeople, "People & contractors"], "/app/reports": [(x) => pageReports(x, query), "Reports"], "/app/search": [(x) => pageSearch(x, query), "Search"], "/app/settings": [pageSettings, "Settings"] };
+  if (company[path]) return { html: appShell(u, path, company[path][0](u)), title: company[path][1] };
+  const m = path.match(/^\/app\/projects\/([^/]+)(?:\/(.*))?$/);
+  if (m) {
+    const p = getProject(u, m[1]);
+    if (!p) return { html: appShell(u, path, notFound()), title: "Not found" };
+    const sub = m[2] || "";
+    let html, title = p.name, mm;
+    if (sub === "") html = pageProject(u, p);
+    else if (sub === "quality") { html = pageQuality(u, p, { q: query.q || "", level: query.level || "", trade: query.trade || "", contractor: query.contractor || "", status: query.status || "" }); title = "Quality"; }
+    else if (sub === "quality/new") { html = pageNewDefect(u, p); title = "New defect"; }
+    else if ((mm = sub.match(/^quality\/defects\/(.+)$/))) { html = pageDefect(u, p, mm[1]); title = "Defect"; }
+    else if ((mm = sub.match(/^quality\/itp\/(.+)$/))) { html = pageItp(u, p, mm[1]); title = "ITP"; }
+    else if (sub === "programme") { html = pageProgramme(u, p); title = "Programme"; }
+    else if (sub === "commercial") { html = pageCommercial(u, p); title = "Commercial"; }
+    else if (sub === "safety") { html = pageSafety(u, p); title = "Safety"; }
+    else if (sub === "workforce") { html = pageWorkforce(u, p); title = "Workforce"; }
+    else if (sub === "documents") { html = pageDocuments(u, p); title = "Documents"; }
+    else if (sub === "diary") { html = pageDiary(u, p); title = "Site diary"; }
+    else if (sub === "reports") html = pagePlaceholder(p, "Project reports", "chart", "Weekly project summary, quality trends, labour hours by trade and cost reports — every metric with a written definition. Planned for phase 5.");
+    else if (sub === "handover") html = pagePlaceholder(p, "Handover", "package", "Compile outstanding defects, inspections, certificates and warranties into an audit-ready handover pack, then manage the defect liability period. Planned for phase 5.");
+    else html = notFound();
+    return { html: appShell(u, path, html), title };
+  }
+  return { html: appShell(u, path, notFound()), title: "Not found" };
+}
+
+let pendingScroll = null;
+function render() {
+  const { path, query } = parseRoute();
+  let out;
+  try { out = resolve(path, query); }
+  catch (e) {
+    if (!(e instanceof RuleError)) throw e;
+    const u = currentUser();
+    out = { html: u ? appShell(u, path, notFound(e.message)) : pageLogin(), title: "Not allowed" };
+  }
+  if (!out) return;
+  document.getElementById("root").innerHTML = out.html;
+  document.title = `${out.title} · BuildOS`;
+  if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
+  else window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", render);
+
+// ===================================================== feedback
+function toast(msg, kind = "ok") {
+  const el = document.createElement("div");
+  el.className = `toast toast-${kind}`;
+  el.setAttribute("role", kind === "ok" ? "status" : "alert");
+  el.innerHTML = `${icon(kind === "ok" ? "checkcircle" : "alert")}<span>${esc(msg)}</span>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add("out"), 3200);
+  setTimeout(() => el.remove(), 3700);
+}
+function formError(formEl, msg) {
+  const box = formEl.querySelector(":scope > .form-msg");
+  box.innerHTML = `<div class="notice notice-error" role="alert" style="margin-top:10px">${icon("alert")}<span>${esc(msg)}</span></div>`;
+}
+
+/** Downscale photos to small JPEG thumbnails so they fit in browser storage. */
+async function readPhotos(input, max = 4) {
+  const files = [...(input?.files || [])].slice(0, max);
+  return Promise.all(files.map((f) => new Promise((res) => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      const s = Math.min(1, 360 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(""); };
+    img.src = url;
+  })));
+}
+
+// ===================================================== actions
+// Each returns a success message, or throws RuleError (shown inline).
+const ACTIONS = {
+  async createDefect(fd, u, el) {
+    const draft = fd.get("mode") === "draft";
+    const photos = (await readPhotos(el.querySelector("[data-photo-input]"))).filter(Boolean);
+    const msg = createDefect(u, { projectId: fd.get("projectId"), title: fd.get("title") || "", locationId: fd.get("locationId") || "", room: fd.get("room") || "", trade: fd.get("trade") || "", contractorId: fd.get("contractorId") || "", priority: fd.get("priority"), dueDate: fd.get("dueDate") || "", photos, draft });
+    return { msg, go: el.dataset.done };
+  },
+  async defect(fd, u, el) {
+    const type = fd.get("type"), id = fd.get("defectId");
+    const a = type === "assign" ? { type, contractorId: fd.get("contractorId"), dueDate: fd.get("dueDate") }
+      : type === "submit_for_verification" ? { type, note: fd.get("note") || "", evidencePhotos: (await readPhotos(el.querySelector('[name="evidence"]'))).map((x) => x || "") }
+      : type === "reject" ? { type, reason: fd.get("reason") || "" } : { type };
+    return actOnDefect(u, id, a);
+  },
+  variation: (fd, u) => actOnVariation(u, fd.get("variationId"), { type: fd.get("type"), reason: fd.get("reason") || "" }),
+  hold: (fd, u) => releaseHoldPoint(u, fd.get("itpId"), fd.get("pointId"), fd.get("decision"), fd.get("comment") || ""),
+  swms: (fd, u) => reviewSwms(u, fd.get("swmsId"), fd.get("decision"), fd.get("comment") || ""),
+  swmsAck: (fd, u) => acknowledgeSwms(u, fd.get("swmsId")),
+  siteIn: (fd, u) => signInToSite(u, fd.get("projectId")),
+  siteOut: (fd, u) => signOutOfSite(u, fd.get("projectId")),
+  diary: (fd, u) => submitDiary(u, fd.get("projectId"), { weather: fd.get("weather") || "", notes: fd.get("notes") || "", delays: fd.get("delays") || "" }),
+  demo(fd) {
+    if (!fd.get("name") || !/.+@.+\..+/.test(fd.get("email") || "")) throw new RuleError("Add your name and a valid work email.");
+    return { msg: "Thanks — this prototype doesn't send the request anywhere yet. Connect it to your inbox or CRM before launch.", stay: true };
+  },
+};
+
+document.addEventListener("submit", async (e) => {
+  const el = e.target;
+  if (el.matches("[data-search]")) { e.preventDefault(); go(`/app/search?q=${encodeURIComponent(el.q.value)}`); return; }
+  if (el.matches("[data-filter]")) {
+    e.preventDefault();
+    const qs = new URLSearchParams([...new FormData(el)].filter(([, v]) => v)).toString();
+    go(el.dataset.filter.slice(1) + (qs ? `?${qs}` : "")); return;
+  }
+  if (!el.dataset.act) return;
+  e.preventDefault();
+  const sub = e.submitter;
+  if (el.dataset.confirm && (!el.dataset.confirmFor || sub?.value === el.dataset.confirmFor) && !confirm(el.dataset.confirm)) return;
+  const fd = new FormData(el, sub);
+  const u = currentUser();
+  const buttons = el.querySelectorAll("button");
+  buttons.forEach((b) => (b.disabled = true));
+  try {
+    const r = await ACTIONS[el.dataset.act](fd, u, el);
+    const res = typeof r === "string" ? { msg: r } : r;
+    if (res.stay) { el.innerHTML = `<div class="notice notice-ok">${icon("checkcircle")}<span>${esc(res.msg)}</span></div>`; return; }
+    save();
+    toast(res.msg);
+    const keep = el.closest("tr")?.id;
+    if (res.go) go(res.go.slice(1)); else { pendingScroll = keep || null; const y = window.scrollY; render(); if (!keep) window.scrollTo(0, y); }
+  } catch (err) {
+    buttons.forEach((b) => (b.disabled = false));
+    if (err instanceof RuleError) formError(el, err.message); else { console.error(err); formError(el, "Something went wrong. Please try again."); }
+  }
+});
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-login],[data-reset],[data-signout],[data-export],[data-qr],[data-scroll],[data-upload-licence]");
+  // Close open menus when clicking elsewhere.
+  document.querySelectorAll("details.menu[open]").forEach((d) => { if (!d.contains(e.target) || t) d.removeAttribute("open"); });
+  if (!t) return;
+  if (t.dataset.login) { store.set(USER_KEY, t.dataset.login); go(t.dataset.next || HOME[t.dataset.login] || "/app"); }
+  else if ("reset" in t.dataset) { if (confirm("Reset all sample data on this device? Your changes will be lost.")) { resetData(); toast("Sample data reset."); render(); } }
+  else if ("signout" in t.dataset) { store.del(USER_KEY); go("/login"); }
+  else if (t.dataset.export) exportDefects(t.dataset.export);
+  else if ("qr" in t.dataset) alert("QR location scanning uses the phone camera — planned for the installable app build.");
+  else if ("uploadLicence" in t.dataset) alert("Credential uploads go to a reviewer for verification — planned with file storage.");
+  else if (t.dataset.scroll) { e.preventDefault(); if (parseRoute().path !== "/") { pendingScroll = t.dataset.scroll; go("/"); } else document.getElementById(t.dataset.scroll)?.scrollIntoView({ behavior: "smooth" }); }
+});
+
+document.addEventListener("change", async (e) => {
+  const el = e.target;
+  if (el.matches("[data-switch]")) {
+    const { path } = parseRoute(), cur = path.match(/^\/app\/projects\/([^/]+)(\/[^/]+)?/);
+    go(el.value ? `/app/projects/${el.value}${cur?.[2] && !/defects|itp|new/.test(path) ? cur[2] : ""}` : "/app");
+  }
+  if (el.matches("[data-photo-input]")) {
+    const f = el.closest("form"), shots = (await readPhotos(el)).filter(Boolean);
+    f.querySelectorAll("[data-preview]").forEach((p, i) => { if (shots[i]) { p.style.background = `center/cover url(${shots[i]})`; p.textContent = ""; } });
+    f.querySelector("[data-photo-count]").textContent = shots.length ? `${shots.length} photo${shots.length > 1 ? "s" : ""} attached` : "";
+  }
+});
+
+// Keyboard: "/" focuses search.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && !/input|textarea|select/i.test(document.activeElement?.tagName || "")) { const q = document.getElementById("q"); if (q) { e.preventDefault(); q.focus(); } }
+});
+const refreshOnline = () => document.querySelectorAll("[data-online-pill]").forEach((p) => (p.innerHTML = navigator.onLine ? `<span class="badge badge-green">${icon("check", 12)}Online</span>` : badge("offline")));
+window.addEventListener("online", refreshOnline);
+window.addEventListener("offline", refreshOnline);
+
+function exportDefects(pid) {
+  const u = currentUser(), p = getProject(u, pid);
+  const { query } = parseRoute();
+  const rows = filterDefects(u, pid, query);
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [["ID", "Title", "Location", "Trade", "Contractor", "Priority", "Due", "Status"].join(","), ...rows.map((d) => [d.ref, d.title, locationLabel(d), d.trade, contractorOf(d.contractorId)?.tradingName, d.priority, d.dueDate, d.status].map(q).join(","))].join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `${p.code}-defects.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+render();
+
+</script>
+</body>
+</html>
