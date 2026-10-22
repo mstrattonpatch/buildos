@@ -179,7 +179,7 @@ function pageProject(u, p) {
     const missing = DB.workers.filter((w) => w.contractorId === s.contractorId && w.inductedProjectIds.includes(p.id) && !s.acknowledgedBy.includes(w.id)).length;
     if (missing) attn.push(["blue", "clock", `<b>SWMS · ${esc(s.title)} v${s.version}</b> needs worker acknowledgement (${missing})`, "Chase", `${base}/safety/swms/${s.id}`]);
   }
-  for (const d of DB.documents.filter((x) => x.projectId === p.id && x.status === "in_review")) attn.push(["blue", "file", `<b>${d.number} rev ${d.revision}</b> uploaded — review before it becomes current`, "Review", `${base}/documents`]);
+  for (const d of DB.documents.filter((x) => x.projectId === p.id && x.status === "in_review")) attn.push(["blue", "file", `<b>${d.number} rev ${d.revision}</b> uploaded — review before it becomes current`, "Review", `${base}/documents/${d.id}`]);
   const cnt = (s) => ready?.items.filter((i) => i.state === s).length ?? 0;
   const tone = { red: "var(--red)", amber: "var(--amber)", blue: "var(--blue)" };
   return `<section class="card card-pad"><div class="page-header"><div>
@@ -527,6 +527,7 @@ function pageTask(u, p, id) {
         ${kv("ITP", itp ? `<a class="link" href="${base}/quality/itp/${itp.id}">${itp.ref} · ${esc(itp.title)}</a>` : "—")}
         ${kv("SWMS", swms ? `${esc(swms.ref)} · ${esc(swms.title)} v${swms.version} ${badge(swms.status)}` : "—")}
         ${kv("Defects", defects.length ? defects.map((d) => `<a class="link" href="${base}/quality/defects/${d.id}">${d.ref}</a>`).join(", ") : "—")}
+        ${kv("Documents", DB.documents.filter((d) => d.taskId === t.id && d.status === "current").map((d) => `<a class="link" href="${base}/documents/${d.id}">${esc(d.number)} rev ${esc(d.revision)}</a>`).join(", ") || "—")}
       </dl></div></section>
       <section class="card"><div class="card-head"><h2>History</h2></div><div class="card-body"><ul class="timeline">${auditFor(t.id).map((a) => `<li><span class="dot ${/delay|blocked/i.test(a.action) ? "amber" : /complete/i.test(a.action) ? "green" : "blue"}"></span><div><b style="font-weight:600">${esc(a.action)}</b> by ${esc(userById(a.actorId)?.name ?? "—")} · <span class="muted">${dateTime(a.at)}</span>${a.detail ? `<div class="muted small">${esc(a.detail)}</div>` : ""}</div></li>`).join("") || '<li class="muted small">No changes recorded yet.</li>'}</ul></div></section>
     </div>
@@ -696,15 +697,78 @@ function insBadge(ins, withType = false) {
   return badge(d < 0 ? "expired" : d <= 30 ? "expiring" : "verified", d < 0 ? `${t}Expired ${dayMonth(ins.expires)}` : d <= 30 ? `${t}Expires ${dayMonth(ins.expires)}` : `${t}Current to ${dayMonth(ins.expires)}`);
 }
 
-function pageDocuments(u, p) {
-  const docs = DB.documents.filter((d) => d.projectId === p.id).sort((a, b) => a.number.localeCompare(b.number) || b.revision.localeCompare(a.revision));
-  const pending = docs.filter((d) => d.status === "in_review");
-  return `${pageHeader({ crumbs: crumbsFor(p), title: "Documents &amp; drawings" })}
-  ${pending.length ? `<div class="notice notice-warn">${icon("alert")}<span>${pending.map((d) => `${d.number} rev ${d.revision}`).join(", ")} ${pending.length > 1 ? "are" : "is"} in review. The previous revision stays current until review is complete, then it's labelled superseded and kept for audit.</span></div>` : ""}
-  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Number</th><th>Title</th><th>Category</th><th>Rev</th><th>Uploaded</th><th>Status</th></tr></thead><tbody>
-  ${docs.map((d) => `<tr${d.status === "superseded" ? ' style="opacity:.6"' : ""}><td class="mono">${d.number}</td><td>${esc(d.title)}</td><td class="small">${d.category}</td><td class="mono">${d.revision}</td><td class="small">${esc(userById(d.uploadedBy)?.name)} · ${dayMonth(d.uploadedAt)}</td><td>${badge(d.status)}</td></tr>`).join("")}
-  </tbody></table></div></section>
-  <p class="small muted">File storage, previews and drawing markup come with the backend build.</p>`;
+const fileSize = (n) => (!n ? "" : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const isImage = (d) => /^image\//.test(d.mimeType || "") || /\.(jpe?g|png|heic)$/i.test(d.filePath || "");
+const isPdf = (d) => d.mimeType === "application/pdf" || /\.pdf$/i.test(d.filePath || "");
+
+function docUploadFields(u, p, series = null) {
+  const d = series?.latest, tasks = DB.tasks.filter((t) => t.projectId === p.id);
+  return `<div class="form-grid">
+    <label class="field full"><span>File <span class="req">*</span> <span class="muted">(PDF, Word or photo, up to 20 MB)</span></span><input type="file" name="file" accept=".pdf,.doc,.docx,image/*" class="input" style="padding-top:7px"></label>
+    ${series ? `${hidden("number", series.number)}<label class="field"><span>Document number</span><input class="input" value="${esc(series.number)}" disabled></label>`
+      : `<label class="field"><span>Document number <span class="req">*</span></span><input name="number" class="input" list="doc-numbers" placeholder="e.g. A-102" data-doc-number autocomplete="off"><datalist id="doc-numbers">${docSeries(p.id).map((x) => `<option value="${esc(x.number)}">${esc(x.latest.title)}</option>`).join("")}</datalist></label>`}
+    <label class="field"><span>Revision <span class="req">*</span></span><input name="revision" class="input" placeholder="e.g. 4 or C"></label>
+    <label class="field"><span>Title <span class="req">*</span></span><input name="title" class="input" value="${esc(d?.title ?? "")}" placeholder="e.g. General arrangement — L2 to L4"></label>
+    <label class="field"><span>Category</span><select name="category" class="input">${DOC_CATEGORIES.map((c) => `<option${(d?.category ?? "Architectural") === c ? " selected" : ""}>${c}</option>`).join("")}</select></label>
+    <label class="field"><span>Responsible company</span><select name="contractor_id" class="input"><option value="">—</option>${DB.contractors.map((c) => `<option value="${c.id}"${d?.contractorId === c.id ? " selected" : ""}>${esc(c.tradingName)}</option>`).join("")}</select></label>
+    <label class="field"><span>Related task</span><select name="task_id" class="input"><option value="">—</option>${tasks.map((t) => `<option value="${t.id}"${d?.taskId === t.id ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>
+    <label class="field full"><span>Description / revision notes</span><input name="description" class="input" placeholder="What changed in this revision?"></label>
+    <p class="small muted full">Drawings, specifications and contracts go to review: the new revision only becomes current once a director, PM or quality manager approves it. Other documents are issued straight away.</p>
+  </div>`;
+}
+
+function pageDocuments(u, p, q = {}) {
+  const base = `#/app/projects/${p.id}`, all = docSeries(p.id), cat = q.cat || "", term = (q.q || "").toLowerCase();
+  const list = all.filter((x) => (!cat || x.latest.category === cat) && (!term || `${x.number} ${x.latest.title}`.toLowerCase().includes(term)));
+  const pending = all.filter((x) => x.pending);
+  const cats = DOC_CATEGORIES.filter((c) => all.some((x) => x.latest.category === c));
+  const qs = (o) => { const v = new URLSearchParams(Object.entries({ cat, q: q.q || "", ...o }).filter(([, x]) => x)).toString(); return `${base}/documents${v ? `?${v}` : ""}`; };
+  const groups = cats.filter((c) => !cat || c === cat).map((c) => [c, list.filter((x) => x.latest.category === c)]).filter(([, l]) => l.length);
+  const row = (x) => { const d = x.current || x.latest, url = d.filePath ? DB.fileUrls[d.filePath] : null;
+    return `<tr><td class="mono"><a class="link" href="${base}/documents/${d.id}">${esc(x.number)}</a></td><td><a class="rowlink" href="${base}/documents/${d.id}">${esc(d.title)}</a>${isNewRevision(d, x) ? ' <span class="badge badge-blue">New revision</span>' : ""}<div class="muted small">${esc(contractorOf(d.contractorId)?.tradingName ?? "")}</div></td>
+      <td class="mono">${x.current ? esc(x.current.revision) : "—"}</td><td class="small">${x.pending ? `<a class="link" href="${base}/documents/${x.pending.id}">Rev ${esc(x.pending.revision)} in review</a>` : "—"}</td>
+      <td class="small">${dayMonth(d.uploadedAt)}</td><td>${x.current ? badge("current") : badge(x.latest.status)}</td><td>${url ? `<a class="btn" style="height:30px" href="${url}" target="_blank" rel="noopener">Open</a>` : ""}</td></tr>`; };
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Documents &amp; drawings", actions: can(u, "documents.upload") ? `<a class="btn btn-dark" href="${base}/documents#upload">Upload</a>` : "" })}
+  ${pending.length ? `<div class="notice notice-warn">${icon("alert")}<span>${pending.map((x) => `<a class="link" href="${base}/documents/${x.pending.id}">${esc(x.number)} rev ${esc(x.pending.revision)}</a>`).join(", ")} ${pending.length > 1 ? "are" : "is"} in review. The current revision stays in use until review is complete.</span></div>` : ""}
+  <section class="card">
+    <form class="row wrap" data-filter="${base}/documents" style="padding:16px 20px;gap:8px"><input name="q" value="${esc(q.q ?? "")}" class="input" placeholder="Search number or title" aria-label="Search documents" style="max-width:260px;height:34px">${cat ? hidden("cat", cat) : ""}<button class="btn" style="height:34px">Search</button>
+      <span class="spacer"></span><a class="chip" data-active="${!cat}" href="${qs({ cat: "" })}">All</a>${cats.map((c) => `<a class="chip" data-active="${c === cat}" href="${qs({ cat: c })}">${c}</a>`).join("")}</form>
+    ${groups.length ? groups.map(([c, l]) => `<div class="doc-folder">${icon("folder", 15)} ${c} <span class="muted">· ${l.length}</span></div><div class="table-wrap"><table class="register"><thead><tr><th>Number</th><th>Title</th><th>Current rev</th><th>In review</th><th>Uploaded</th><th>Status</th><th></th></tr></thead><tbody>${l.map(row).join("")}</tbody></table></div>`).join("")
+      : emptyState("file", all.length ? "No documents match" : "No documents yet", all.length ? "Try another search or category." : "Upload drawings, specifications, certificates and minutes. Each document number keeps its full revision history.")}
+  </section>
+  ${can(u, "documents.upload") ? `<section class="card card-pad" id="upload"><h2 style="margin-bottom:12px">Upload a document or new revision</h2>${form("uploadDoc", `${hidden("project", p.id)}${docUploadFields(u, p)}<div style="margin-top:14px"><button class="btn btn-primary">Upload</button></div>`)}</section>` : ""}`;
+}
+
+function pageDocument(u, p, id) {
+  const d = DB.documents.find((x) => x.id === id && x.projectId === p.id);
+  if (!d) return notFound();
+  const base = `#/app/projects/${p.id}`, series = docSeries(p.id).find((x) => x.revisions.some((r) => r.id === d.id));
+  const url = d.filePath ? DB.fileUrls[d.filePath] : null, task = DB.tasks.find((t) => t.id === d.taskId);
+  const kv = (k, v) => `<dt class="muted">${k}</dt><dd style="text-align:left;font-family:inherit">${v}</dd>`;
+  const preview = !url ? `<div class="empty"><p class="muted small">${d.filePath ? "The file couldn't be loaded." : "No file attached (sample record)."}</p></div>`
+    : isPdf(d) ? `<iframe class="doc-preview" src="${url}" title="${esc(d.number)} preview"></iframe>`
+    : isImage(d) ? `<img class="doc-preview-img" src="${url}" alt="${esc(d.title)}">`
+    : `<div class="empty"><p class="muted small">No preview for this file type.</p><a class="btn" href="${url}" target="_blank" rel="noopener">Download</a></div>`;
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/documents`, "Documents"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${esc(d.number)} rev ${esc(d.revision)}</span>${esc(d.title)}`,
+    meta: `<span class="row wrap" style="gap:8px">${badge(d.status)}<span>${esc(d.category ?? "")}</span></span>`, actions: url ? `<a class="btn" href="${url}" target="_blank" rel="noopener">${icon("download", 15)} Open / download</a>` : "" })}
+  ${d.status === "superseded" && series.current ? `<div class="notice notice-error">${icon("alert")}<span><b>Superseded — don't build from this revision.</b> <a class="link" href="${base}/documents/${series.current.id}">Rev ${esc(series.current.revision)} is current.</a></span></div>` : ""}
+  ${d.status === "in_review" ? `<div class="notice notice-warn">${icon("clock")}<span><b>In review — not yet for construction.</b>${series.current ? ` <a class="link" href="${base}/documents/${series.current.id}">Rev ${esc(series.current.revision)}</a> stays current until this is approved.` : ""}</span></div>` : ""}
+  ${d.status === "rejected" ? `<div class="notice notice-error">${icon("xcircle")}<span><b>Rejected</b> by ${esc(userById(d.reviewedBy)?.name ?? "reviewer")}: ${esc(d.reviewComment ?? "")}</span></div>` : ""}
+  <div class="cc-grid">
+    <div class="stack-lg" style="min-width:0">
+      <section class="card" style="overflow:hidden">${preview}</section>
+      <section class="card"><div class="card-head"><h2>Revision history</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Rev</th><th>Uploaded</th><th>Reviewed</th><th>Status</th></tr></thead><tbody>
+        ${series.revisions.map((r) => `<tr${r.id === d.id ? ' style="background:#fafbf9"' : ""}><td class="mono"><a class="link" href="${base}/documents/${r.id}">${esc(r.revision)}</a>${r.id === d.id ? ' <span class="muted small">(this)</span>' : ""}${r.description ? `<div class="muted small" style="font-family:var(--font)">${esc(r.description)}</div>` : ""}</td>
+          <td class="small">${esc(userById(r.uploadedBy)?.name ?? "—")}<div class="muted">${dateTime(r.uploadedAt)}</div></td>
+          <td class="small">${r.reviewedBy ? `${esc(userById(r.reviewedBy)?.name ?? "—")}<div class="muted">${dateTime(r.reviewedAt)}${r.reviewComment ? ` · ${esc(r.reviewComment)}` : ""}</div>` : "—"}</td><td>${badge(r.status)}</td></tr>`).join("")}
+      </tbody></table></div></section>
+    </div>
+    <aside class="stack-lg">
+      <section class="card card-pad"><dl class="kv" style="grid-template-columns:120px 1fr">${kv("File", esc(d.fileName ?? "—") + (d.fileSize ? ` <span class="muted">· ${fileSize(d.fileSize)}</span>` : ""))}${kv("Uploaded by", esc(userById(d.uploadedBy)?.name ?? "—"))}${kv("Company", esc(contractorOf(d.contractorId)?.tradingName ?? "—"))}${kv("Task", task ? `<a class="link" href="${base}/programme/${task.id}">${esc(task.name)}</a>` : "—")}${d.description ? kv("Notes", esc(d.description)) : ""}</dl></section>
+      ${d.status === "in_review" && can(u, "documents.approve") ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Review</h2>${form("reviewDoc", `${hidden("doc", d.id)}<div class="stack"><label class="field"><span>Comment <span class="muted">(required to reject)</span></span><textarea name="comment" class="input"></textarea></label><div class="row wrap"><button class="btn btn-primary" name="decision" value="approve">Approve — issue for construction</button><button class="btn btn-danger" name="decision" value="reject">Reject</button></div></div>`, `data-confirm="Issue ${esc(d.number)} rev ${esc(d.revision)}?${series.current ? ` Rev ${esc(series.current.revision)} will be superseded.` : ""}" data-confirm-for="approve"`)}</section>` : ""}
+      ${can(u, "documents.upload") && !series.pending ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Upload a new revision</h2>${form("uploadDoc", `${hidden("project", p.id)}${docUploadFields(u, p, series)}<div style="margin-top:14px"><button class="btn btn-dark">Upload revision</button></div>`)}</section>` : ""}
+    </aside>
+  </div>`;
 }
 
 function pageDiary(u, p) {
@@ -847,7 +911,7 @@ function pageNewProject(u) {
 const notFound = (msg = "That page or record doesn't exist, or your role can't see it.") => `<section class="card">${emptyState("search", "Not found", msg, '<a class="btn" href="#/app">Back to overview</a>')}</section>`;
 
 // ===================================================== mobile site app
-const siteTabs = (route) => { const fp = DB.projects[0]; const t = (h, l, ic) => `<a href="${h}"${route === h.slice(1) ? ' aria-current="page"' : ""}>${icon(ic, 21)}${l}</a>`; return `<nav class="site-tabs" aria-label="Site app">${t("#/site", "Today", "calendar")}${t("#/app/tasks", "Tasks", "listchecks")}<a href="#/site/defect" aria-label="Raise defect"><span class="fab">${icon("plus", 26)}</span></a>${t(fp ? `#/app/projects/${fp.id}/documents` : "#/app", "Drawings", "file")}${t("#/site/sign-in", "Me", "user")}</nav>`; };
+const siteTabs = (route) => { const fp = DB.projects[0]; const t = (h, l, ic) => `<a href="${h}"${route === h.slice(1) ? ' aria-current="page"' : ""}>${icon(ic, 21)}${l}</a>`; return `<nav class="site-tabs" aria-label="Site app">${t("#/site", "Today", "calendar")}${t("#/app/tasks", "Tasks", "listchecks")}<a href="#/site/defect" aria-label="Raise defect"><span class="fab">${icon("plus", 26)}</span></a>${t("#/site/drawings", "Drawings", "file")}${t("#/site/sign-in", "Me", "user")}</nav>`; };
 const siteWrap = (inner) => `<div class="site-wrap"><div class="site">${inner}</div></div>`;
 function pageSiteToday(u, route) {
   const p = listProjects(u)[0];
@@ -864,6 +928,24 @@ function pageSiteToday(u, route) {
     <div class="list-card">${todays.map(({ i, pt }) => `<a href="#/app/projects/${p.id}/quality/itp/${i.id}"><span class="li-icon" style="background:${pt.type === "hold" ? "var(--red-tint)" : "var(--blue-tint)"};color:${pt.type === "hold" ? "var(--red)" : "var(--blue)"}">${icon(pt.type === "hold" ? "lock" : "clock", 18)}</span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">${esc(pt.type === "hold" ? `${i.title.split("—")[0].trim()} ${pt.name.toLowerCase()}` : i.title.split("·")[0].trim())}</b><span class="muted small">${i.ref} · ${pt.type === "hold" ? "Hold point" : pt.type} · ${pt.status === "submitted" ? "awaiting release" : "to do"}</span></span><span class="muted">${icon("chevron", 18)}</span></a>`).join("") || '<div class="li muted">No inspections today.</div>'}</div>
   </div>${siteTabs(route)}`);
 }
+function pageSiteDrawings(u, route, q = {}) {
+  const p = listProjects(u)[0];
+  if (!p) return pageSiteToday(u, route);
+  const term = (q.q || "").toLowerCase();
+  const list = docSeries(p.id).filter((x) => x.current && (!term || `${x.number} ${x.current.title}`.toLowerCase().includes(term)));
+  const fresh = list.filter((x) => isNewRevision(x.current, x));
+  const swms = swmsSeries(p.id).filter((x) => x.current).map((x) => x.current);
+  const item = (d, x) => { const url = d.filePath ? DB.fileUrls[d.filePath] : null; return `<${url ? `a href="${url}" target="_blank" rel="noopener"` : "div class=\"li\""}><span class="li-icon" style="background:var(--blue-tint);color:var(--blue)">${icon("file", 18)}</span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">${esc(d.number)} · rev ${esc(d.revision)}</b><span class="muted small">${esc(d.title)}</span></span>${x && isNewRevision(d, x) ? '<span class="badge badge-blue">New</span>' : ""}</${url ? "a" : "div"}>`; };
+  return siteWrap(`<div class="site-top"><a href="#/site" class="link">Back</a><b>Drawings &amp; documents</b><span style="width:40px"></span></div>
+  <div class="site-body">
+    <form data-filter="/site/drawings" class="row"><input name="q" class="input" value="${esc(q.q ?? "")}" placeholder="Search number or title" style="height:48px;font-size:16px" aria-label="Search"><button class="btn btn-lg">Search</button></form>
+    <p class="small muted">Current revisions only — superseded and in-review drawings aren't shown.</p>
+    ${fresh.length ? `<div class="notice notice-info">${icon("alert")}<span>${fresh.length} new revision${fresh.length > 1 ? "s" : ""} this week: ${fresh.map((x) => `${esc(x.number)} rev ${esc(x.current.revision)}`).join(", ")}</span></div>` : ""}
+    <div class="list-card">${list.map((x) => item(x.current, x)).join("") || '<div class="li muted">No current documents.</div>'}</div>
+    ${swms.length ? `<div class="label">SWMS in use</div><div class="list-card">${swms.map((s) => { const url = s.filePath ? DB.fileUrls[s.filePath] : null; return `<a href="${url ?? `#/app/projects/${p.id}/safety/swms/${s.id}`}"${url ? ' target="_blank" rel="noopener"' : ""}><span class="li-icon" style="background:var(--amber-tint);color:var(--amber-text)">${icon("shield", 18)}</span><span style="flex:1"><b style="display:block;font-size:15px">${esc(s.title)} v${s.version}</b><span class="muted small">${esc(contractorOf(s.contractorId)?.tradingName ?? "")}</span></span></a>`; }).join("")}</div>` : ""}
+  </div>${siteTabs("/site/drawings")}`);
+}
+
 function pageSiteDefect(u) {
   const p = listProjects(u)[0];
   if (!p) return pageSiteToday(u, "/site");

@@ -336,11 +336,11 @@ function createSeed(now = new Date()) {
 // Mirror of role_can() in the database. Used only to decide which buttons
 // to show — the database refuses anything a role isn't allowed to do.
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
-  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage"],
-  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit"],
-  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit"],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve"],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve"],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload"],
+  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve"],
+  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload"],
   worker: ["defect.create"],
 };
 const VARIATION_LIMIT = { project_manager: 5000000, director: Infinity };
@@ -604,6 +604,25 @@ const STARTER_TEMPLATES = [
   ] },
 ];
 
+// ----------------------------------------------------------- documents
+const DOC_CATEGORIES = ["Architectural", "Structural", "Services", "Civil", "Specification", "Contract", "Certificates", "Safety", "Minutes", "Correspondence", "Handover", "Other"];
+/** Mirrors document_needs_review() in the database. */
+const docNeedsReview = (cat) => ["Architectural", "Structural", "Services", "Civil", "Specification", "Contract"].includes(cat);
+/** One entry per document number: current revision, any revision in review, and every revision. */
+function docSeries(projectId) {
+  const groups = new Map();
+  for (const d of DB.documents.filter((x) => x.projectId === projectId)) {
+    const k = d.number.toLowerCase();
+    (groups.get(k) || groups.set(k, []).get(k)).push(d);
+  }
+  return [...groups.values()].map((revs) => {
+    revs.sort((a, b) => (b.uploadedAt || "").localeCompare(a.uploadedAt || ""));
+    return { number: revs[0].number, current: revs.find((r) => r.status === "current") || null, pending: revs.find((r) => r.status === "in_review") || null, latest: revs[0], revisions: revs };
+  }).sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+}
+/** A revision issued in the last week replaced an earlier one. */
+const isNewRevision = (d, series) => series.revisions.length > 1 && d.status === "current" && daysBetween(D(d.reviewedAt || d.uploadedAt), new Date()) <= 7;
+
 // ---------------------------------------------------------------- SWMS
 /** High-risk construction work categories (WHS Regulations r 291). */
 const HRCW = [
@@ -635,7 +654,7 @@ function search(u, q) {
   const out = [];
   for (const p of listProjects(u)) if (hit(p.name, p.code, p.address)) out.push(["Project", p.name, p.code, `#/app/projects/${p.id}`]);
   for (const d of listDefects(u)) if (hit(d.ref, d.title, d.trade)) out.push(["Defect", `${d.ref} · ${d.title}`, projName(d.projectId), `#/app/projects/${d.projectId}/quality/defects/${d.id}`]);
-  for (const d of DB.documents) if (hit(d.number, d.title)) out.push(["Document", `${d.number} rev ${d.revision} · ${d.title}`, projName(d.projectId), `#/app/projects/${d.projectId}/documents`]);
+  for (const d of DB.documents.filter((x) => x.status !== "superseded" && x.status !== "rejected")) if (hit(d.number, d.title)) out.push(["Document", `${d.number} rev ${d.revision} · ${d.title}`, projName(d.projectId), `#/app/projects/${d.projectId}/documents/${d.id}`]);
   for (const w of DB.workers) if (hit(w.name)) out.push(["Worker", w.name, contractorOf(w.contractorId)?.tradingName ?? "", `#/app/people`]);
   for (const v of listVariations(u)) if (hit(v.ref, v.title)) out.push(["Variation", `${v.ref} · ${v.title}`, projName(v.projectId), `#/app/projects/${v.projectId}/commercial`]);
   return out.slice(0, 40);
@@ -659,6 +678,8 @@ function myTasks(u) {
     out.push({ title: `Review SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · ${contractorOf(s.contractorId)?.tradingName}`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: "blue" });
   if (can(u, "commercial.view")) for (const c of DB.claims.filter((c) => c.status === "submitted"))
     out.push({ title: `Assess progress claim ${c.ref}`, sub: `${projName(c.projectId)} · response due ${dayMonth(c.dueDate)}`, href: `#/app/projects/${c.projectId}/commercial`, tone: "amber" });
+  if (can(u, "documents.approve")) for (const d of DB.documents.filter((x) => x.status === "in_review"))
+    out.push({ title: `Review ${d.number} rev ${d.revision} · ${d.title}`, sub: `${projName(d.projectId)} · uploaded ${dayMonth(d.uploadedAt)}`, href: `#/app/projects/${d.projectId}/documents/${d.id}`, tone: "blue" });
   if (can(u, "swms.submit")) for (const s of DB.swms.filter((x) => x.status === "changes_requested" && (u.role !== "subcontractor_admin" || x.contractorId === u.contractorId)))
     out.push({ title: `Revise SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · changes requested`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: "amber" });
   if (u.role === "subcontractor_admin") for (const d of listDefects(u).filter((d) => d.status === "assigned" || d.status === "rectifying"))

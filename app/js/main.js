@@ -49,6 +49,7 @@ function resolve(path, query) {
   if (path === "/site") return { html: pageSiteToday(u, path), title: "Site app" };
   if (path === "/site/defect") return { html: pageSiteDefect(u), title: "New defect" };
   if (path === "/site/sign-in") return { html: pageSiteSignIn(u, path), title: "Site sign-in" };
+  if (path === "/site/drawings") return { html: pageSiteDrawings(u, path, query), title: "Drawings" };
   const company = {
     "/app": [pageControlCentre, "Company overview"], "/app/projects": [pageProjects, "Projects"], "/app/projects/new": [pageNewProject, "New project"],
     "/app/tasks": [pageTasks, "My tasks"], "/app/people": [pagePeople, "People & contractors"], "/app/reports": [(x) => pageReports(x, query), "Reports"],
@@ -75,7 +76,8 @@ function resolve(path, query) {
     else if (sub === "safety") { html = pageSafety(u, p); title = "Safety"; }
     else if ((mm = sub.match(/^safety\/swms\/(.+)$/))) { html = pageSwms(u, p, mm[1]); title = "SWMS"; }
     else if (sub === "workforce") { html = pageWorkforce(u, p); title = "Workforce"; }
-    else if (sub === "documents") { html = pageDocuments(u, p); title = "Documents"; }
+    else if (sub === "documents") { html = pageDocuments(u, p, query); title = "Documents"; }
+    else if ((mm = sub.match(/^documents\/(.+)$/))) { html = pageDocument(u, p, mm[1]); title = "Document"; }
     else if (sub === "diary") { html = pageDiary(u, p); title = "Site diary"; }
     else if (sub === "reports") html = pagePlaceholder(p, "Project reports", "chart", "Weekly project summary, quality trends, labour hours by trade and cost reports — every metric with a written definition. Planned for a later phase.");
     else if (sub === "handover") html = pagePlaceholder(p, "Handover", "package", "Compile outstanding defects, inspections, certificates and warranties into an audit-ready handover pack. Planned for a later phase.");
@@ -284,6 +286,18 @@ const ACTIONS = {
     const photos = await uploadPhotos(el.querySelector('[name="photos"]'), 10);
     return (await rpc("submit_itp_point", { p_point: f(fd, "point"), p: { photos, measurement: f(fd, "measurement"), note: f(fd, "note") } })).message;
   },
+  // ---- documents
+  async uploadDoc(fd, u, el) {
+    for (const k of ["number", "title", "revision"]) if (!f(fd, k)) throw new RuleError(k === "number" ? "Enter the document number, e.g. A-102." : `Enter the ${k}.`);
+    if (!el.querySelector('[name="file"]')?.files?.length) throw new RuleError("Choose the file to upload.");
+    const file = await uploadDocumentWithInfo(el.querySelector('[name="file"]'));
+    const r = await rpc("upload_document", { p_project: f(fd, "project"), p: {
+      number: f(fd, "number"), title: f(fd, "title"), revision: f(fd, "revision"), category: f(fd, "category"), description: f(fd, "description"),
+      contractor_id: f(fd, "contractor_id"), task_id: f(fd, "task_id"), file_path: file.path, file_name: file.name, file_size: file.size, mime_type: file.type,
+    } });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/documents/${r.id}` };
+  },
+  async reviewDoc(fd) { return (await rpc("review_document", { p_document: f(fd, "doc"), p_decision: f(fd, "decision"), p_comment: f(fd, "comment") })).message; },
   // ---- workflows
   async createDefect(fd, u, el) {
     const draft = fd.get("mode") === "draft";
@@ -390,6 +404,12 @@ document.addEventListener("change", async (e) => {
   if (el.matches("[data-switch]")) {
     const { path } = parseRoute(), cur = path.match(/^\/app\/projects\/([^/]+)(\/[^/]+)?/);
     go(el.value ? `/app/projects/${el.value}${cur?.[2] && !/defects|itp|new/.test(path) ? cur[2] : ""}` : "/app");
+  }
+  if (el.matches("[data-doc-number]")) {
+    // Typing an existing number fills in its title and category.
+    const fm = el.closest("form"), d = DB.documents.find((x) => x.number.toLowerCase() === el.value.trim().toLowerCase());
+    const title = fm.querySelector("[name=title]"), cat = fm.querySelector("[name=category]");
+    if (d) { if (!title.value) title.value = d.title; if (d.category) cat.value = d.category; }
   }
   if (el.matches("[data-photo-input]")) {
     const fm = el.closest("form"), shots = (await previewPhotos(el)).filter(Boolean);

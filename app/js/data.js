@@ -127,7 +127,7 @@ async function signPhotos(db) {
 }
 
 async function signFiles(db) {
-  const paths = uniq(db.swms.map((s) => s.filePath).filter((p) => p && p.startsWith(db.org.id + "/")));
+  const paths = uniq([...db.swms.map((s) => s.filePath), ...db.documents.map((d) => d.filePath)].filter((p) => p && p.startsWith(db.org.id + "/")));
   if (!paths.length) return;
   const { data } = await sb.storage.from("documents").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.fileUrls[x.path] = x.signedUrl;
@@ -135,15 +135,20 @@ async function signFiles(db) {
 
 /** Upload one document (PDF, image or Office file) to the private documents bucket. Returns its path or "". */
 async function uploadDocument(input) {
+  return (await uploadDocumentWithInfo(input))?.path ?? "";
+}
+
+/** Same as uploadDocument, but also returns the file's name, size and type. */
+async function uploadDocumentWithInfo(input) {
   const file = input?.files?.[0];
-  if (!file) return "";
+  if (!file) return null;
   if (file.size > 20 * 1024 * 1024) throw new RuleError("That file is over 20 MB. Please upload a smaller copy.");
   const ext = (file.name.match(/\.([a-z0-9]{1,5})$/i)?.[1] || "bin").toLowerCase();
   if (!["pdf", "jpg", "jpeg", "png", "heic", "doc", "docx"].includes(ext)) throw new RuleError("Upload a PDF, Word document or photo.");
   const path = `${DB.org.id}/${crypto.randomUUID()}.${ext}`;
   const { error } = await sb.storage.from("documents").upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
   if (error) throw new RuleError(`Upload failed: ${friendlyError(error)}`);
-  return path;
+  return { path, name: file.name, size: file.size, type: file.type };
 }
 
 /** Downscale and upload photos to the company's private folder. Returns storage paths. */
