@@ -89,12 +89,29 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **Cost ledger**: actual = approved bills + approved receipts + internal charges + processed labour − agreed backcharges; committed adds open PO balances; forecast final is the larger of budget and committed unless set by hand. Warnings: forecast over budget, 90%+ spent, PS/PC over allowance, costs with no budget line, claims past due or certified short.
 - **Progress claims**: lump sum (a schedule of contract items that adds up to the contract sum, plus approved variations, retention to a cap) or cost-plus (every approved, unclaimed cost to the period end, the fee on costs, labour at chargeout). Draft → submitted → certified (a short certificate needs the payment-schedule reason) → paid. Each claim prints as a payment claim document with the security-of-payment statement.
 
+## Estimates
+
+*Estimates* (PMs and directors) holds quotes for new work.
+
+- Items by category (trade package) with quantity × rate. A quantity can be a sum such as `12.05*10`.
+- **Assemblies** are company build-ups (e.g. a stud wall per m²) that drop priced items into an estimate.
+- **Trade package quotes**: mark one quote per package as *Use* and it replaces that package's itemised cost.
+- Markup on cost gives the sell price; the summary shows cost, sell, GST and margin. Inclusions and exclusions go on the quote.
+- Draft → sent (locked) → won or lost. **New version** copies a sent or lost quote; the old one is kept as superseded.
+- The **client quote** prints sell prices by package with inclusions, exclusions and acceptance lines — no rates, costs or suppliers.
+- A won estimate **converts to a job**: the contract sum, a budget line per package (at cost) and a claim schedule per package (at sell) are filled in.
+
+## Reports & handover
+
+- **Project reports** (*Reports*): weekly site report, client progress report, cost report (internal only), quality report and site diary pack, for any date range. The client view leaves out internal detail. Each section notes how its figures are worked out. Print or save as PDF.
+- **Handover** (*Handover*): readiness checks for open defects, unreleased inspection points, open NCRs, and current certificates, warranties, O&M manuals and as-built drawings (upload these under those document categories). The pack lists outstanding defects, ITP status and the drawing register, and prints as a cover document. Issuing it records the recipient and what was outstanding, and moves the project into its defects liability period.
+
 ## Roles
 
 | Role | Can |
 | --- | --- |
 | Director | Everything, including approving variations of any size |
-| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety, approving and processing timesheets, rates, giving and checking tasks, budgets, POs, bills, receipts and claims (PMs up to $50,000 per PO or bill) |
+| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety, approving and processing timesheets, rates, giving and checking tasks, budgets, POs, bills, receipts and claims (PMs up to $50,000 per PO or bill), estimates, issuing the handover pack |
 | Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress, NCRs, approving permits, investigating incidents, the site register and visitors, entering and approving timesheets, giving and checking tasks, accepting site notes |
 | Quality manager | Defects, ITP templates and hold-point sign-off, NCRs, giving and checking tasks |
 | Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations, answering their NCRs, requesting permits, reporting incidents, entering their workers' hours |

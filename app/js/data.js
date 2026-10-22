@@ -64,13 +64,13 @@ async function loadCompany(orgId) {
   const T = [
     "memberships", "contractors", "insurances", "workers", "inductions", "credentials", "projects", "locations", "tasks",
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
-    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads", "contract_items", "purchase_orders", "bills", "receipts", "internal_charges", "backcharges",
+    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads", "contract_items", "purchase_orders", "bills", "receipts", "internal_charges", "backcharges", "estimates", "estimate_items", "estimate_quotes", "assemblies", "handovers",
   ];
   const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
     sb.from("profiles").select("*"),
     selectAll("attendance", (q) => q.gte("at", twoDaysAgo)),
-    selectAll("audit_events", (q) => q.order("at", { ascending: false }).limit(300)),
+    selectAll("audit_events", (q) => q.order("at", { ascending: false }).limit(1000)),
     selectAll("invitations", (q) => q.is("accepted_at", null)),
     selectAll("timesheets", (q) => q.gte("date", ymd(new Date(Date.now() - 120 * 86400000)))),
     selectAll("messages", (q) => q.order("created_at", { ascending: false }).limit(500)),
@@ -129,6 +129,11 @@ async function loadCompany(orgId) {
     receipts: r.receipts.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
     internalCharges: r.internal_charges.sort((a, b) => b.date.localeCompare(a.date)),
     backcharges: r.backcharges.sort((a, b) => b.ref.localeCompare(a.ref)),
+    estimates: r.estimates.sort((a, b) => b.ref.localeCompare(a.ref) || b.version - a.version),
+    estimateItems: r.estimate_items.sort((a, b) => a.seq - b.seq),
+    estimateQuotes: r.estimate_quotes,
+    assemblies: r.assemblies.filter((a) => !a.archived).map((a) => ({ ...a, components: a.components || [] })).sort((a, b) => a.name.localeCompare(b.name)),
+    handovers: r.handovers.sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)),
     variations: r.variations.sort((a, b) => a.ref.localeCompare(b.ref)),
     claims: r.claims.sort((a, b) => a.ref.localeCompare(b.ref)),
     diary: r.diary.sort((a, b) => b.date.localeCompare(a.date)),

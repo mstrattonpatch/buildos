@@ -83,6 +83,9 @@ function resolve(path, query) {
   if (company[path]) return { html: appShell(u, path, company[path][0](u)), title: company[path][1] };
   if (path === "/app/timesheets") return { html: appShell(u, path, pageCompanyTimesheets(u, query)), title: "Timesheets" };
   if (path === "/app/timesheets/sheet") return { html: appShell(u, path, pageWeeklySheet(u, query)), title: "Weekly timesheet" };
+  if (path === "/app/estimates") return { html: appShell(u, path, pageEstimates(u)), title: "Estimates" };
+  const em = path.match(/^\/app\/estimates\/([^/]+)(\/quote)?$/);
+  if (em) return { html: appShell(u, path, em[2] ? pageQuote(u, em[1]) : pageEstimate(u, em[1])), title: em[2] ? "Client quote" : "Estimate" };
   if (path === "/app/rates") return { html: appShell(u, path, pageRates(u)), title: "Rates" };
   if (path === "/app/templates") return { html: appShell(u, path, pageTemplates(u)), title: "ITP templates" };
   const tm = path.match(/^\/app\/templates\/([^/]+)$/);
@@ -126,8 +129,8 @@ function resolve(path, query) {
     else if (sub === "documents") { html = pageDocuments(u, p, query); title = "Documents"; }
     else if ((mm = sub.match(/^documents\/(.+)$/))) { html = pageDocument(u, p, mm[1]); title = "Document"; }
     else if (sub === "diary") { html = pageDiary(u, p); title = "Site diary"; }
-    else if (sub === "reports") html = pagePlaceholder(p, "Project reports", "chart", "Weekly project summary, quality trends, labour hours by trade and cost reports — every metric with a written definition. Planned for a later phase.");
-    else if (sub === "handover") html = pagePlaceholder(p, "Handover", "package", "Compile outstanding defects, inspections, certificates and warranties into an audit-ready handover pack. Planned for a later phase.");
+    else if (sub === "reports") { html = pageProjectReports(u, p, query); title = "Reports"; }
+    else if (sub === "handover") { html = pageHandover(u, p); title = "Handover"; }
     else html = notFound();
     return { html: appShell(u, path, html), title };
   }
@@ -416,6 +419,37 @@ const ACTIONS = {
     const s = DB.swms.find((x) => x.id === f(fd, "swmsId"));
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
+  // ---- estimates & handover
+  async createEstimate(fd) {
+    const r = await rpc("create_estimate", { p_org: DB.org.id, p: Object.fromEntries(["name", "client", "address", "markup_pct", "valid_until"].map((k) => [k, f(fd, k)])) });
+    return { msg: r.message, go: `/app/estimates/${r.id}` };
+  },
+  async saveEstimate(fd, u, el) {
+    const items = [...el.querySelectorAll("[data-rows=items] .est-row")].map((row) => {
+      const v = (n) => row.querySelector(`[name=${n}]`).value.trim(), qtyRaw = v("it_qty"), qty = evalQty(qtyRaw);
+      if (!v("it_desc")) return null;
+      if (Number.isNaN(qty)) throw new RuleError(`Check the quantity for "${v("it_desc")}" — use numbers and + − × ÷ only.`);
+      const rate = v("it_rate") ? parseMoney(v("it_rate")) : 0;
+      return { category: v("it_cat"), description: v("it_desc"), qty, unit: v("it_unit"), rate, qty_formula: /[*/+()-]/.test(qtyRaw.replace(/^-/, "")) ? qtyRaw : "" };
+    }).filter(Boolean);
+    const quotes = [...el.querySelectorAll("[data-rows=quotes] .est-row")].map((row) => ({ category: row.querySelector("[name=q_cat]").value.trim(), supplier: row.querySelector("[name=q_supplier]").value.trim(), amount: parseMoney(row.querySelector("[name=q_amount]").value), note: row.querySelector("[name=q_note]").value.trim(), selected: row.querySelector("[name=q_sel]").checked })).filter((q) => q.supplier);
+    return (await rpc("save_estimate", { p_estimate: f(fd, "id"), p: { ...Object.fromEntries(["name", "client", "address", "markup_pct", "valid_until", "inclusions", "exclusions", "notes"].map((k) => [k, f(fd, k)])), items, quotes } })).message;
+  },
+  async estimateAction(fd) {
+    const action = f(fd, "action"), r = await rpc("estimate_action", { p_estimate: f(fd, "id"), p_action: action, p: Object.fromEntries(["note", "code", "start_date", "pc_date"].map((k) => [k, f(fd, k)])) });
+    if (action === "convert") return { msg: r.message, go: `/app/projects/${r.id}/commercial` };
+    if (action === "new_version") return { msg: r.message, go: `/app/estimates/${r.id}` };
+    return r.message;
+  },
+  async saveAssembly(fd) {
+    const d = fd.getAll("c_desc"), q = fd.getAll("c_qty"), un = fd.getAll("c_unit"), rt = fd.getAll("c_rate");
+    const components = d.map((x, i) => ({ description: String(x).trim(), qty: evalQty(q[i]), unit: String(un[i]).trim(), rate: parseMoney(rt[i]) ?? 0 })).filter((c) => c.description);
+    if (components.some((c) => Number.isNaN(c.qty))) throw new RuleError("Check the component quantities.");
+    return (await rpc("save_assembly", { p_org: DB.org.id, p_id: null, p: { name: f(fd, "name"), unit: f(fd, "unit"), category: f(fd, "category"), components } })).message;
+  },
+  async issueHandover(fd) {
+    return (await rpc("issue_handover", { p_project: f(fd, "project"), p: { recipient: f(fd, "recipient"), dlp_months: f(fd, "dlp_months"), note: f(fd, "note"), accept_outstanding: fd.get("accept_outstanding") === "on" } })).message;
+  },
   // ---- costs & claims
   async budgetLine(fd) {
     const b = f(fd, "budget") ? parseMoney(f(fd, "budget")) : 0, fo = f(fd, "forecast_override") ? parseMoney(f(fd, "forecast_override")) : null;
@@ -639,6 +673,21 @@ document.addEventListener("click", async (e) => {
     else if (rows.children.length > 1) hz.closest(".hz-row").remove();
     return;
   }
+  const est = e.target.closest("[data-add-est],[data-remove-est],[data-insert-asm]");
+  if (est) {
+    const fm = est.closest("form");
+    if ("removeEst" in est.dataset) { const rows = est.closest(".est-rows"); if (rows.children.length > 1) est.closest(".est-row").remove(); else est.closest(".est-row").querySelectorAll("input").forEach((i) => (i.type === "checkbox" ? (i.checked = false) : (i.value = ""))); }
+    else if (est.dataset.addEst) { const rows = fm.querySelector(`[data-rows=${est.dataset.addEst}]`); rows.insertAdjacentHTML("beforeend", est.dataset.addEst === "items" ? estRow() : quoteRow()); rows.lastElementChild.querySelector("input").focus(); }
+    else {
+      // Expand an assembly into priced items: component quantity × how many.
+      const a = DB.assemblies.find((x) => x.id === fm.querySelector("[data-asm]").value), n = evalQty(fm.querySelector("[data-asm-qty]").value || "1");
+      if (!a || Number.isNaN(n) || !n) { formError(fm, "Choose an assembly and how many."); return; }
+      const rows = fm.querySelector("[data-rows=items]");
+      [...rows.querySelectorAll(".est-row")].filter((r) => !r.querySelector("[name=it_desc]").value.trim()).forEach((r) => r.remove());
+      for (const c of a.components) rows.insertAdjacentHTML("beforeend", estRow({ category: a.category || a.name, description: `${c.description} (${a.name})`, qty: Math.round(c.qty * n * 1000) / 1000, unit: c.unit, rate: c.rate }));
+    }
+    return;
+  }
   const pt = e.target.closest("[data-add-point],[data-remove-point]");
   if (pt) {
     const rows = pt.closest("form").querySelector(".pt-rows");
@@ -674,6 +723,7 @@ document.addEventListener("change", async (e) => {
     go(el.value ? `/app/projects/${el.value}${cur?.[2] && !/defects|itp|new/.test(path) ? cur[2] : ""}` : "/app");
   }
   if (el.matches("[data-count-files]")) { const box = el.closest("form").querySelector("[data-file-count]"); if (box) box.textContent = el.files.length ? `${el.files.length} photo${el.files.length > 1 ? "s" : ""} attached` : ""; return; }
+  if (el.matches("[data-est-calc]")) return;
   if (el.matches("[data-check-all]")) { el.closest("form").querySelectorAll("input[name=ids]").forEach((c) => (c.checked = el.checked)); return; }
   if (el.matches("[data-doc-number]")) {
     // Typing an existing number fills in its title and category.
@@ -686,6 +736,14 @@ document.addEventListener("change", async (e) => {
     fm.querySelectorAll("[data-preview]").forEach((p, i) => { if (shots[i]) { p.style.background = `center/cover url(${shots[i]})`; p.textContent = ""; } });
     fm.querySelector("[data-photo-count]").textContent = shots.length ? `${shots.length} photo${shots.length > 1 ? "s" : ""} attached` : "";
   }
+});
+
+// Live line totals while editing an estimate.
+document.addEventListener("input", (e) => {
+  const row = e.target.closest?.(".est-row");
+  if (!row || !e.target.matches("[data-est-calc]")) return;
+  const q = evalQty(row.querySelector("[name=it_qty]").value), r = parseMoney(row.querySelector("[name=it_rate]").value);
+  row.querySelector("[data-line-total]").textContent = Number.isNaN(q) ? "check qty" : r === null ? "" : money(Math.round(q * r));
 });
 
 document.addEventListener("keydown", (e) => {

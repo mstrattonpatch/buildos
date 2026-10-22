@@ -479,3 +479,17 @@ table.kv th { text-align: left; font-weight: 600; color: var(--muted); font-size
 .claim-sum td { padding: 5px 0 5px 24px; border-top: 1px solid var(--border); }
 .claim-sum td:first-child { padding-left: 0; }
 @media print { .claim-doc { border: 0; box-shadow: none; padding: 0; } .subnav { display: none; } }
+/* estimates, reports, handover */
+.est-rows { display: flex; flex-direction: column; gap: 6px; }
+.est-row { display: grid; grid-template-columns: 140px 1fr 110px 70px 100px 100px 34px; gap: 6px; align-items: center; }
+.est-row .input { height: 34px; }
+.quote-row { grid-template-columns: 140px 1fr 120px 1fr 70px 34px; }
+.est-total { text-align: right; }
+@media (max-width: 900px) { .est-row, .quote-row { grid-template-columns: 1fr 1fr; } }
+fieldset[disabled] .input { background: #fafbf9; }
+.asm summary { cursor: pointer; padding: 4px 0; }
+.report-head { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+.report-diary { border-bottom: 1px solid var(--border); padding: 8px 0; }
+@media print { .report-sec { break-inside: avoid; } .report-head { margin-top: 0; } }
+.report-head.print-only { display: none; }
+@media print { .report-head.print-only { display: flex; } }

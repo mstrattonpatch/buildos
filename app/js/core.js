@@ -339,8 +339,8 @@ function createSeed(now = new Date()) {
 const SAFETY = ["ncr.manage", "permit.request", "permit.approve", "safety.report", "safety.manage", "attendance.manage"];
 const TIME = ["timesheet.submit", "timesheet.approve", "timesheet.process", "rates.manage"];
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign", "cost.manage", "receipt.submit"],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign", "cost.manage", "receipt.submit"],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign", "cost.manage", "receipt.submit", "estimate.manage"],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign", "cost.manage", "receipt.submit", "estimate.manage"],
   site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY, "timesheet.submit", "timesheet.approve", "task.assign", "receipt.submit"],
   quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve", "ncr.manage", "safety.report", "task.assign", "receipt.submit"],
   subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload", "permit.request", "safety.report", "timesheet.submit"],
@@ -609,7 +609,7 @@ const STARTER_TEMPLATES = [
 ];
 
 // ----------------------------------------------------------- documents
-const DOC_CATEGORIES = ["Architectural", "Structural", "Services", "Civil", "Specification", "Contract", "Certificates", "Safety", "Minutes", "Correspondence", "Handover", "Other"];
+const DOC_CATEGORIES = ["Architectural", "Structural", "Services", "Civil", "Specification", "Contract", "Certificates", "Warranties", "O&M manuals", "As-built", "Safety", "Minutes", "Correspondence", "Handover", "Other"];
 /** Mirrors document_needs_review() in the database. */
 const docNeedsReview = (cat) => ["Architectural", "Structural", "Services", "Civil", "Specification", "Contract"].includes(cat);
 /** One entry per document number: current revision, any revision in review, and every revision. */
@@ -773,6 +773,43 @@ function costLedger(pid) {
   const claimWarnings = [...claims.filter((c) => c.status === "submitted" && c.dueDate && c.dueDate < todayYmd()).map((c) => ["red", `${c.ref} claimed ${money(c.claimed)} — not certified, due ${dayMonth(c.dueDate)}`]),
     ...claims.filter((c) => (c.status === "certified" || c.status === "paid") && c.certified < c.claimed).map((c) => ["amber", `${c.ref} certified ${money(c.claimed - c.certified)} less than claimed`])];
   return { rows, claimWarnings };
+}
+
+// ---- estimates
+/** "12.05*10" → 120.5. Only numbers, + − × ÷ and brackets; anything else is refused. */
+function evalQty(v) {
+  const t = String(v ?? "").replace(/×/g, "*").replace(/÷/g, "/").replace(/,/g, "").trim();
+  if (!t) return 0;
+  if (!/^[\d.\s+\-*/()]+$/.test(t)) return NaN;
+  try { const n = Function(`"use strict"; return (${t});`)(); return Number.isFinite(n) && n >= 0 ? Math.round(n * 1000) / 1000 : NaN; } catch { return NaN; }
+}
+/** Mirrors estimate_costs() in the database: per category, the selected quote or the itemised total. */
+function estimateCosts(e) {
+  const items = DB.estimateItems.filter((i) => i.estimateId === e.id), quotes = DB.estimateQuotes.filter((q) => q.estimateId === e.id);
+  const cats = uniq([...items.map((i) => i.category), ...quotes.filter((q) => q.selected).map((q) => q.category)]);
+  const rows = cats.map((category) => {
+    const q = quotes.find((x) => x.category === category && x.selected), itemised = sum(items.filter((i) => i.category === category), (i) => Math.round(Number(i.qty) * i.rate));
+    const cost = q ? q.amount : itemised;
+    return { category, cost, sell: Math.round(cost * (1 + Number(e.markupPct) / 100)), quote: q, itemised };
+  });
+  const cost = sum(rows, (r) => r.cost), sell = sum(rows, (r) => r.sell);
+  return { rows, cost, sell, gst: Math.round(sell * 0.1), margin: sell - cost };
+}
+const estimateVersions = (e) => DB.estimates.filter((x) => x.seriesId === e.seriesId).sort((a, b) => a.version - b.version);
+
+// ---- handover
+function handoverChecks(pid) {
+  const docs = (cat) => DB.documents.filter((d) => d.projectId === pid && d.category === cat && d.status === "current");
+  const openDefects = DB.defects.filter((d) => d.projectId === pid && d.status !== "closed" && d.status !== "draft");
+  const points = DB.itps.filter((i) => i.projectId === pid).flatMap((i) => i.points), open = points.filter((x) => x.status !== "released");
+  const ncrs = DB.ncrs.filter((n) => n.projectId === pid && n.status !== "closed");
+  return [
+    { key: "defects", label: "Defects closed", ok: !openDefects.length, detail: openDefects.length ? `${openDefects.length} open` : "None open", list: openDefects },
+    { key: "itps", label: "Inspections released", ok: !open.length, detail: points.length ? `${points.length - open.length} of ${points.length} points released` : "No ITPs on this project" },
+    { key: "ncrs", label: "NCRs closed", ok: !ncrs.length, detail: ncrs.length ? `${ncrs.length} open` : "None open" },
+    ...[["Certificates", "Certificates (compliance, occupation)"], ["Warranties", "Warranties"], ["O&M manuals", "Operation & maintenance manuals"], ["As-built", "As-built drawings"]]
+      .map(([cat, label]) => ({ key: cat, label, ok: docs(cat).length > 0, detail: docs(cat).length ? `${docs(cat).length} document${docs(cat).length > 1 ? "s" : ""}` : "None uploaded", docs: docs(cat), cat })),
+  ];
 }
 
 function myTasks(u) {
