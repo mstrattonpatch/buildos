@@ -40,7 +40,7 @@ function taskTone(t) {
   if (t.status === "in_progress") return ["var(--green)", "in progress"];
   return [t.forecastStart <= todayYmd() ? "var(--blue)" : "#c9cfc8", "starting"];
 }
-function gantt(tasks, fromOffset = -2, days = 14) {
+function gantt(tasks, fromOffset = -2, days = 14, opts = {}) {
   const start = startOfDay(new Date()); start.setDate(start.getDate() + fromOffset);
   const idx = (s) => Math.round((D(s) - start) / 86400000);
   const P = (i) => `${(Math.max(0, Math.min(days, i)) / days) * 100}%`;
@@ -49,13 +49,15 @@ function gantt(tasks, fromOffset = -2, days = 14) {
   const head = cols.map((d, i) => `<span data-today="${i === today}" style="visibility:${d.getDay() % 6 ? "visible" : "hidden"}">${days > 20 ? (d.getDay() === 1 ? d.getDate() : "") : `${d.toLocaleDateString("en-AU", { weekday: "narrow" })} ${d.getDate()}`}</span>`).join("");
   const rows = tasks.map((t) => {
     const s = idx(t.forecastStart), f = idx(t.forecastFinish) + 1, bs = idx(t.baselineStart), bf = idx(t.baselineFinish) + 1, [c, l] = taskTone(t);
-    const bars = t.isMilestone ? `<span class="g-ms" style="left:calc(${P(s + 0.5)} - 6px);background:${c}"></span>`
-      : `${f > 0 && s < days ? `<span class="g-bar" style="left:${P(s)};width:calc(${P(f)} - ${P(s)});background:${c}"></span>` : ""}${bf > 0 && bs < days ? `<span class="g-base" style="left:${P(bs)};width:calc(${P(bf)} - ${P(bs)})"></span>` : ""}`;
-    return `<div class="g-name" style="font-weight:${t.isMilestone ? 700 : 500}" title="${esc(t.name)}">${esc(t.name)}</div><div class="g-track" aria-label="${esc(t.name)}: ${l}"><span class="g-today" style="left:${P(today + 0.5)}"></span>${bars}</div>`;
+    const crit = opts.critical?.get(t.id)?.critical ? " crit" : "";
+    const bars = t.isMilestone ? `<span class="g-ms${crit}" style="left:calc(${P(s + 0.5)} - 6px);background:${c}"></span>`
+      : `${f > 0 && s < days ? `<span class="g-bar${crit}" style="left:${P(s)};width:calc(${P(f)} - ${P(s)});background:${c}"></span>` : ""}${bf > 0 && bs < days ? `<span class="g-base" style="left:${P(bs)};width:calc(${P(bf)} - ${P(bs)})"></span>` : ""}`;
+    const label = opts.link ? `<a href="${opts.link}/${t.id}" class="rowlink">${esc(t.name)}</a>` : esc(t.name);
+    return `<div class="g-name" style="font-weight:${t.isMilestone ? 700 : 500}" title="${esc(t.name)}">${label}</div><div class="g-track" aria-label="${esc(t.name)}: ${l}"><span class="g-today" style="left:${P(today + 0.5)}"></span>${bars}</div>`;
   }).join("");
   return `<div class="gantt"><div></div><div class="g-head" style="grid-template-columns:repeat(${days},1fr)">${head}</div>${rows}</div>`;
 }
-const ganttKey = () => `<div class="row wrap small muted" style="gap:14px;margin-top:12px"><span class="row" style="gap:5px"><i class="key" style="background:var(--green)"></i>In progress</span><span class="row" style="gap:5px"><i class="key" style="background:var(--amber)"></i>At risk (forecast past baseline)</span><span class="row" style="gap:5px"><i class="key" style="background:var(--blue)"></i>Starting</span><span class="row" style="gap:5px"><i class="key" style="background:var(--red);width:9px;height:9px;transform:rotate(45deg)"></i>Milestone blocked</span><span class="row" style="gap:5px"><i class="key" style="background:#c9cfc8;height:3px"></i>Baseline</span></div>`;
+const ganttKey = (crit = false) => `<div class="row wrap small muted" style="gap:14px;margin-top:12px">${crit ? '<span class="row" style="gap:5px"><i class="key crit-key"></i>Critical path</span>' : ""}<span class="row" style="gap:5px"><i class="key" style="background:var(--green)"></i>In progress</span><span class="row" style="gap:5px"><i class="key" style="background:var(--amber)"></i>At risk (forecast past baseline)</span><span class="row" style="gap:5px"><i class="key" style="background:var(--blue)"></i>Starting</span><span class="row" style="gap:5px"><i class="key" style="background:var(--red);width:9px;height:9px;transform:rotate(45deg)"></i>Milestone blocked</span><span class="row" style="gap:5px"><i class="key" style="background:#c9cfc8;height:3px"></i>Baseline</span></div>`;
 
 // ===================================================== internal app shell
 const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/people", "People & contractors", "users"], ["#/app/reports", "Reports", "chart"]];
@@ -122,11 +124,11 @@ function pageControlCentre(u) {
   const tot = pos.reduce((a, { c }) => c ? { o: a.o + c.originalContract, ap: a.ap + c.approvedVariations, cm: a.cm + c.committed, ac: a.ac + c.actual, ex: a.ex + c.variationExposure } : a, { o: 0, ap: 0, cm: 0, ac: 0, ex: 0 });
   const tasks = myTasks(u);
   const rows = pos.map(({ p, c }) => {
-    const behind = p.plannedProgress - p.verifiedProgress;
+    const pr = progressOf(p), nm = nextMilestoneOf(p), behind = pr.planned - pr.verified;
     return `<tr><td><a class="rowlink" href="#/app/projects/${p.id}">${esc(p.name)}</a><div class="muted small"><span class="mono" style="font-size:12px">${p.code}</span> · ${p.type}</div></td>
-      <td><div class="bar" style="margin-top:6px"><span class="planned" style="width:${p.plannedProgress}%"></span><span class="actual" style="width:${p.verifiedProgress}%"></span></div><div class="small ${behind > 0 ? "amber-text" : "green-text"}" style="margin-top:5px">${p.verifiedProgress}% verified · ${behind > 0 ? `${behind}% behind` : "on track"}</div></td>
+      <td><div class="bar" style="margin-top:6px"><span class="planned" style="width:${pr.planned}%"></span><span class="actual" style="width:${pr.verified}%"></span></div><div class="small ${behind > 0 ? "amber-text" : "green-text"}" style="margin-top:5px">${pr.verified}% verified · ${behind > 0 ? `${behind}% behind` : "on track"}</div></td>
       ${showMoney && c ? `<td class="num">${money(c.revisedContract, { compact: true })}</td><td class="num ${c.forecastFinalCost > c.revisedContract ? "red-text" : ""}">${money(c.forecastFinalCost, { compact: true })}</td><td class="num ${c.forecastMarginPct < 0 ? "red-text" : ""}">${pct(c.forecastMarginPct)}</td>` : ""}
-      <td class="small">${esc(p.nextMilestone.name)} · ${dayMonth(p.nextMilestone.date)}</td></tr>`;
+      <td class="small">${esc(nm.name)} · ${dayMonth(nm.date)}</td></tr>`;
   }).join("");
   return `${pageHeader({ title: "Company overview", meta: `<span>${longToday()} · ${projects.length} active projects</span>`, actions: `<a class="btn" href="#/app/reports">Reports</a>${can(u, "project.manage") ? '<a class="btn btn-dark" href="#/app/projects/new">New project</a>' : ""}` })}
   <div class="metrics">
@@ -185,7 +187,7 @@ function pageProject(u, p) {
       <div class="page-meta"><span>${esc(p.address)}</span><span>Client: <b>${esc(p.client)}</b></span><span>PM: <b>${esc(userById(p.pmId)?.name)}</b></span>${showMoney ? `<span>Contract: <b>${money(c.revisedContract, { compact: true })}</b></span>` : ""}<span>PC: <b>${D(p.pcDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}</b></span></div>
     </div><div class="row wrap"><a class="btn" href="${base}/reports">Weekly report</a><a class="btn btn-dark" href="${base}/diary">Today's site diary</a></div></div></section>
   <div class="metrics">
-    ${metric("Programme", `${p.verifiedProgress}%`, `${p.plannedProgress}% planned`, p.plannedProgress > p.verifiedProgress ? "amber" : null, `${base}/programme`)}
+    ${metric("Programme", `${progressOf(p).verified}%`, `${progressOf(p).planned}% planned`, progressOf(p).planned > progressOf(p).verified ? "amber" : null, `${base}/programme`)}
     ${metric("Open defects", open.length, `${od.length} overdue`, od.length ? "amber" : null, `${base}/quality`)}
     ${metric("Awaiting sign-off", so.total, `${so.holdsBlocking.length} hold point${so.holdsBlocking.length === 1 ? "" : "s"}`, so.holdsBlocking.length ? "red" : null, `${base}/quality`)}
     ${metric("On site now", here.length, `${companiesOnSite(p.id)} companies`, null, `${base}/workforce`)}
@@ -348,14 +350,117 @@ function pageItp(u, p, id) {
 }
 
 // ===================================================== other project modules
-function pageProgramme(u, p) {
-  const tasks = DB.tasks.filter((t) => t.projectId === p.id).sort((a, b) => a.forecastStart.localeCompare(b.forecastStart));
-  return `${pageHeader({ crumbs: crumbsFor(p), title: "Programme &amp; tasks", meta: `<span>Planned <b>${p.plannedProgress}%</b></span><span>Verified on site <b>${p.verifiedProgress}%</b></span><span>PC <b>${dayMonth(p.pcDate)}</b></span>` })}
-  <section class="card"><div class="card-head"><h2>Six-week view</h2><div class="spacer"></div><span class="small muted">Forecast vs baseline · numbers mark Mondays</span></div><div class="card-body">${gantt(tasks, -7, 42)}${ganttKey()}</div></section>
-  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Task</th><th>Contractor</th><th>Baseline finish</th><th>Forecast finish</th><th class="right">Slip</th><th class="right">Progress</th><th>Quality</th><th>Status</th></tr></thead><tbody>
-  ${tasks.map((t) => { const slip = daysBetween(D(t.baselineFinish), D(t.forecastFinish)), itp = DB.itps.find((i) => i.id === t.itpId); return `<tr><td style="font-weight:${t.isMilestone ? 700 : 500}">${t.isMilestone ? "◆ " : ""}${esc(t.name)}<div class="muted small">${esc(t.trade)}</div></td><td class="small">${esc(contractorOf(t.contractorId)?.tradingName ?? "—")}</td><td class="small">${dayMonth(t.baselineFinish)}</td><td class="small">${dayMonth(t.forecastFinish)}</td><td class="num ${slip > 0 ? "amber-text" : ""}">${slip > 0 ? `+${slip}d` : "—"}</td><td class="num">${t.progress}%</td><td class="small">${itp ? `<a class="link" href="#/app/projects/${p.id}/quality/itp/${itp.id}">${itp.ref}</a>` : "—"}</td><td>${badge(t.status)}</td></tr>`; }).join("")}
-  </tbody></table></div></section>
+const VIEWS = { "2w": ["2 weeks", -2, 14], "6w": ["6 weeks", -7, 42], "12w": ["12 weeks", -7, 84], all: ["Whole programme"] };
+
+function predecessorPicker(projectTasks, self, selected = []) {
+  // Hide this task and anything that already depends on it (that would be a loop).
+  const blocked = new Set(self ? [self.id] : []);
+  let grew = true;
+  while (grew) { grew = false; for (const t of projectTasks) if (!blocked.has(t.id) && t.predecessorIds.some((x) => blocked.has(x))) { blocked.add(t.id); grew = true; } }
+  const opts = projectTasks.filter((t) => !blocked.has(t.id));
+  if (!opts.length) return '<p class="muted small">No other tasks to link yet.</p>';
+  return `<div class="pick-list">${opts.map((t) => `<label class="row small" style="gap:8px"><input type="checkbox" name="predecessor_ids" value="${t.id}"${selected.includes(t.id) ? " checked" : ""}>${t.isMilestone ? "◆ " : ""}${esc(t.name)} <span class="muted">· finishes ${dayMonth(t.forecastFinish)}</span></label>`).join("")}</div>`;
+}
+
+function taskFields(p, projectTasks, t = null) {
+  const v = (k) => esc(t?.[k] ?? "");
+  const opt = (list, sel, label) => `<option value="">—</option>${list.map((x) => `<option value="${x.id}"${x.id === sel ? " selected" : ""}>${esc(label(x))}</option>`).join("")}`;
+  return `<div class="form-grid task-form">
+    <label class="field full"><span>Name <span class="req">*</span></span><input name="name" class="input" value="${v("name")}" placeholder="e.g. L4 slab — reo &amp; formwork"></label>
+    <label class="row small full" style="gap:8px"><input type="checkbox" name="is_milestone"${t?.isMilestone ? " checked" : ""}> This is a milestone (a single date, e.g. "L4 slab pour" or "Practical completion")</label>
+    <label class="field"><span><span class="when-task">Start</span><span class="when-ms">Milestone date</span> <span class="req">*</span></span><input type="date" name="forecast_start" class="input" value="${v("forecastStart")}"></label>
+    <label class="field finish-field"><span>Finish <span class="req">*</span></span><input type="date" name="forecast_finish" class="input" value="${v("forecastFinish")}"></label>
+    <label class="field"><span>Trade</span><input name="trade" class="input" value="${v("trade")}" placeholder="e.g. Concrete"></label>
+    <label class="field"><span>Contractor</span><select name="contractor_id" class="input">${opt(DB.contractors, t?.contractorId, (c) => c.tradingName)}</select></label>
+    <div class="field full"><span>Must finish first <span class="muted">(predecessors — finish-to-start)</span></span>${predecessorPicker(projectTasks, t, t?.predecessorIds ?? [])}</div>
+    <label class="field"><span>Linked ITP</span><select name="itp_id" class="input">${opt(DB.itps.filter((i) => i.projectId === p.id), t?.itpId, (i) => `${i.ref} · ${i.title}`)}</select></label>
+    <label class="field"><span>Linked SWMS</span><select name="swms_id" class="input">${opt(DB.swms.filter((x) => x.projectId === p.id), t?.swmsId, (x) => `${x.ref} · ${x.title}`)}</select></label>
+    <label class="field"><span>Cost code</span><input name="cost_code" class="input" value="${v("costCode")}" placeholder="e.g. 02-CON"></label>
+    ${t ? `<label class="field"><span>Delay reason <span class="muted">(needed if the finish moves later)</span></span><input name="delay_reason" class="input" placeholder="e.g. Wet weather, late steel delivery"></label>` : "<span></span>"}
+  </div>`;
+}
+
+function pageProgramme(u, p, q = {}) {
+  const base = `#/app/projects/${p.id}`, tasks = DB.tasks.filter((t) => t.projectId === p.id).sort((a, b) => a.forecastStart.localeCompare(b.forecastStart) || a.forecastFinish.localeCompare(b.forecastFinish));
+  const cp = criticalPath(tasks), pr = progressOf(p), manage = can(u, "project.manage");
+  const view = VIEWS[q.view] ? q.view : "6w";
+  let from, days;
+  if (view === "all" && tasks.length) {
+    const first = Math.min(...tasks.map((t) => dayNo(t.forecastStart)), ...tasks.map((t) => dayNo(t.baselineStart || t.forecastStart)));
+    const last = Math.max(...tasks.map((t) => dayNo(t.forecastFinish)));
+    from = first - dayNo(todayYmd()); days = Math.max(14, last - first + 3);
+  } else [, from, days] = VIEWS[view === "all" ? "6w" : view];
+  const end = tasks.length ? tasks.reduce((a, t) => (t.forecastFinish > a ? t.forecastFinish : a), tasks[0].forecastFinish) : null;
+  const late = end && p.pcDate ? daysBetween(D(p.pcDate), D(end)) : 0;
+  const critCount = [...cp.values()].filter((x) => x.critical).length;
+  const rows = tasks.map((t) => {
+    const slip = t.baselineFinish ? daysBetween(D(t.baselineFinish), D(t.forecastFinish)) : 0, c = cp.get(t.id), clash = dependencyClashes(t, tasks), itp = DB.itps.find((i) => i.id === t.itpId);
+    return `<tr><td><a class="rowlink" href="${base}/programme/${t.id}" style="font-weight:${t.isMilestone ? 700 : 600}">${t.isMilestone ? "◆ " : ""}${esc(t.name)}</a><div class="muted small">${esc(t.trade ?? "")}${clash.length ? ` <span class="amber-text">${icon("alert", 12)} starts before ${esc(clash[0].name)} finishes</span>` : ""}</div></td>
+      <td class="small">${esc(contractorOf(t.contractorId)?.tradingName ?? "—")}</td>
+      <td class="small" style="white-space:nowrap">${dayMonth(t.forecastStart)}${t.isMilestone ? "" : ` – ${dayMonth(t.forecastFinish)}`}</td>
+      <td class="num ${slip > 0 ? "amber-text" : ""}">${slip > 0 ? `+${slip}d` : slip < 0 ? `${slip}d` : "—"}</td>
+      <td class="num">${t.status === "complete" ? "—" : c?.critical ? '<span class="crit-text">0d</span>' : `${c?.float ?? 0}d`}</td>
+      <td class="num">${t.progress}%</td>
+      <td class="small">${itp ? `<a class="link" href="${base}/quality/itp/${itp.id}">${itp.ref}</a>` : "—"}</td>
+      <td>${badge(t.status)}</td></tr>`;
+  }).join("");
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Programme &amp; tasks",
+    meta: `<span>Planned <b>${pr.planned}%</b></span><span>Progress on site <b>${pr.verified}%</b></span>${end ? `<span>Forecast finish <b>${dayMonth(end)}</b>${p.pcDate ? ` <span class="${late > 0 ? "amber-text" : "green-text"}">(${late > 0 ? `${late}d after` : late < 0 ? `${-late}d before` : "on"} PC)</span>` : ""}</span>` : ""}${p.pcDate ? `<span>PC <b>${dayMonth(p.pcDate)}</b></span>` : ""}`,
+    actions: manage ? `<a class="btn btn-dark" href="${base}/programme#new-task">Add task</a>` : "" })}
+  ${tasks.length ? `<section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Gantt</h2><div class="spacer"></div><div class="row wrap" style="gap:6px">${Object.entries(VIEWS).map(([k, [l]]) => `<a class="chip" data-active="${k === view}" href="${base}/programme?view=${k}">${l}</a>`).join("")}</div></div>
+    <div class="card-body">${gantt(tasks, from, days, { critical: cp, link: `${base}/programme` })}${ganttKey(true)}
+    <p class="small muted" style="margin-top:8px">${critCount} task${critCount === 1 ? "" : "s"} on the critical path — any delay to these pushes out the finish date. Float is how many days a task can slip without delaying completion.</p></div></section>
+  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Task</th><th>Contractor</th><th>Forecast</th><th class="right">Slip</th><th class="right">Float</th><th class="right">Progress</th><th>Quality</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>`
+    : `<section class="card">${emptyState("calendar", "No programme yet", "Add the project's tasks and milestones. Link tasks that must finish first, and the critical path is worked out for you.")}</section>`}
+  ${manage ? `<section class="card card-pad" id="new-task"><h2 style="margin-bottom:12px">Add a task or milestone</h2>${form("createTask", `${hidden("project", p.id)}${taskFields(p, tasks)}<div style="margin-top:14px"><button class="btn btn-primary">Add to programme</button></div>`)}</section>` : ""}
+  ${manage && tasks.length ? `<section class="card card-pad"><h2 style="margin-bottom:4px">Re-baseline</h2><p class="muted small" style="margin-bottom:12px">Copies every current forecast date into the baseline — for example after an extension of time is approved. The old baseline stays in the history.</p>${form("rebaseline", `${hidden("project", p.id)}<div class="row wrap" style="gap:8px"><input name="reason" class="input" placeholder="Reason, e.g. EOT 2 approved" style="max-width:340px;height:36px"><button class="btn">Re-baseline programme</button></div>`, 'data-confirm="Replace the baseline for every task with today\'s forecast dates?"')}</section>` : ""}
   <p class="small muted">Physical progress, ITP sign-off and claim entitlement are tracked separately: a task can be complete while its ITP is unsigned.</p>`;
+}
+
+function pageTask(u, p, id) {
+  const t = DB.tasks.find((x) => x.id === id && x.projectId === p.id);
+  if (!t) return notFound();
+  const base = `#/app/projects/${p.id}`, tasks = DB.tasks.filter((x) => x.projectId === p.id), cp = criticalPath(tasks).get(t.id);
+  const manage = can(u, "project.manage"), siteTeam = manage || can(u, "diary.submit");
+  const slip = t.baselineFinish ? daysBetween(D(t.baselineFinish), D(t.forecastFinish)) : 0, clash = dependencyClashes(t, tasks);
+  const preds = tasks.filter((x) => t.predecessorIds.includes(x.id)), succs = tasks.filter((x) => x.predecessorIds.includes(t.id));
+  const itp = DB.itps.find((i) => i.id === t.itpId), swms = DB.swms.find((s) => s.id === t.swmsId), defects = DB.defects.filter((d) => d.taskId === t.id);
+  const kv = (k, v) => `<dt class="muted">${k}</dt><dd style="text-align:left;font-family:inherit">${v}</dd>`;
+  const link = (x) => `<a class="link" href="${base}/programme/${x.id}">${x.isMilestone ? "◆ " : ""}${esc(x.name)}</a> <span class="muted small">(${dayMonth(x.forecastFinish)})</span>`;
+  const openHolds = itp?.points.filter((x) => x.type === "hold" && x.status !== "released").length ?? 0;
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/programme`, "Programme"]], title: `${t.isMilestone ? "◆ " : ""}${esc(t.name)}`,
+    meta: `<span class="row wrap" style="gap:8px">${badge(t.status)}${cp?.critical ? '<span class="badge badge-red">Critical path</span>' : ""}${t.isMilestone ? '<span class="tag">Milestone</span>' : ""}</span>` })}
+  ${clash.length ? `<div class="notice notice-warn">${icon("alert")}<span>Starts before ${clash.map((x) => `<b>${esc(x.name)}</b> finishes (${dayMonth(x.forecastFinish)})`).join(", ")}. Move the start date or remove the link.</span></div>` : ""}
+  ${openHolds ? `<div class="notice notice-error">${icon("lock")}<span><b>${itp.ref}</b> has ${openHolds} hold point${openHolds > 1 ? "s" : ""} not released. Work covered by a hold point must not proceed until it's released.</span></div>` : ""}
+  <div class="cc-grid">
+    <div class="stack-lg" style="min-width:0">
+      <section class="card"><div class="card-head"><h2>Dates</h2></div><div class="card-body"><dl class="kv" style="grid-template-columns:180px 1fr">
+        ${kv("Forecast", `${dayMonth(t.forecastStart)}${t.isMilestone ? "" : ` – ${dayMonth(t.forecastFinish)} · ${durationDays(t)} days`}`)}
+        ${kv("Baseline", t.baselineStart ? `${dayMonth(t.baselineStart)}${t.isMilestone ? "" : ` – ${dayMonth(t.baselineFinish)}`}` : "—")}
+        ${kv("Slip vs baseline", slip > 0 ? `<span class="amber-text">${slip} days late</span>` : slip < 0 ? `${-slip} days early` : "On baseline")}
+        ${kv("Float", t.status === "complete" ? "—" : cp?.critical ? '<span class="crit-text">None — on the critical path</span>' : `${cp?.float ?? 0} days`)}
+        ${kv("Actual", t.actualStart ? `Started ${dayMonth(t.actualStart)}${t.actualFinish ? ` · finished ${dayMonth(t.actualFinish)}` : ""}` : "Not started")}
+        ${t.delayReason ? kv("Last delay reason", esc(t.delayReason)) : ""}
+      </dl></div></section>
+      <section class="card"><div class="card-head"><h2>Links</h2></div><div class="card-body"><dl class="kv" style="grid-template-columns:180px 1fr">
+        ${kv("Contractor", esc(contractorOf(t.contractorId)?.tradingName ?? "—"))}${kv("Trade", esc(t.trade ?? "—"))}${kv("Cost code", esc(t.costCode ?? "—"))}
+        ${kv("Must finish first", preds.map(link).join("<br>") || "—")}${kv("Waiting on this", succs.map(link).join("<br>") || "—")}
+        ${kv("ITP", itp ? `<a class="link" href="${base}/quality/itp/${itp.id}">${itp.ref} · ${esc(itp.title)}</a>` : "—")}
+        ${kv("SWMS", swms ? `${esc(swms.ref)} · ${esc(swms.title)} v${swms.version} ${badge(swms.status)}` : "—")}
+        ${kv("Defects", defects.length ? defects.map((d) => `<a class="link" href="${base}/quality/defects/${d.id}">${d.ref}</a>`).join(", ") : "—")}
+      </dl></div></section>
+      <section class="card"><div class="card-head"><h2>History</h2></div><div class="card-body"><ul class="timeline">${auditFor(t.id).map((a) => `<li><span class="dot ${/delay|blocked/i.test(a.action) ? "amber" : /complete/i.test(a.action) ? "green" : "blue"}"></span><div><b style="font-weight:600">${esc(a.action)}</b> by ${esc(userById(a.actorId)?.name ?? "—")} · <span class="muted">${dateTime(a.at)}</span>${a.detail ? `<div class="muted small">${esc(a.detail)}</div>` : ""}</div></li>`).join("") || '<li class="muted small">No changes recorded yet.</li>'}</ul></div></section>
+    </div>
+    <aside class="stack-lg">
+      ${siteTeam ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Update progress</h2>${form("taskProgress", `${hidden("task", t.id)}<div class="stack">
+        <label class="field"><span>Physical progress</span><div class="row"><input type="range" name="progress" min="0" max="100" step="5" value="${t.progress}" class="range" oninput="this.nextElementSibling.textContent=this.value+'%'"><b style="min-width:44px;text-align:right">${t.progress}%</b></div></label>
+        <label class="row small" style="gap:8px"><input type="checkbox" name="blocked"${t.status === "blocked" ? " checked" : ""}> Work is blocked</label>
+        <label class="field"><span>Note <span class="muted">(say what's blocking it)</span></span><input name="note" class="input" placeholder="e.g. Waiting on hold point release"></label>
+        <button class="btn btn-primary">Save progress</button></div>`)}</section>` : ""}
+      ${manage ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Edit task</h2>${form("updateTask", `${hidden("task", t.id)}${taskFields(p, tasks, t)}<div style="margin-top:14px"><button class="btn btn-dark">Save changes</button></div>`)}</section>
+        ${t.progress === 0 ? `<section class="card card-pad"><h2 style="margin-bottom:6px">Remove task</h2><p class="muted small" style="margin-bottom:12px">Only possible while no progress is recorded. Links from other tasks are removed too.</p>${form("deleteTask", `${hidden("task", t.id)}${hidden("project", p.id)}<button class="btn btn-danger">Remove from programme</button>`, `data-confirm="Remove ${esc(t.name)} from the programme?"`)}</section>` : ""}` : ""}
+    </aside>
+  </div>`;
 }
 
 function pageCommercial(u, p) {
@@ -457,7 +562,7 @@ const pagePlaceholder = (p, title, ic, body) => `${pageHeader({ crumbs: crumbsFo
 function pageProjects(u) {
   if (!listProjects(u).length) return pageGettingStarted(u);
   return `${pageHeader({ title: "Projects", meta: `<span>${listProjects(u).length} active</span>`, actions: can(u, "project.manage") ? '<a class="btn btn-dark" href="#/app/projects/new">New project</a>' : "" })}
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${listProjects(u).map((p) => { const c = projectCommercial(u, p.id); return `<a href="#/app/projects/${p.id}" class="card card-pad stack" style="gap:10px"><div><h2>${esc(p.name)}</h2><div class="muted small"><span class="mono" style="font-size:12px">${p.code}</span> · ${p.type} · ${esc(p.address)}</div></div><div class="bar"><span class="planned" style="width:${p.plannedProgress}%"></span><span class="actual" style="width:${p.verifiedProgress}%"></span></div><div class="row wrap small muted" style="gap:14px"><span>${p.verifiedProgress}% verified</span><span>${openDefects(u, p.id).length} open defects</span>${c ? `<span>${money(c.revisedContract, { compact: true })}</span>` : ""}<span>PM ${esc(userById(p.pmId)?.name)}</span></div><div class="small">Next: <b>${esc(p.nextMilestone.name)}</b> · ${dayMonth(p.nextMilestone.date)}</div></a>`; }).join("")}</div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${listProjects(u).map((p) => { const c = projectCommercial(u, p.id), pr = progressOf(p), nm = nextMilestoneOf(p); return `<a href="#/app/projects/${p.id}" class="card card-pad stack" style="gap:10px"><div><h2>${esc(p.name)}</h2><div class="muted small"><span class="mono" style="font-size:12px">${p.code}</span> · ${p.type} · ${esc(p.address)}</div></div><div class="bar"><span class="planned" style="width:${pr.planned}%"></span><span class="actual" style="width:${pr.verified}%"></span></div><div class="row wrap small muted" style="gap:14px"><span>${pr.verified}% verified</span><span>${openDefects(u, p.id).length} open defects</span>${c ? `<span>${money(c.revisedContract, { compact: true })}</span>` : ""}<span>PM ${esc(userById(p.pmId)?.name)}</span></div><div class="small">Next: <b>${esc(nm.name)}</b> · ${dayMonth(nm.date)}</div></a>`; }).join("")}</div>
 `;
 }
 const pageTasks = (u) => `${pageHeader({ title: "My tasks", meta: `<span>${myTasks(u).length} open · everything assigned to you as ${ROLE_LABEL[u.role].toLowerCase()}, across every module</span>` })}<section class="card card-pad">${taskList(myTasks(u))}</section>`;

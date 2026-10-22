@@ -66,7 +66,8 @@ function resolve(path, query) {
     else if (sub === "quality/new") { html = pageNewDefect(u, p); title = "New defect"; }
     else if ((mm = sub.match(/^quality\/defects\/(.+)$/))) { html = pageDefect(u, p, mm[1]); title = "Defect"; }
     else if ((mm = sub.match(/^quality\/itp\/(.+)$/))) { html = pageItp(u, p, mm[1]); title = "ITP"; }
-    else if (sub === "programme") { html = pageProgramme(u, p); title = "Programme"; }
+    else if (sub === "programme") { html = pageProgramme(u, p, query); title = "Programme"; }
+    else if ((mm = sub.match(/^programme\/(.+)$/))) { html = pageTask(u, p, mm[1]); title = "Task"; }
     else if (sub === "commercial") { html = pageCommercial(u, p); title = "Commercial"; }
     else if (sub === "safety") { html = pageSafety(u, p); title = "Safety"; }
     else if (sub === "workforce") { html = pageWorkforce(u, p); title = "Workforce"; }
@@ -142,6 +143,10 @@ function parseMoney(v) {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 const f = (fd, k) => String(fd.get(k) ?? "").trim();
+const taskPayload = (fd) => ({
+  name: f(fd, "name"), is_milestone: fd.get("is_milestone") === "on", forecast_start: f(fd, "forecast_start"), forecast_finish: f(fd, "forecast_finish"),
+  trade: f(fd, "trade"), contractor_id: f(fd, "contractor_id"), predecessor_ids: fd.getAll("predecessor_ids"), itp_id: f(fd, "itp_id"), swms_id: f(fd, "swms_id"), cost_code: f(fd, "cost_code"),
+});
 
 // Each returns a message (or { msg, go, stay, noReload }) or throws RuleError (shown inline).
 const ACTIONS = {
@@ -226,6 +231,19 @@ const ACTIONS = {
     if (amount === null) throw new RuleError("Enter the cost impact as a number.");
     return (await rpc("create_variation", { p_project: f(fd, "project"), p: { title: f(fd, "title"), reason: f(fd, "reason"), amount, time_impact_days: parseInt(f(fd, "days") || "0", 10) || 0 } })).message;
   },
+  // ---- programme
+  async createTask(fd) {
+    return (await rpc("create_task", { p_project: f(fd, "project"), p: taskPayload(fd) })).message;
+  },
+  async updateTask(fd) { return (await rpc("update_task", { p_task: f(fd, "task"), p: { ...taskPayload(fd), delay_reason: f(fd, "delay_reason") } })).message; },
+  async taskProgress(fd) {
+    return (await rpc("update_task_progress", { p_task: f(fd, "task"), p_progress: parseInt(f(fd, "progress"), 10), p_blocked: fd.get("blocked") === "on", p_note: f(fd, "note") })).message;
+  },
+  async deleteTask(fd) {
+    const r = await rpc("delete_task", { p_task: f(fd, "task") });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/programme` };
+  },
+  async rebaseline(fd) { return (await rpc("rebaseline_programme", { p_project: f(fd, "project"), p_reason: f(fd, "reason") })).message; },
   // ---- workflows
   async createDefect(fd, u, el) {
     const draft = fd.get("mode") === "draft";

@@ -391,3 +391,12 @@ noscript { display: block; padding: 40px; text-align: center; }
 .org-name { color: #8fa59b; font-size: 12px; font-weight: 600; padding: 0 10px 8px; margin-top: -8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 1279px) { .org-name { display: none; } }
 @keyframes spin { to { transform: rotate(360deg); } }
+.gantt .g-bar.crit, .gantt .g-ms.crit { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ink); }
+.crit-key { width: 14px; height: 8px; border-radius: 3px; background: var(--surface); box-shadow: 0 0 0 1.5px var(--ink); }
+.crit-text { color: var(--red); font-weight: 700; }
+.pick-list { display: grid; gap: 6px; max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r-input); padding: 10px 12px; background: #fafbf9; }
+.task-form .when-ms { display: none; }
+.task-form:has([name=is_milestone]:checked) .when-ms { display: inline; }
+.task-form:has([name=is_milestone]:checked) .when-task, .task-form:has([name=is_milestone]:checked) .finish-field { display: none; }
+.range { flex: 1; accent-color: var(--green); }
+aside .task-form { grid-template-columns: 1fr; }

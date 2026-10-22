@@ -39,6 +39,10 @@ supabase/migrations/               database schema, security rules, workflow fun
 2. **Authentication → Sign In / Providers → Email:** keep *Confirm email* on for real use. Supabase's built-in email sender only sends a few emails per hour — set up custom SMTP before inviting many people.
 3. Check the migration ran: **Database → Tables** should list `projects`, `defects` and so on.
 
+## Programme
+
+Tasks and milestones with finish-to-start dependencies (loops are refused), forecast vs baseline dates, critical path and float, site progress updates (0–100%, or flagged blocked with a reason), and delay reasons whenever a forecast finish moves later. Re-baselining copies forecasts to the baseline and is recorded in the history. Project progress is calculated from task progress weighted by duration.
+
 ## Roles
 
 | Role | Can |

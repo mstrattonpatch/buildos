@@ -505,6 +505,69 @@ function readiness(pid, taskId) {
   return { task: t, items };
 }
 
+// ------------------------------------------------------------ programme
+const dayNo = (s) => Math.round(D(s) / 86400000);
+const durationDays = (t) => dayNo(t.forecastFinish) - dayNo(t.forecastStart) + 1;
+
+/**
+ * Float and critical path from forecast dates and finish-to-start links.
+ * Late finish = earliest late start of any successor − 1 day, or the
+ * programme's last finish. Zero (or negative) float = critical.
+ */
+function criticalPath(tasks) {
+  const out = new Map();
+  if (!tasks.length) return out;
+  const byId = new Map(tasks.map((t) => [t.id, t])), succ = new Map(), lf = new Map();
+  for (const t of tasks) for (const p of t.predecessorIds) if (byId.has(p)) (succ.get(p) || succ.set(p, []).get(p)).push(t);
+  const end = Math.max(...tasks.map((t) => dayNo(t.forecastFinish)));
+  const span = (t) => dayNo(t.forecastFinish) - dayNo(t.forecastStart);
+  const LF = (t, seen = new Set()) => {
+    if (lf.has(t.id)) return lf.get(t.id);
+    if (seen.has(t.id)) return end; // the database prevents loops; guard anyway
+    seen.add(t.id);
+    const ss = succ.get(t.id) || [];
+    // A task must finish the day before its successor starts; a milestone's successor can start the same day.
+    const v = ss.length ? Math.min(...ss.map((s) => LF(s, seen) - span(s) - (t.isMilestone ? 0 : 1))) : end;
+    lf.set(t.id, v);
+    return v;
+  };
+  for (const t of tasks) {
+    const float = LF(t) - dayNo(t.forecastFinish);
+    out.set(t.id, { float, critical: float <= 0 && t.status !== "complete" });
+  }
+  return out;
+}
+
+/** Predecessors this task starts before (finish-to-start broken). */
+function dependencyClashes(t, tasks) {
+  return t.predecessorIds.map((id) => tasks.find((x) => x.id === id)).filter(Boolean)
+    .filter((p) => (p.isMilestone ? dayNo(t.forecastStart) < dayNo(p.forecastFinish) : dayNo(t.forecastStart) <= dayNo(p.forecastFinish)));
+}
+
+/**
+ * Planned vs site-reported progress, weighted by task duration. Projects
+ * with progress entered directly (e.g. the sample set) keep those figures.
+ */
+function progressOf(p) {
+  const tasks = DB.tasks.filter((t) => t.projectId === p.id && t.baselineStart && t.baselineFinish);
+  if (p.plannedProgress || p.verifiedProgress || !tasks.length) return { planned: p.plannedProgress || 0, verified: p.verifiedProgress || 0 };
+  const today = dayNo(todayYmd());
+  let w = 0, planned = 0, done = 0;
+  for (const t of tasks) {
+    const d = Math.max(1, dayNo(t.baselineFinish) - dayNo(t.baselineStart) + 1);
+    w += d;
+    planned += d * Math.min(1, Math.max(0, (today - dayNo(t.baselineStart) + 1) / d));
+    done += d * (t.progress / 100);
+  }
+  return { planned: Math.round((planned / w) * 100), verified: Math.round((done / w) * 100) };
+}
+
+/** Next open milestone from the programme, falling back to the project record. */
+function nextMilestoneOf(p) {
+  const m = DB.tasks.filter((t) => t.projectId === p.id && t.isMilestone && t.status !== "complete").sort((a, b) => a.forecastStart.localeCompare(b.forecastStart))[0];
+  return m ? { name: m.name, date: m.forecastStart } : p.nextMilestone;
+}
+
 function search(u, q) {
   const n = q.trim().toLowerCase();
   if (!n) return [];
@@ -559,7 +622,7 @@ function notifications(u) {
   if (od.length) out.push({ title: `${od.length} defects overdue`, sub: "Across active projects", href: "#/app/reports?view=overdue", tone: "amber" });
   for (const c of complianceExpiring(14)) out.push({ title: `${c.who} — ${c.what}`, sub: c.days < 0 ? "Expired" : `Expires in ${c.days} days`, href: "#/app/people", tone: c.days < 0 ? "red" : "amber" });
   for (const i of DB.itps) for (const p of i.points.filter((p) => p.status === "rejected")) out.push({ title: `Inspection rejected · ${i.ref} ${p.name}`, sub: projName(i.projectId), href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: "red" });
-  for (const p of DB.projects) { const d = daysBetween(new Date(), D(p.nextMilestone.date)); if (d >= 0 && d <= 7) out.push({ title: `${p.nextMilestone.name} in ${d} days`, sub: p.name, href: `#/app/projects/${p.id}/programme`, tone: "blue" }); }
+  for (const p of DB.projects) { const nm = nextMilestoneOf(p), d = daysBetween(new Date(), D(nm.date)); if (d >= 0 && d <= 7) out.push({ title: `${nm.name} in ${d} days`, sub: p.name, href: `#/app/projects/${p.id}/programme`, tone: "blue" }); }
   return out;
 }
 
