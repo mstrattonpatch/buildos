@@ -34,7 +34,27 @@ async function refresh() {
   lastLoad = Date.now();
 }
 
+// The QR gate works without an account; its state lives here between renders.
+let GATE = { code: null };
+async function loadGate(code) {
+  try { GATE.info = await rpc("gate_info", { p_code: code }); } catch (e) { GATE.error = e.message; }
+  GATE.loading = false;
+  if (parseRoute().path === `/gate/${code}`) render();
+}
+/** Gate calls report "not found" as { error } so failed guesses still count towards the rate limit. */
+async function gateRpc(fn, args = {}) {
+  const r = await rpc(fn, { p_code: GATE.code, ...args });
+  if (r?.error) throw new RuleError(r.error);
+  return r;
+}
+async function gateStatus(workerCode) {
+  GATE.status = await gateRpc("gate_worker_status", { p_worker_code: workerCode });
+  GATE.workerCode = workerCode;
+}
+
 function resolve(path, query) {
+  const gm = path.match(/^\/gate\/([^/]+)$/);
+  if (gm) return { html: pageGate(gm[1]), title: "Site sign-in" };
   if ((path === "/login" || path === "/signup") && SESSION && DB && currentUser()) { go(homeFor(currentUser())); return null; }
   if (path === "/login") return { html: pageSignIn(), title: "Sign in" };
   if (path === "/signup") return { html: pageSignUp(), title: "Create account" };
@@ -70,12 +90,21 @@ function resolve(path, query) {
     else if (sub === "quality/new") { html = pageNewDefect(u, p); title = "New defect"; }
     else if ((mm = sub.match(/^quality\/defects\/(.+)$/))) { html = pageDefect(u, p, mm[1]); title = "Defect"; }
     else if ((mm = sub.match(/^quality\/itp\/(.+)$/))) { html = pageItp(u, p, mm[1]); title = "ITP"; }
+    else if (sub === "quality/ncrs") { html = pageNcrs(u, p); title = "NCRs"; }
+    else if ((mm = sub.match(/^quality\/ncrs\/(.+)$/))) { html = pageNcr(u, p, mm[1]); title = "NCR"; }
     else if (sub === "programme") { html = pageProgramme(u, p, query); title = "Programme"; }
     else if ((mm = sub.match(/^programme\/(.+)$/))) { html = pageTask(u, p, mm[1]); title = "Task"; }
     else if (sub === "commercial") { html = pageCommercial(u, p); title = "Commercial"; }
     else if (sub === "safety") { html = pageSafety(u, p); title = "Safety"; }
     else if ((mm = sub.match(/^safety\/swms\/(.+)$/))) { html = pageSwms(u, p, mm[1]); title = "SWMS"; }
+    else if (sub === "safety/incidents") { html = pageIncidents(u, p); title = "Incidents"; }
+    else if ((mm = sub.match(/^safety\/incidents\/(.+)$/))) { html = pageIncident(u, p, mm[1]); title = "Safety report"; }
+    else if (sub === "safety/permits") { html = pagePermits(u, p); title = "Permits"; }
+    else if ((mm = sub.match(/^safety\/permits\/(.+)$/))) { html = pagePermit(u, p, mm[1]); title = "Permit"; }
+    else if (sub === "safety/toolbox") { html = pageToolbox(u, p); title = "Toolbox talks"; }
+    else if (sub === "safety/access") { html = pageSiteAccess(u, p); title = "Site access"; }
     else if (sub === "workforce") { html = pageWorkforce(u, p); title = "Workforce"; }
+    else if (sub === "workforce/muster") { html = pageMuster(u, p); title = "Muster list"; }
     else if (sub === "documents") { html = pageDocuments(u, p, query); title = "Documents"; }
     else if ((mm = sub.match(/^documents\/(.+)$/))) { html = pageDocument(u, p, mm[1]); title = "Document"; }
     else if (sub === "diary") { html = pageDiary(u, p); title = "Site diary"; }
@@ -332,6 +361,63 @@ const ACTIONS = {
     const s = DB.swms.find((x) => x.id === f(fd, "swmsId"));
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
+  // ---- safety extras
+  async createNcr(fd) {
+    const r = await rpc("create_ncr", { p_project: f(fd, "project"), p: Object.fromEntries(["title", "requirement", "location", "contractor_id", "containment"].map((k) => [k, f(fd, k)])) });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/quality/ncrs/${r.id}` };
+  },
+  async updateNcr(fd) { return (await rpc("update_ncr", { p_ncr: f(fd, "id"), p: Object.fromEntries(["containment", "root_cause", "corrective_action"].map((k) => [k, f(fd, k)])) })).message; },
+  async advanceNcr(fd) { return (await rpc("advance_ncr", { p_ncr: f(fd, "id"), p_note: f(fd, "note") })).message; },
+  async requestPermit(fd) {
+    const r = await rpc("request_permit", { p_project: f(fd, "project"), p: Object.fromEntries(["type", "location", "valid_from", "valid_to", "contractor_id", "description", "conditions"].map((k) => [k, f(fd, k)])) });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/safety/permits/${r.id}` };
+  },
+  async permitAction(fd) { return (await rpc("permit_action", { p_permit: f(fd, "id"), p_action: f(fd, "action"), p_note: f(fd, "note") })).message; },
+  async reportIncident(fd) {
+    const at = f(fd, "occurred_at");
+    const r = await rpc("report_incident", { p_project: f(fd, "project"), p: { ...Object.fromEntries(["type", "severity", "title", "location", "description", "immediate_action"].map((k) => [k, f(fd, k)])), occurred_at: at ? new Date(at).toISOString() : "", notifiable: fd.get("notifiable") === "on" } });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/safety/incidents/${r.id}` };
+  },
+  async incidentAction(fd) { return (await rpc("incident_action", { p_incident: f(fd, "id"), p_action: f(fd, "action"), p: { root_cause: f(fd, "root_cause"), corrective_action: f(fd, "corrective_action") } })).message; },
+  async toolbox(fd) { return (await rpc("record_toolbox_talk", { p_project: f(fd, "project"), p: { topic: f(fd, "topic"), date: f(fd, "date"), notes: f(fd, "notes"), attendees: fd.getAll("attendees") } })).message; },
+  async manualIn(fd) { return (await rpc("manual_sign_in", { p_project: f(fd, "project"), p_worker: f(fd, "worker"), p_reason: f(fd, "reason") })).message; },
+  async manualOut(fd) { return (await rpc("manual_sign_out", { p_project: f(fd, "project"), p_worker: f(fd, "worker") })).message; },
+  async fixMissing(fd) { return (await rpc("fix_missing_sign_outs", { p_project: f(fd, "project") })).message; },
+  async visitorOut(fd) { return (await rpc("office_visitor", { p_project: f(fd, "project"), p_action: "sign_out", p: { id: f(fd, "id") } })).message; },
+  async resetGate(fd) { return (await rpc("reset_gate_code", { p_project: f(fd, "project") })).message; },
+  // ---- the gate (no account)
+  async gateWorker(fd) {
+    const code = f(fd, "worker_code").replace(/\D/g, "");
+    if (code.length !== 6) throw new RuleError("Enter your 6-digit worker code.");
+    await gateStatus(code);
+    prefs.set("buildos_worker_code", code);
+    return { msg: `Hi ${GATE.status.name.split(" ")[0]}.`, noReload: true };
+  },
+  async gateAck(fd) {
+    const r = await gateRpc("gate_worker_action", { p_worker_code: GATE.workerCode, p_action: "acknowledge", p_swms: f(fd, "swms") });
+    await gateStatus(GATE.workerCode);
+    return { msg: r.message, noReload: true };
+  },
+  async gateIn() {
+    const r = await gateRpc("gate_worker_action", { p_worker_code: GATE.workerCode, p_action: "sign_in" });
+    await gateStatus(GATE.workerCode);
+    return { msg: r.message, noReload: true };
+  },
+  async gateOut() {
+    const r = await gateRpc("gate_worker_action", { p_worker_code: GATE.workerCode, p_action: "sign_out" });
+    await gateStatus(GATE.workerCode);
+    return { msg: r.message, noReload: true };
+  },
+  async gateVisitorIn(fd) {
+    const r = await gateRpc("gate_visitor_sign_in", { p: { ...Object.fromEntries(["name", "company", "phone", "purpose", "host", "vehicle_rego"].map((k) => [k, f(fd, k)])), rules_accepted: fd.get("rules_accepted") === "on" } });
+    prefs.set(`buildos_visitor_${GATE.code}`, JSON.stringify({ id: r.id, name: f(fd, "name") }));
+    GATE.step = "home";
+    return { msg: r.message, noReload: true };
+  },
+  async gateVisitorOut(fd) {
+    try { const r = await gateRpc("gate_visitor_sign_out", { p_visitor: f(fd, "visitor") }); return { msg: r.message, noReload: true }; }
+    finally { prefs.del(`buildos_visitor_${GATE.code}`); }
+  },
   async swmsAck(fd) { return (await rpc("swms_acknowledge", { p_swms: f(fd, "swmsId") })).message; },
   async siteIn(fd) { return (await rpc("site_sign_in", { p_project: f(fd, "projectId") })).message; },
   async siteOut(fd) { return (await rpc("site_sign_out", { p_project: f(fd, "projectId") })).message; },
@@ -389,6 +475,15 @@ document.addEventListener("click", async (e) => {
     else if (rows.children.length > 1) pt.closest(".pt-row").remove();
     return;
   }
+  const gs = e.target.closest("[data-gate-step],[data-gate-forget]");
+  if (gs) {
+    if ("gateForget" in gs.dataset) { prefs.del("buildos_worker_code"); GATE.status = null; GATE.step = "worker"; }
+    else { GATE.step = gs.dataset.gateStep; if (GATE.step === "home") GATE.status = null; }
+    render(); window.scrollTo(0, 0); return;
+  }
+  if (e.target.closest("[data-print]")) { window.print(); return; }
+  const tick = e.target.closest("[data-tick-onsite]");
+  if (tick) { tick.closest("form").querySelectorAll("input[data-onsite]").forEach((c) => (c.checked = true)); return; }
   const t = e.target.closest("[data-signout],[data-org],[data-export],[data-qr],[data-refresh]");
   document.querySelectorAll("details.menu[open]").forEach((d) => { if (!d.contains(e.target) || t) d.removeAttribute("open"); });
   if (!t) return;

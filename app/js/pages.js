@@ -10,7 +10,7 @@ const STATUS = {
   certified: ["green", "check", "Certified"], paid: ["green", "check", "Paid"], included_in_claim: ["green", "check", "In claim"],
   closed: ["green", "check", "Closed"], superseded: ["grey", "dashed", "Superseded"], overdue: ["amber", "alert", "Overdue"],
   expiring: ["amber", "alert", "Expiring"], changes_requested: ["amber", "alert", "Changes requested"], rejected: ["red", "xcircle", "Rejected"],
-  expired: ["red", "xcircle", "Expired"], blocked: ["red-solid", "lock", "Blocked"], hold: ["red-solid", "lock", "Hold point"], offline: ["dashed", "cloudoff", "Offline"],
+  expired: ["red", "xcircle", "Expired"], requested: ["blue", "clock", "Awaiting approval"], investigating: ["blue", "clock", "Investigating"], corrective_action: ["blue", "clock", "Corrective action"], verification: ["blue", "clock", "Verification"], blocked: ["red-solid", "lock", "Blocked"], hold: ["red-solid", "lock", "Hold point"], offline: ["dashed", "cloudoff", "Offline"],
 };
 const badge = (status, label) => { const [t, i, l] = STATUS[status] || ["grey", "circle", status]; return `<span class="badge badge-${t}">${icon(i, 13, "stroke-width:2.6")}${esc(label ?? l)}</span>`; };
 const sampleTag = () => `<span class="sample-tag" title="Illustrative figures">Sample data</span>`;
@@ -269,7 +269,9 @@ function pageQuality(u, p, f) {
       const st = i.points.some((x) => x.status === "rejected") ? "rejected" : i.points.some((x) => x.status === "submitted") ? "in_review" : i.points.some((x) => x.status === "pending") ? "open" : "complete";
       return `<tr><td><a class="mono link" href="${h}">${i.ref}</a></td><td><a class="rowlink" href="${h}">${esc(i.title)}</a><div class="muted small">Template v${i.templateVersion}</div></td><td class="small">${i.points.filter((x) => x.status === "released").length} / ${i.points.length} released</td><td>${!holds.length ? '<span class="muted small">—</span>' : openH.length ? badge("hold", `${openH.length} hold`) : badge("released")}</td><td>${badge(st)}</td></tr>`;
     }).join("")}</tbody></table></div>
-  </section>`;
+  </section>
+  ${(() => { const ncrs = listNcrs(u, p.id), open = ncrs.filter((n) => n.status !== "closed"); return `<section class="card card-pad" id="ncrs"><div class="row wrap"><h2>Non-conformance reports</h2><span class="spacer"></span><a class="link small" href="${base}/quality/ncrs">${ncrs.length ? `${open.length} open of ${ncrs.length} →` : "Open the NCR register →"}</a></div>
+    ${open.length ? `<div class="stack" style="gap:6px;margin-top:10px">${open.slice(0, 5).map((n) => `<a class="row rowlink" href="${base}/quality/ncrs/${n.id}" style="gap:10px"><span class="mono small">${esc(n.ref)}</span><span style="flex:1">${esc(n.title)}</span>${badge(n.status)}</a>`).join("")}</div>` : '<p class="small muted" style="margin-top:6px">No open NCRs.</p>'}</section>`; })()}`;
 }
 
 function defectFormHtml(u, p, mobile = false) {
@@ -616,16 +618,11 @@ function pageSafety(u, p) {
       <td class="small ${due !== null && due <= 14 ? (due < 0 ? "red-text" : "amber-text") : ""}">${current?.reviewDue ? dayMonth(current.reviewDue) : "—"}</td>
       <td>${current ? badge("approved") : badge(latest.status)}</td></tr>`;
   }).join("");
-  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance", actions: can(u, "swms.submit") ? `<a class="btn btn-dark" href="${base}/safety#new-swms">Submit a SWMS</a>` : "" })}
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance", actions: can(u, "swms.submit") ? `<a class="btn btn-dark" href="${base}/safety#new-swms">Submit a SWMS</a>` : "" })}${safetyTabs(u, p, "")}
   <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>SWMS register</h2><div class="spacer"></div><span class="small muted">Submit → review → approve → workers acknowledge the version in force</span></div>
   ${visible.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Activity</th><th>Contractor</th><th>Version</th><th>Acknowledged</th><th>Review due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : emptyState("shield", "No SWMS yet", "Contractors submit a Safe Work Method Statement for high-risk work. Once approved, their workers must acknowledge it before signing in to site.")}</section>
-  ${can(u, "swms.submit") ? `<section class="card card-pad" id="new-swms"><h2 style="margin-bottom:12px">Submit a SWMS</h2>${form("submitSwms", `${hidden("project", p.id)}${swmsFields(u, p)}<div style="margin-top:14px"><button class="btn btn-primary">Submit for review</button></div>`)}</section>` : ""}
-  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
-    <section class="card">${emptyState("filewarn", "Permits to work", "Configurable permit types and approvers per project. A permit is never issued just because a form is complete. Planned for a later phase.")}</section>
-    <section class="card">${emptyState("octagon", "Incidents & observations", "Hazard, near-miss and incident reports with investigation and corrective actions. Planned for a later phase.")}</section>
-    <section class="card">${emptyState("listchecks", "Toolbox talks", "Record talks and attendance, linked to the day's site diary. Planned for a later phase.")}</section>
-  </div>`;
+  ${can(u, "swms.submit") ? `<section class="card card-pad" id="new-swms"><h2 style="margin-bottom:12px">Submit a SWMS</h2>${form("submitSwms", `${hidden("project", p.id)}${swmsFields(u, p)}<div style="margin-top:14px"><button class="btn btn-primary">Submit for review</button></div>`)}</section>` : ""}`;
 }
 
 function pageSwms(u, p, id) {
@@ -676,21 +673,250 @@ function pageSwms(u, p, id) {
   </div>`;
 }
 
+// ===================================================== safety extras
+const safetyTabs = (u, p, cur) => `<nav class="subnav" aria-label="Safety">${[["", "SWMS"], ["incidents", "Incidents &amp; hazards"], ["permits", "Permits to work"], ["toolbox", "Toolbox talks"], ...(can(u, "attendance.manage") ? [["access", "Site access &amp; visitors"]] : [])]
+  .map(([k, l]) => `<a href="#/app/projects/${p.id}/safety${k ? `/${k}` : ""}"${k === cur ? ' aria-current="page"' : ""}>${l}</a>`).join("")}</nav>`;
+const SEVERITY = { low: "grey", medium: "amber", high: "red", critical: "red-solid" };
+const sevBadge = (s) => `<span class="badge badge-${SEVERITY[s] || "grey"}">${icon("alert", 12)}${words(s)}</span>`;
+const userName = (id) => userById(id)?.name ?? "—";
+const contractorOptions = (sel = "", blank = "—") => `<option value="">${blank}</option>${DB.contractors.map((c) => `<option value="${c.id}"${c.id === sel ? " selected" : ""}>${esc(c.tradingName)}</option>`).join("")}`;
+const field = (label, inner, cls = "") => `<label class="field ${cls}"><span>${label}</span>${inner}</label>`;
+
+function pageIncidents(u, p) {
+  const base = `#/app/projects/${p.id}`, list = DB.incidents.filter((x) => x.projectId === p.id), open = list.filter((x) => x.status !== "closed");
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance", actions: can(u, "safety.report") ? `<a class="btn btn-dark" href="${base}/safety/incidents#report">Report something</a>` : "" })}${safetyTabs(u, p, "incidents")}
+  <div class="metrics">${metric("Open reports", open.length)}${metric("Incidents this month", list.filter((x) => x.type === "incident" && x.occurredAt.slice(0, 7) === todayYmd().slice(0, 7)).length)}${metric("Near misses &amp; hazards", list.filter((x) => x.type === "near_miss" || x.type === "hazard").length, "Reporting these is good")}${metric("Notifiable open", open.filter((x) => x.notifiable).length, "Regulator notified?", open.some((x) => x.notifiable) ? "red" : null)}</div>
+  <section class="card"><div class="card-head"><h2>Register</h2><div class="spacer"></div><span class="small muted">Report → investigate → corrective action → close</span></div>
+  ${list.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>What happened</th><th>Type</th><th>Severity</th><th>When</th><th>Status</th></tr></thead><tbody>${list.map((x) => `<tr><td><a class="mono link" href="${base}/safety/incidents/${x.id}">${esc(x.ref)}</a></td><td><a class="rowlink" href="${base}/safety/incidents/${x.id}">${esc(x.title)}</a><div class="muted small">${esc(x.location ?? "")}${x.notifiable ? ' · <b class="red-text">Notifiable</b>' : ""}</div></td><td class="small">${esc(INCIDENT_TYPES[x.type].split(" (")[0])}</td><td>${sevBadge(x.severity)}</td><td class="small">${dateTime(x.occurredAt)}<div class="muted">${esc(userName(x.reportedBy))}</div></td><td>${badge(x.status)}</td></tr>`).join("")}</tbody></table></div>`
+    : emptyState("octagon", "Nothing reported yet", "Anyone on the project can report an incident, near miss, hazard or observation from the office or their phone.")}</section>
+  ${can(u, "safety.report") ? `<section class="card card-pad" id="report"><h2 style="margin-bottom:12px">Report an incident, near miss or hazard</h2>${form("reportIncident", `${hidden("project", p.id)}<div class="form-grid">
+    ${field("What are you reporting?", `<select name="type" class="input">${Object.entries(INCIDENT_TYPES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select>`)}
+    ${field("Severity", `<select name="severity" class="input"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select>`)}
+    ${field("What happened?", `<input name="title" class="input" placeholder="e.g. Pallet fell from hoist on L3">`, "full")}
+    ${field("Where", `<input name="location" class="input" placeholder="e.g. L3 hoist landing">`)}
+    ${field("When", `<input name="occurred_at" type="datetime-local" class="input">`)}
+    ${field("Details", `<textarea name="description" class="input"></textarea>`, "full")}
+    ${field("Immediate action taken", `<textarea name="immediate_action" class="input" placeholder="e.g. Area barricaded, hoist stood down"></textarea>`, "full")}
+    <label class="row small full" style="gap:8px;align-items:flex-start"><input type="checkbox" name="notifiable"><span><b>Notifiable incident</b> — a death, serious injury or illness, or dangerous incident. <span class="muted">Notify the regulator immediately and don't disturb the site.</span></span></label>
+  </div><div style="margin-top:14px"><button class="btn btn-primary">Submit report</button></div>`)}</section>` : ""}`;
+}
+
+function pageIncident(u, p, id) {
+  const x = DB.incidents.find((i) => i.id === id && i.projectId === p.id);
+  if (!x) return notFound();
+  const base = `#/app/projects/${p.id}`, manage = can(u, "safety.manage") && x.status !== "closed";
+  const row = (k, v) => v ? `<div><div class="label">${k}</div><p>${esc(v)}</p></div>` : "";
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/safety/incidents`, "Incidents"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${esc(x.ref)}</span>${esc(x.title)}`,
+    meta: `<span class="row wrap" style="gap:8px">${badge(x.status)}${sevBadge(x.severity)}<span>${esc(INCIDENT_TYPES[x.type])}</span></span>` })}
+  ${x.notifiable && x.status !== "closed" ? `<div class="notice notice-error">${icon("alert")}<span><b>Notifiable incident.</b> Notify the regulator immediately and keep the site undisturbed until an inspector says otherwise.</span></div>` : ""}
+  <div class="cc-grid"><div class="stack-lg" style="min-width:0">
+    <section class="card card-pad stack">
+      <p class="small muted">Reported by ${esc(userName(x.reportedBy))} · ${dateTime(x.reportedAt)} · happened ${dateTime(x.occurredAt)}${x.location ? ` · ${esc(x.location)}` : ""}</p>
+      ${row("Details", x.description)}${row("Immediate action", x.immediateAction)}${row("Root cause", x.rootCause)}${row("Corrective action", x.correctiveAction)}
+      ${x.status === "closed" ? `<p class="green-text">${icon("check")} Closed by ${esc(userName(x.closedBy))} · ${dateTime(x.closedAt)}</p>` : ""}
+    </section>
+  </div><aside class="stack-lg">
+    ${manage ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Investigation</h2>${form("incidentAction", `${hidden("id", x.id)}<div class="stack">
+      ${field("Root cause", `<textarea name="root_cause" class="input">${esc(x.rootCause ?? "")}</textarea>`)}
+      ${field(`Corrective action ${x.type === "observation" ? '<span class="muted">(optional)</span>' : '<span class="muted">(needed to close)</span>'}`, `<textarea name="corrective_action" class="input">${esc(x.correctiveAction ?? "")}</textarea>`)}
+      <div class="row wrap"><button class="btn" name="action" value="save">Save</button>${x.status === "open" ? '<button class="btn" name="action" value="investigate">Start investigation</button>' : ""}<button class="btn btn-primary" name="action" value="close">Close out</button></div></div>`, 'data-confirm="Close this report? It can\'t be reopened." data-confirm-for="close"')}</section>`
+      : x.status !== "closed" ? `<section class="card card-pad"><p class="small muted">The site supervisor or PM investigates and closes out reports.</p></section>` : ""}
+  </aside></div>`;
+}
+
+function pagePermits(u, p) {
+  const base = `#/app/projects/${p.id}`, list = DB.permits.filter((x) => x.projectId === p.id && (u.role !== "subcontractor_admin" || x.contractorId === u.contractorId || x.requestedBy === u.id));
+  const live = list.filter((x) => permitLive(x));
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance", actions: can(u, "permit.request") ? `<a class="btn btn-dark" href="${base}/safety/permits#request">Request a permit</a>` : "" })}${safetyTabs(u, p, "permits")}
+  <div class="metrics">${metric("Live today", live.length, live.map((x) => x.type).join(", ") || "No permitted work today")}${metric("Awaiting approval", list.filter((x) => x.status === "requested").length, "Work can't start until approved", "amber")}</div>
+  <section class="card"><div class="card-head"><h2>Permit register</h2><div class="spacer"></div><span class="small muted">A permit is issued only by an authorised person — never just because the form is complete</span></div>
+  ${list.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Work</th><th>Company</th><th>Dates</th><th>Status</th></tr></thead><tbody>${list.map((x) => `<tr><td><a class="mono link" href="${base}/safety/permits/${x.id}">${esc(x.ref)}</a></td><td><a class="rowlink" href="${base}/safety/permits/${x.id}">${esc(x.type)}</a><div class="muted small">${esc(x.location)}</div></td><td class="small">${esc(contractorOf(x.contractorId)?.tradingName ?? "—")}</td><td class="small">${dayMonth(x.validFrom)}${x.validTo !== x.validFrom ? ` – ${dayMonth(x.validTo)}` : ""}</td><td>${permitLive(x) ? badge("current", "Live today") : badge(x.status === "requested" ? "requested" : x.status === "approved" && x.validTo < todayYmd() ? "expired" : x.status)}</td></tr>`).join("")}</tbody></table></div>`
+    : emptyState("filewarn", "No permits yet", "Request a permit for hot work, work at heights, confined spaces, excavation and similar. An authorised person other than the requester approves it.")}</section>
+  ${can(u, "permit.request") ? `<section class="card card-pad" id="request"><h2 style="margin-bottom:12px">Request a permit to work</h2>${form("requestPermit", `${hidden("project", p.id)}<div class="form-grid">
+    ${field("Permit type", `<select name="type" class="input">${PERMIT_TYPES.map((t) => `<option>${t}</option>`).join("")}</select>`)}
+    ${field("Location", `<input name="location" class="input" placeholder="e.g. L3 riser, grid C4">`)}
+    ${field("From", `<input name="valid_from" type="date" class="input" value="${todayYmd()}">`)}
+    ${field('To <span class="muted">(up to 7 days)</span>', `<input name="valid_to" type="date" class="input">`)}
+    ${u.role === "subcontractor_admin" ? "" : field("Company doing the work", `<select name="contractor_id" class="input">${contractorOptions()}</select>`)}
+    ${field("Work to be done", `<textarea name="description" class="input"></textarea>`, "full")}
+    ${field("Controls in place", `<textarea name="conditions" class="input" placeholder="e.g. Fire watch 60 min after, extinguisher at hand, area cleared of combustibles"></textarea>`, "full")}
+  </div><div style="margin-top:14px"><button class="btn btn-primary">Request permit</button></div>`)}</section>` : ""}`;
+}
+
+function pagePermit(u, p, id) {
+  const x = DB.permits.find((i) => i.id === id && i.projectId === p.id);
+  if (!x) return notFound();
+  const base = `#/app/projects/${p.id}`, mine = x.requestedBy === u.id;
+  const decide = x.status === "requested" && can(u, "permit.approve") && !mine;
+  const closable = x.status === "approved" && (can(u, "permit.approve") || mine);
+  const row = (k, v) => `<tr><th style="width:190px">${k}</th><td>${v}</td></tr>`;
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/safety/permits`, "Permits"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${esc(x.ref)}</span>${esc(x.type)}`,
+    meta: `<span class="row wrap" style="gap:8px">${permitLive(x) ? badge("current", "Live today") : badge(x.status)}<span>${esc(x.location)}</span></span>`, actions: `<button class="btn no-print" type="button" data-print>${icon("download", 15)} Print permit</button>` })}
+  ${x.status === "requested" ? `<div class="notice notice-warn">${icon("lock")}<span><b>Not yet approved — work must not start.</b>${mine ? " Another authorised person must approve it." : ""}</span></div>` : ""}
+  <div class="cc-grid"><div class="stack-lg" style="min-width:0">
+    <section class="card"><div class="table-wrap"><table class="register kv">${row("Permit", `${esc(x.ref)} · ${esc(x.type)}`)}${row("Project", esc(p.name))}${row("Location", esc(x.location))}${row("Valid", `${dayMonth(x.validFrom)}${x.validTo !== x.validFrom ? ` – ${dayMonth(x.validTo)}` : ""}`)}${row("Company", esc(contractorOf(x.contractorId)?.tradingName ?? "—"))}
+      ${row("Work", esc(x.description ?? "—"))}${row("Controls", esc(x.conditions ?? "—"))}${row("Requested", `${esc(userName(x.requestedBy))} · ${dateTime(x.requestedAt)}`)}
+      ${x.approvedBy ? row(x.status === "rejected" ? "Rejected" : "Approved", `${esc(userName(x.approvedBy))} · ${dateTime(x.approvedAt)}${x.decisionNote ? ` — ${esc(x.decisionNote)}` : ""}`) : ""}
+      ${x.closedBy ? row("Closed", `${esc(userName(x.closedBy))} · ${dateTime(x.closedAt)}${x.closeNote ? ` — ${esc(x.closeNote)}` : ""}`) : ""}</table></div></section>
+  </div><aside class="stack-lg no-print">
+    ${decide ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Approve or reject</h2>${form("permitAction", `${hidden("id", x.id)}<div class="stack">${field('Note <span class="muted">(required to reject)</span>', `<textarea name="note" class="input" placeholder="e.g. Checked area — combustibles removed"></textarea>`)}
+      <div class="row wrap"><button class="btn btn-primary" name="action" value="approve">Approve permit</button><button class="btn btn-danger" name="action" value="reject">Reject</button></div></div>`, `data-confirm="Approve ${esc(x.ref)}? You're confirming the controls are in place." data-confirm-for="approve"`)}</section>` : ""}
+    ${closable ? `<section class="card card-pad"><h2 style="margin-bottom:6px">Close out</h2><p class="small muted" style="margin-bottom:12px">When the work is finished, close the permit so the area is handed back.</p>${form("permitAction", `${hidden("id", x.id)}<div class="stack">${field("Note", `<textarea name="note" class="input" placeholder="e.g. Fire watch completed 3:40 pm"></textarea>`)}<div><button class="btn" name="action" value="close">Close permit</button></div></div>`)}</section>` : ""}
+  </aside></div>`;
+}
+
+function pageToolbox(u, p) {
+  const talks = DB.toolbox.filter((t) => t.projectId === p.id), here = new Set(onSiteNow(p.id).map((e) => e.workerId));
+  const crew = DB.workers.filter((w) => w.inductedProjectIds.includes(p.id) || here.has(w.id));
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance" })}${safetyTabs(u, p, "toolbox")}
+  ${can(u, "diary.submit") ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Record a toolbox talk</h2>${form("toolbox", `${hidden("project", p.id)}<div class="form-grid">
+    ${field("Topic", `<input name="topic" class="input" placeholder="e.g. Hoist loading and exclusion zones">`)}${field("Date", `<input name="date" type="date" class="input" value="${todayYmd()}">`)}
+    ${field("Points covered", `<textarea name="notes" class="input"></textarea>`, "full")}</div>
+    <div class="row" style="margin:14px 0 6px"><b class="small">Who attended</b><span class="spacer"></span>${here.size ? `<button class="btn btn-sm" type="button" data-tick-onsite>Tick everyone on site (${here.size})</button>` : ""}</div>
+    ${crew.length ? `<div class="hrcw-grid">${crew.map((w) => `<label class="row small" style="gap:8px"><input type="checkbox" name="attendees" value="${w.id}"${here.has(w.id) ? ' data-onsite' : ""}><span>${esc(w.name)} <span class="muted">· ${esc(contractorOf(w.contractorId)?.tradingName ?? "")}</span></span></label>`).join("")}</div>` : '<p class="small muted">No workers inducted to this project yet.</p>'}
+    <div style="margin-top:14px"><button class="btn btn-primary">Save toolbox talk</button></div>`)}</section>` : ""}
+  <section class="card"><div class="card-head"><h2>Talks</h2><div class="spacer"></div><span class="small muted">${talks.length} recorded</span></div>
+  ${talks.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Date</th><th>Topic</th><th>Run by</th><th>Attended</th></tr></thead><tbody>${talks.map((t) => `<tr><td class="small" style="white-space:nowrap">${dayMonth(t.date)}</td><td style="font-weight:600">${esc(t.topic)}${t.notes ? `<div class="muted small" style="font-weight:400">${esc(t.notes)}</div>` : ""}</td><td class="small">${esc(userName(t.runBy))}</td><td class="small"><details><summary class="link" style="cursor:pointer">${t.attendees.length} worker${t.attendees.length === 1 ? "" : "s"}</summary>${t.attendees.map((id) => esc(DB.workers.find((w) => w.id === id)?.name ?? "")).join(", ")}</details></td></tr>`).join("")}</tbody></table></div>`
+    : emptyState("listchecks", "No toolbox talks yet", "Record each talk with who attended. It's kept against the project for audit.")}</section>`;
+}
+
+/** QR code as SVG (qrcode-generator, loaded with the app). */
+function qrSvg(text, cell = 6) {
+  if (typeof qrcode !== "function") return `<p class="small muted">QR code library didn't load. Use the link below instead.</p>`;
+  const q = qrcode(0, "M"); q.addData(text); q.make();
+  return q.createSvgTag(cell, 2, "QR code for site sign-in");
+}
+const gateUrl = (p) => `${appUrl()}#/gate/${p.gateCode}`;
+function pageSiteAccess(u, p) {
+  if (!can(u, "attendance.manage")) return notFound();
+  const base = `#/app/projects/${p.id}`, url = gateUrl(p), crew = DB.workers.filter((w) => w.inductedProjectIds.includes(p.id));
+  const vis = DB.visitors.filter((v) => v.projectId === p.id);
+  return `<div class="no-print">${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance" })}${safetyTabs(u, p, "access")}</div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start">
+    <section class="card card-pad qr-poster"><div class="label no-print" style="margin-bottom:10px">Gate poster</div>
+      <h1 style="font-size:28px">Sign in here</h1><p style="font-size:17px;margin:4px 0 14px"><b>${esc(p.name)}</b>${p.address ? ` · ${esc(p.address)}` : ""}</p>
+      <div class="qr-box">${qrSvg(url)}</div>
+      <ol class="small" style="margin:14px 0 0 18px;line-height:1.7"><li>Scan with your phone camera — no app or account needed.</li><li><b>Workers:</b> enter your 6-digit worker code.</li><li><b>Visitors:</b> enter your details and accept the site rules.</li><li>Scan again to sign out when you leave.</li></ol>
+      <p class="mono small muted" style="margin-top:12px;word-break:break-all">${esc(url)}</p>
+      <div class="row wrap no-print" style="margin-top:14px"><button class="btn btn-dark" type="button" data-print>${icon("download", 15)} Print poster</button><a class="btn" href="${esc(url)}" target="_blank" rel="noopener">Open the gate page</a>
+      ${can(u, "project.manage") ? form("resetGate", `${hidden("project", p.id)}<button class="btn btn-danger">Replace QR code</button>`, 'data-confirm="Replace the QR code? Printed posters will stop working." style="display:inline"') : ""}</div>
+    </section>
+    <section class="card no-print"><div class="card-head"><h2>Worker codes</h2><div class="spacer"></div><span class="small muted">Workers type this at the gate</span></div>
+      ${crew.length ? `<div class="table-wrap"><table class="register"><tbody>${crew.map((w) => `<tr><td style="font-weight:600">${esc(w.name)}<div class="muted small" style="font-weight:400">${esc(contractorOf(w.contractorId)?.tradingName ?? "")}</div></td><td class="mono" style="font-size:16px;letter-spacing:2px">${esc(w.workerCode ?? "")}</td></tr>`).join("")}</tbody></table></div>`
+        : '<p class="small muted" style="padding:0 20px 18px">Induct workers to this project to give them gate access.</p>'}
+    </section>
+  </div>
+  <section class="card no-print"><div class="card-head"><h2>Visitor log</h2><div class="spacer"></div><span class="small muted">Last 14 days · on site now: ${visitorsOnSite(p.id).length}</span></div>
+    ${vis.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Visitor</th><th>Purpose</th><th>Host</th><th>In</th><th>Out</th></tr></thead><tbody>${vis.map((v) => `<tr><td style="font-weight:600">${esc(v.name)}<div class="muted small" style="font-weight:400">${esc([v.company, v.phone, v.vehicleRego].filter(Boolean).join(" · "))}</div></td><td class="small">${esc(v.purpose)}</td><td class="small">${esc(v.host ?? "—")}</td><td class="small">${dateTime(v.signedInAt)}</td><td class="small">${v.signedOutAt ? timeOf(v.signedOutAt) : form("visitorOut", `${hidden("project", p.id)}${hidden("id", v.id)}<button class="btn btn-sm">Sign out</button>`)}</td></tr>`).join("")}</tbody></table></div>`
+      : '<p class="small muted" style="padding:0 20px 18px">No visitors yet. They sign in by scanning the gate poster.</p>'}
+  </section>`;
+}
+
+// ---- NCRs (quality)
+function pageNcrs(u, p) {
+  const base = `#/app/projects/${p.id}`, list = listNcrs(u, p.id);
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/quality`, "Quality"]], title: "Non-conformance reports", actions: can(u, "ncr.manage") ? `<a class="btn btn-dark" href="${base}/quality/ncrs#raise">Raise an NCR</a>` : "" })}
+  <section class="card"><div class="card-head"><h2>NCR register</h2><div class="spacer"></div>${stepper(NCR_STEPS, "")}</div>
+  ${list.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Non-conformance</th><th>Company</th><th>Raised</th><th>Status</th></tr></thead><tbody>${list.map((n) => `<tr><td><a class="mono link" href="${base}/quality/ncrs/${n.id}">${esc(n.ref)}</a></td><td><a class="rowlink" href="${base}/quality/ncrs/${n.id}">${esc(n.title)}</a><div class="muted small">${esc(n.requirement)}</div></td><td class="small">${esc(contractorOf(n.contractorId)?.tradingName ?? "—")}</td><td class="small">${dayMonth(n.raisedAt)}<div class="muted">${esc(userName(n.raisedBy))}</div></td><td>${badge(n.status)}</td></tr>`).join("")}</tbody></table></div>`
+    : emptyState("clipboard", "No NCRs", "Raise an NCR when work doesn't meet a drawing, specification or standard. It's closed only after the fix is verified by someone other than the person who raised it.")}</section>
+  ${can(u, "ncr.manage") ? `<section class="card card-pad" id="raise"><h2 style="margin-bottom:12px">Raise a non-conformance</h2>${form("createNcr", `${hidden("project", p.id)}<div class="form-grid">
+    ${field("What doesn't conform?", `<input name="title" class="input" placeholder="e.g. Slab cover to reo less than specified">`, "full")}
+    ${field("Requirement breached", `<input name="requirement" class="input" placeholder="e.g. S-201 note 4 — 40 mm cover">`, "full")}
+    ${field("Location", `<input name="location" class="input" placeholder="e.g. L4 slab, grid B–C">`)}
+    ${field("Responsible company", `<select name="contractor_id" class="input">${contractorOptions()}</select>`)}
+    ${field('Immediate containment <span class="muted">(can add later)</span>', `<textarea name="containment" class="input" placeholder="e.g. Pour stopped, area tagged out"></textarea>`, "full")}
+  </div><div style="margin-top:14px"><button class="btn btn-primary">Raise NCR</button></div>`)}</section>` : ""}`;
+}
+function pageNcr(u, p, id) {
+  const n = listNcrs(u, p.id).find((x) => x.id === id);
+  if (!n) return notFound();
+  const base = `#/app/projects/${p.id}`, team = can(u, "ncr.manage"), edit = ncrCanEdit(u, n);
+  const next = { open: ["Start corrective action", "Needs the immediate containment"], corrective_action: ["Ready for verification", "Needs the root cause and corrective action"], verification: ["Verify and close", "Someone other than the person who raised it"] }[n.status];
+  const row = (k, v, hint = "") => `<div><div class="label">${k}</div><p>${v ? esc(v) : `<span class="muted">${hint || "Not recorded yet"}</span>`}</p></div>`;
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/quality`, "Quality"], [`${base}/quality/ncrs`, "NCRs"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${esc(n.ref)}</span>${esc(n.title)}`,
+    meta: `<span class="row wrap" style="gap:8px">${badge(n.status)}<span>${esc(contractorOf(n.contractorId)?.tradingName ?? "No company assigned")}</span></span>` })}
+  ${stepper(NCR_STEPS, n.status)}
+  <div class="cc-grid" style="margin-top:14px"><div class="stack-lg" style="min-width:0">
+    <section class="card card-pad stack">
+      <p class="small muted">Raised by ${esc(userName(n.raisedBy))} · ${dateTime(n.raisedAt)}${n.location ? ` · ${esc(n.location)}` : ""}</p>
+      ${row("Requirement breached", n.requirement)}${row("Immediate containment", n.containment)}${row("Root cause", n.rootCause, "The responsible company or the NCR team records this")}${row("Corrective action", n.correctiveAction)}
+      ${n.status === "closed" ? `<p class="green-text">${icon("check")} Verified and closed by ${esc(userName(n.closedBy))} · ${dateTime(n.closedAt)}</p>` : ""}
+    </section>
+  </div><aside class="stack-lg">
+    ${edit ? `<section class="card card-pad"><h2 style="margin-bottom:12px">${team ? "Update" : "Your response"}</h2>${form("updateNcr", `${hidden("id", n.id)}<div class="stack">
+      ${team ? field("Immediate containment", `<textarea name="containment" class="input">${esc(n.containment ?? "")}</textarea>`) : ""}
+      ${field("Root cause", `<textarea name="root_cause" class="input">${esc(n.rootCause ?? "")}</textarea>`)}${field("Corrective action", `<textarea name="corrective_action" class="input">${esc(n.correctiveAction ?? "")}</textarea>`)}
+      <div><button class="btn">Save</button></div></div>`)}</section>` : ""}
+    ${team && next ? `<section class="card card-pad"><h2 style="margin-bottom:4px">Next step</h2><p class="small muted" style="margin-bottom:12px">${next[1]}.</p>${form("advanceNcr", `${hidden("id", n.id)}${n.status === "verification" ? field("Verification note", `<textarea name="note" class="input" placeholder="e.g. Cover re-checked with meter, 42–48 mm"></textarea>`) : ""}<div style="margin-top:10px"><button class="btn btn-primary">${next[0]}</button></div>`)}</section>` : ""}
+  </aside></div>`;
+}
+
+// ---- muster list & the public gate
+function pageMuster(u, p) {
+  if (!can(u, "attendance.manage")) return notFound();
+  const here = onSiteNow(p.id).map((e) => ({ e, w: DB.workers.find((w) => w.id === e.workerId) })).filter((x) => x.w).sort((a, b) => a.w.name.localeCompare(b.w.name)), vis = visitorsOnSite(p.id);
+  return `${pageHeader({ crumbs: [[`#/app/projects/${p.id}`, p.name], [`#/app/projects/${p.id}/workforce`, "Workforce"]], title: "Emergency muster list", meta: `<span>${esc(p.name)} · ${here.length + vis.length} people on site at ${timeOf(new Date().toISOString())}, ${longToday()}</span>`, actions: `<button class="btn btn-dark no-print" type="button" data-print>${icon("download", 15)} Print</button>` })}
+  <section class="card"><div class="card-head"><h2>Workers (${here.length})</h2></div><div class="table-wrap"><table class="register muster"><thead><tr><th style="width:40px">✓</th><th>Name</th><th>Company</th><th>Phone</th><th>In</th></tr></thead><tbody>
+    ${here.map(({ e, w }) => `<tr><td><span class="tick-box"></span></td><td style="font-weight:600">${esc(w.name)}</td><td class="small">${esc(contractorOf(w.contractorId)?.tradingName ?? "")}</td><td class="small">${esc(w.phone ?? "")}</td><td class="small">${timeOf(e.at)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted small">No workers signed in.</td></tr>'}
+  </tbody></table></div></section>
+  <section class="card"><div class="card-head"><h2>Visitors (${vis.length})</h2></div><div class="table-wrap"><table class="register muster"><thead><tr><th style="width:40px">✓</th><th>Name</th><th>Company</th><th>Phone</th><th>Host</th><th>In</th></tr></thead><tbody>
+    ${vis.map((v) => `<tr><td><span class="tick-box"></span></td><td style="font-weight:600">${esc(v.name)}</td><td class="small">${esc(v.company ?? "")}</td><td class="small">${esc(v.phone ?? "")}</td><td class="small">${esc(v.host ?? "")}</td><td class="small">${timeOf(v.signedInAt)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted small">No visitors signed in.</td></tr>'}
+  </tbody></table></div></section>
+  <p class="small muted">Taken from the sign-in register. People who didn't sign in won't be listed — check with each company's leading hand.</p>`;
+}
+
+function pageGate(code) {
+  if (GATE.code !== code) { GATE = { code, loading: true, step: "home" }; loadGate(code); }
+  const g = GATE, top = (back) => `<div class="site-top">${back ? '<button class="link" type="button" data-gate-step="home">Back</button>' : "<span></span>"}<b>${esc(g.info?.project ?? "Site sign-in")}</b><span style="width:40px"></span></div>`;
+  if (g.loading) return siteWrap(`<div class="site-body" style="padding-top:60px"><p class="muted row" style="gap:10px">${icon("rotate", 18, "animation:spin 1s linear infinite")} Loading…</p></div>`);
+  if (g.error) return siteWrap(`<div class="site-body" style="padding-top:40px"><h1 style="font-size:24px">Can't open the gate</h1><div class="notice notice-error">${icon("alert")}<span>${esc(g.error)}</span></div></div>`);
+  const visitor = (() => { try { return JSON.parse(prefs.get(`buildos_visitor_${code}`) || "null"); } catch { return null; } })();
+  if (g.step === "worker" && g.status) {
+    const s = g.status, blocked = s.blockers.filter((b) => !/^SWMS/.test(b) || !s.swms.length);
+    return siteWrap(`${top(true)}<div class="site-body" style="padding-top:18px">
+      <div><div class="muted small">${esc(s.company ?? "")}</div><h1 style="font-size:26px">Hi ${esc(s.name.split(" ")[0])}</h1></div>
+      ${s.on_site ? `<div class="notice notice-ok">${icon("checkcircle")}<span>You're signed in to site.</span></div>${form("gateOut", '<button class="btn btn-lg btn-block">Sign out of site</button>')}` : `
+        ${s.swms.map((w) => `<div class="callout stack" style="gap:10px"><b style="font-size:17px">Read before you sign in: ${esc(w.title)} (v${w.version})</b><p class="small">${esc(w.activity ?? "")}</p>${(w.hazards || []).map((h) => `<p class="small"><b>${esc(h.hazard)}:</b> ${esc(h.controls)}</p>`).join("")}${form("gateAck", hidden("swms", w.id) + '<button class="btn btn-dark btn-lg btn-block">I\'ve read it — acknowledge</button>')}</div>`).join("")}
+        ${blocked.length ? `<div class="notice notice-error">${icon("xcircle")}<span><b>You can't sign in yet.</b> ${blocked.map(esc).join("; ")}. See the site office.</span></div>` : ""}
+        ${form("gateIn", `<button class="btn ${s.blockers.length ? "" : "btn-primary"} btn-lg btn-block"${s.blockers.length ? " disabled" : ""}>Sign in to site</button>`)}`}
+      <p class="small muted" style="text-align:center">Not ${esc(s.name.split(" ")[0])}? <button class="link" type="button" data-gate-forget>Use a different code</button></p></div>`);
+  }
+  if (g.step === "worker") return siteWrap(`${top(true)}<div class="site-body" style="padding-top:18px"><h1 style="font-size:24px">Worker sign-in</h1>
+    ${form("gateWorker", `<div class="stack">${field("Your 6-digit worker code", `<input name="worker_code" class="input" inputmode="numeric" autocomplete="off" maxlength="6" value="${esc(prefs.get("buildos_worker_code") ?? "")}" style="height:56px;font-size:24px;letter-spacing:6px;text-align:center">`)}<button class="btn btn-primary btn-lg btn-block">Continue</button></div>`)}
+    <p class="small muted">Your code is on the BuildOS app under <b>Me</b>, or ask the site office.</p></div>`);
+  if (g.step === "visitor") return siteWrap(`${top(true)}<div class="site-body" style="padding-top:18px"><h1 style="font-size:24px">Visitor sign-in</h1>
+    ${form("gateVisitorIn", `<div class="stack">${field("Full name", '<input name="name" class="input" autocomplete="name">')}${field("Company", '<input name="company" class="input" autocomplete="organization">')}${field("Mobile", '<input name="phone" class="input" type="tel" autocomplete="tel">')}
+      ${field("Reason for visit", '<input name="purpose" class="input" placeholder="e.g. Meeting, delivery, inspection">')}${field("Who are you here to see?", '<input name="host" class="input">')}${field('Vehicle rego <span class="muted">(if parking on site)</span>', '<input name="vehicle_rego" class="input">')}
+      <div class="callout"><b>Site rules</b><ul class="small" style="margin:6px 0 0 18px;line-height:1.6">${SITE_RULES.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>
+      <label class="row" style="gap:10px;align-items:flex-start"><input type="checkbox" name="rules_accepted" style="width:22px;height:22px"><span>I've read and will follow the site rules.</span></label>
+      <button class="btn btn-primary btn-lg btn-block">Sign in</button></div>`)}</div>`);
+  return siteWrap(`${top(false)}<div class="site-body" style="padding-top:24px">
+    <div><div class="muted small row" style="gap:4px">${icon("mappin", 14)}${esc(g.info.company)}</div><h1 style="font-size:26px">${esc(g.info.project)}</h1>${g.info.address ? `<p class="muted">${esc(g.info.address)}</p>` : ""}</div>
+    ${visitor ? `<div class="notice notice-ok">${icon("checkcircle")}<span>${esc(visitor.name)}, you're signed in as a visitor.</span></div>${form("gateVisitorOut", hidden("visitor", visitor.id) + '<button class="btn btn-lg btn-block">Sign out — I\'m leaving</button>')}` : ""}
+    <button class="big-action primary" type="button" data-gate-step="worker" style="width:100%;align-items:flex-start">${icon("hardhat", 22)}I'm working on site</button>
+    <button class="big-action" type="button" data-gate-step="visitor" style="width:100%;align-items:flex-start">${icon("user", 22)}I'm a visitor</button>
+    <p class="small muted" style="text-align:center">No app or account needed.</p></div>`);
+}
+
 function pageWorkforce(u, p) {
-  const here = onSiteNow(p.id), hereIds = new Set(here.map((e) => e.workerId));
+  const base = `#/app/projects/${p.id}`, here = onSiteNow(p.id), hereIds = new Set(here.map((e) => e.workerId)), office = can(u, "attendance.manage");
   const workers = DB.workers.filter((w) => w.inductedProjectIds.includes(p.id) || hereIds.has(w.id) || DB.tasks.some((t) => t.projectId === p.id && t.contractorId === w.contractorId));
-  const rows = workers.map((w) => ({ w, r: workerRequirements(w.id, p.id), inAt: here.find((e) => e.workerId === w.id)?.at })).sort((a, b) => a.r.eligible - b.r.eligible);
-  const comps = uniq(workers.map((w) => w.contractorId)).map(contractorOf);
-  return `${pageHeader({ crumbs: crumbsFor(p), title: "Workforce &amp; site access" })}
-  <div class="metrics">${metric("On site now", here.length, `${companiesOnSite(p.id)} companies`)}${metric("Can't sign in", rows.filter((x) => !x.r.eligible).length, "Exact requirement shown below", "amber")}${metric("Companies engaged", comps.length)}</div>
-  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Site register &amp; eligibility</h2><div class="spacer"></div><span class="small muted">A check-in is attendance, not an approved timesheet</span></div>
-  <div class="table-wrap"><table class="register"><thead><tr><th>Worker</th><th>Company</th><th>On site</th><th>Requirements</th></tr></thead><tbody>
-  ${rows.map(({ w, r, inAt }) => { const issues = r.reqs.filter((x) => x.severity !== "ok"); return `<tr><td style="font-weight:600">${esc(w.name)}</td><td class="small">${esc(contractorOf(w.contractorId)?.tradingName)}</td><td class="small">${inAt ? badge("current", `In ${timeOf(inAt)}`) : '<span class="muted">Not on site</span>'}</td><td class="small">${issues.length ? `<div class="row wrap" style="gap:6px">${issues.map((x) => badge(x.severity === "blocking" ? "rejected" : "expiring", `${x.label} — ${x.detail}`)).join("")}</div>` : badge("verified", "All requirements met")}</td></tr>`; }).join("")}
+  const rows = workers.map((w) => ({ w, r: workerRequirements(w.id, p.id), inAt: here.find((e) => e.workerId === w.id) })).sort((a, b) => a.r.eligible - b.r.eligible);
+  const comps = uniq(workers.map((w) => w.contractorId)).map(contractorOf).filter(Boolean), missing = office ? missingSignOuts(p.id) : [], vis = office ? visitorsOnSite(p.id) : [];
+  const action = ({ w, r, inAt }) => !office ? "" : inAt ? form("manualOut", `${hidden("project", p.id)}${hidden("worker", w.id)}<button class="btn btn-sm">Sign out</button>`)
+    : r.eligible ? form("manualIn", `${hidden("project", p.id)}${hidden("worker", w.id)}<div class="inline-form"><input name="reason" class="input" placeholder="Reason, e.g. no phone" aria-label="Reason for manual sign-in"><button class="btn btn-sm">Sign in</button></div>`) : "";
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Workforce &amp; site access", actions: office ? `<a class="btn btn-dark" href="${base}/workforce/muster">${icon("users", 15)} Muster list</a><a class="btn" href="${base}/safety/access">Gate QR &amp; visitors</a>` : "" })}
+  <div class="metrics">${metric("On site now", here.length, `${companiesOnSite(p.id)} companies`)}${office ? metric("Visitors on site", vis.length) : ""}${metric("Can't sign in", rows.filter((x) => !x.r.eligible).length, "Exact requirement shown below", "amber")}${metric("Companies engaged", comps.length)}</div>
+  ${missing.length ? `<div class="notice notice-warn" style="align-items:center">${icon("clock")}<span style="flex:1"><b>${missing.length} missing sign-out${missing.length > 1 ? "s" : ""}:</b> ${missing.map((e) => esc(DB.workers.find((w) => w.id === e.workerId)?.name ?? "")).join(", ")} — still signed in from an earlier day.</span>${form("fixMissing", `${hidden("project", p.id)}<button class="btn btn-sm">Record sign-out at 3:30 pm</button>`)}</div>` : ""}
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Site register &amp; eligibility</h2><div class="spacer"></div><span class="small muted">${office ? "Signing someone in by hand needs a reason, and requirements still apply · " : ""}A check-in is attendance, not an approved timesheet</span></div>
+  <div class="table-wrap"><table class="register"><thead><tr><th>Worker</th><th>Company</th><th>On site</th><th>Requirements</th>${office ? "<th></th>" : ""}</tr></thead><tbody>
+  ${rows.map((x) => { const { w, r, inAt } = x, issues = r.reqs.filter((y) => y.severity !== "ok"); return `<tr><td style="font-weight:600">${esc(w.name)}</td><td class="small">${esc(contractorOf(w.contractorId)?.tradingName)}</td><td class="small">${inAt ? badge("current", `In ${timeOf(inAt.at)}${inAt.method === "manual" ? " (by hand)" : ""}`) : '<span class="muted">Not on site</span>'}</td><td class="small">${issues.length ? `<div class="row wrap" style="gap:6px">${issues.map((y) => badge(y.severity === "blocking" ? "rejected" : "expiring", `${y.label} — ${y.detail}`)).join("")}</div>` : badge("verified", "All requirements met")}</td>${office ? `<td>${action(x)}</td>` : ""}</tr>`; }).join("")}
   </tbody></table></div></section>
+  ${vis.length ? `<section class="card"><div class="card-head"><h2>Visitors on site</h2></div><div class="table-wrap"><table class="register"><tbody>${vis.map((v) => `<tr><td style="font-weight:600">${esc(v.name)}<div class="muted small" style="font-weight:400">${esc(v.company ?? "")}</div></td><td class="small">${esc(v.purpose)}${v.host ? ` · seeing ${esc(v.host)}` : ""}</td><td class="small">In ${timeOf(v.signedInAt)}</td><td>${form("visitorOut", `${hidden("project", p.id)}${hidden("id", v.id)}<button class="btn btn-sm">Sign out</button>`)}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
   <section class="card"><div class="card-head"><h2>Contractor compliance</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Company</th><th>Trade</th><th>Public liability</th><th>Workers comp</th></tr></thead><tbody>
-  ${comps.map((c) => `<tr><td style="font-weight:600">${esc(c.tradingName)}<div class="muted small">ABN ${c.abn}</div></td><td class="small">${esc(c.trade)}</td>${c.insurances.map((ins) => insBadge(ins)).map((b) => `<td>${b}</td>`).join("")}</tr>`).join("")}
+  ${comps.map((c) => `<tr><td style="font-weight:600">${esc(c.tradingName)}${c.abn ? `<div class="muted small">ABN ${esc(c.abn)}</div>` : ""}</td><td class="small">${esc(c.trade ?? "")}</td>${["Public liability", "Workers comp"].map((t) => { const ins = c.insurances.find((i) => i.type === t); return `<td>${ins ? insBadge(ins) : '<span class="muted small">Not on file</span>'}</td>`; }).join("")}</tr>`).join("")}
   </tbody></table></div></section>
-  <p class="small muted">Timesheets (separate payroll and charge-out rates, supervisor approval) are planned for phase 3.</p>`;
+  <p class="small muted">Timesheets (separate payroll and charge-out rates, supervisor approval) are next on the roadmap.</p>`;
 }
 function insBadge(ins, withType = false) {
   const d = daysBetween(new Date(), D(ins.expires)), t = withType ? `${ins.type} · ` : "";
@@ -923,7 +1149,7 @@ function pageSiteToday(u, route) {
     <div class="site-stats"><div><b>${onSiteNow(p.id).length}</b><span>On site</span></div><div><b>${todays.length}</b><span>Inspections</span></div><div><b style="color:#f1b56b">${overdueDefects(u, p.id).length}</b><span>Overdue</span></div></div>
   </header>
   <div class="site-body">
-    <div class="big-actions"><a href="#/site/defect" class="big-action primary">${icon("camera", 22)}Raise defect</a><a href="#/app/projects/${p.id}/quality" class="big-action">${icon("clipboard", 22)}Inspect</a><a href="#/site/sign-in" class="big-action">${icon("qr", 22)}Site sign-in</a><a href="#/app/projects/${p.id}/diary" class="big-action">${icon("notebook", 22)}Site diary</a></div>
+    <div class="big-actions"><a href="#/site/defect" class="big-action primary">${icon("camera", 22)}Raise defect</a><a href="#/app/projects/${p.id}/quality" class="big-action">${icon("clipboard", 22)}Inspect</a><a href="#/site/sign-in" class="big-action">${icon("qr", 22)}Site sign-in</a><a href="#/app/projects/${p.id}/diary" class="big-action">${icon("notebook", 22)}Site diary</a><a href="#/app/projects/${p.id}/safety/incidents#report" class="big-action">${icon("alert", 22)}Report hazard</a>${can(u, "permit.request") ? `<a href="#/app/projects/${p.id}/safety/permits#request" class="big-action">${icon("filewarn", 22)}Request permit</a>` : ""}</div>
     <div class="label">Inspections today</div>
     <div class="list-card">${todays.map(({ i, pt }) => `<a href="#/app/projects/${p.id}/quality/itp/${i.id}"><span class="li-icon" style="background:${pt.type === "hold" ? "var(--red-tint)" : "var(--blue-tint)"};color:${pt.type === "hold" ? "var(--red)" : "var(--blue)"}">${icon(pt.type === "hold" ? "lock" : "clock", 18)}</span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">${esc(pt.type === "hold" ? `${i.title.split("—")[0].trim()} ${pt.name.toLowerCase()}` : i.title.split("·")[0].trim())}</b><span class="muted small">${i.ref} · ${pt.type === "hold" ? "Hold point" : pt.type} · ${pt.status === "submitted" ? "awaiting release" : "to do"}</span></span><span class="muted">${icon("chevron", 18)}</span></a>`).join("") || '<div class="li muted">No inspections today.</div>'}</div>
   </div>${siteTabs(route)}`);
@@ -966,6 +1192,8 @@ function pageSiteSignIn(u, route) {
     ${r.reqs.some((x) => x.severity === "warning" && /licence/i.test(x.label)) ? '<p class="small muted">A licence is expiring soon — send your supervisor a photo of the renewed card.</p>' : ""}
     ${onSite ? `<div class="notice notice-ok">${icon("checkcircle")}You're signed in to site.</div>${form("siteOut", hidden("projectId", p.id) + '<button class="btn btn-lg btn-block">Sign out of site</button>')}`
       : form("siteIn", hidden("projectId", p.id) + `<button class="btn ${r.eligible ? "btn-primary" : ""} btn-lg btn-block"${r.eligible ? "" : " disabled"}>Sign in to site</button>`)}
-    <p class="small muted" style="text-align:center">No account needed · linked to ${esc(contractorOf(w.contractorId)?.tradingName)}</p>
+    <div class="li" style="justify-content:space-between;border:1px solid var(--border);border-radius:12px;padding:12px 14px"><span class="small">Your gate code <span class="muted">(for the QR poster)</span></span><b class="mono" style="font-size:20px;letter-spacing:3px">${esc(w.workerCode ?? "")}</b></div>
+    <a class="btn btn-lg btn-block" href="#/app/projects/${p.id}/safety/incidents#report">${icon("alert", 16)} Report a hazard or incident</a>
+    <p class="small muted" style="text-align:center">Linked to ${esc(contractorOf(w.contractorId)?.tradingName)}</p>
   </div>${siteTabs(route)}`);
 }

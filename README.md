@@ -53,15 +53,24 @@ On a project, add an ITP from a template and link it to a programme task. Points
 
 Contractors (or the site team on their behalf) submit a Safe Work Method Statement with the work activity, high-risk construction work categories, hazards and controls, the document itself and the programme tasks it covers. A supervisor, PM or director approves it (with a periodic review date) or requests changes. Each revision is a new version: the approved version stays in force — and keeps controlling site sign-in — until the revision is approved. Revisions require workers to acknowledge again unless marked as a minor correction. Every version keeps who submitted, reviewed and acknowledged it.
 
+## Safety extras & site access
+
+- **Incidents, near misses, hazards, observations** — anyone on the project can report from the office or their phone. A supervisor or PM investigates, records the root cause and corrective action, and closes out (a corrective action is required, except for observations). Notifiable incidents are flagged until closed.
+- **Permits to work** — requested for up to 7 days, approved by a supervisor, PM or director who is *not* the requester, then closed when the work is done. Live permits show on the register and can be printed.
+- **Toolbox talks** — topic, date, points covered and who attended (tick everyone on site in one go).
+- **NCRs** (under Quality) — requirement breached → containment → root cause and corrective action (the responsible subcontractor can answer these) → verification. Someone other than the person who raised it must verify and close it.
+- **QR gate** — each project has a printable poster (*Safety → Site access & visitors*). Scanning it opens a page that needs no account. Workers enter their 6-digit worker code, read and acknowledge any SWMS, and sign in or out; the same requirements as the app apply. Visitors enter their details and accept the site rules. Gate calls are rate-limited, and **Replace QR code** stops old posters working.
+- **Workforce** — supervisors can sign someone in by hand (a reason is required, requirements still apply), sign people out, record missing sign-outs at 3:30 pm, and print an emergency **muster list** of workers and visitors on site. Visitor details are visible only to the people who run the site register.
+
 ## Roles
 
 | Role | Can |
 | --- | --- |
 | Director | Everything, including approving variations of any size |
-| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial |
-| Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress |
-| Quality manager | Defects, ITP templates and hold-point sign-off |
-| Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations |
-| Worker | Raise defects, acknowledge SWMS, sign in to site |
+| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety |
+| Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress, NCRs, approving permits, investigating incidents, the site register and visitors |
+| Quality manager | Defects, ITP templates and hold-point sign-off, NCRs |
+| Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations, answering their NCRs, requesting permits, reporting incidents |
+| Worker | Raise defects, report hazards and incidents, request permits, acknowledge SWMS, sign in to site |
 
 Company **admins** (the person who created the company, plus anyone they tick as admin) can invite people and change roles.

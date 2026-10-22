@@ -64,14 +64,15 @@ async function loadCompany(orgId) {
   const T = [
     "memberships", "contractors", "insurances", "workers", "inductions", "credentials", "projects", "locations", "tasks",
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
-    "itp_templates", "itp_template_points", "itp_signoffs",
+    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees",
   ];
-  const [orgRes, profRes, attendance, audit, invitations, ...rows] = await Promise.all([
+  const [orgRes, profRes, attendance, audit, invitations, visitors, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
     sb.from("profiles").select("*"),
     selectAll("attendance", (q) => q.gte("at", twoDaysAgo)),
     selectAll("audit_events", (q) => q.order("at", { ascending: false }).limit(300)),
     selectAll("invitations", (q) => q.is("accepted_at", null)),
+    selectAll("visitors", (q) => q.gte("signed_in_at", new Date(Date.now() - 14 * 86400000).toISOString()).order("signed_in_at", { ascending: false })),
     ...T.map((t) => selectAll(t)),
   ]);
   if (orgRes.error) throw new Error(friendlyError(orgRes.error));
@@ -104,6 +105,11 @@ async function loadCompany(orgId) {
       return { ...s, seriesId: s.seriesId || s.id, hazards: s.hazards || [], highRiskCategories: s.highRiskCategories || [], acknowledgedBy: acks.map((a) => a.workerId), acks };
     }),
     documents: r.documents,
+    ncrs: r.ncrs.sort((a, b) => b.ref.localeCompare(a.ref)),
+    permits: r.permits.sort((a, b) => b.ref.localeCompare(a.ref)),
+    incidents: r.incidents.sort((a, b) => b.reportedAt.localeCompare(a.reportedAt)),
+    toolbox: r.toolbox_talks.map((t) => ({ ...t, attendees: r.toolbox_attendees.filter((a) => a.talkId === t.id).map((a) => a.workerId) })).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)),
+    visitors,
     attendance,
     budgetLines: r.budget_lines.sort((a, b) => a.costCode.localeCompare(b.costCode)),
     variations: r.variations.sort((a, b) => a.ref.localeCompare(b.ref)),

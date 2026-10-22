@@ -335,13 +335,14 @@ function createSeed(now = new Date()) {
 // ------------------------------------------------------- permissions
 // Mirror of role_can() in the database. Used only to decide which buttons
 // to show — the database refuses anything a role isn't allowed to do.
+const SAFETY = ["ncr.manage", "permit.request", "permit.approve", "safety.report", "safety.manage", "attendance.manage"];
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve"],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve"],
-  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload"],
-  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve"],
-  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload"],
-  worker: ["defect.create"],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY],
+  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve", "ncr.manage", "safety.report"],
+  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload", "permit.request", "safety.report"],
+  worker: ["defect.create", "permit.request", "safety.report"],
 };
 const VARIATION_LIMIT = { project_manager: 5000000, director: Infinity };
 const ROLE_LABEL = { director: "Director", project_manager: "Project manager", site_supervisor: "Site supervisor", quality_manager: "Quality manager", subcontractor_admin: "Subcontractor admin", worker: "Worker" };
@@ -656,11 +657,30 @@ function search(u, q) {
   for (const d of listDefects(u)) if (hit(d.ref, d.title, d.trade)) out.push(["Defect", `${d.ref} · ${d.title}`, projName(d.projectId), `#/app/projects/${d.projectId}/quality/defects/${d.id}`]);
   for (const d of DB.documents.filter((x) => x.status !== "superseded" && x.status !== "rejected")) if (hit(d.number, d.title)) out.push(["Document", `${d.number} rev ${d.revision} · ${d.title}`, projName(d.projectId), `#/app/projects/${d.projectId}/documents/${d.id}`]);
   for (const w of DB.workers) if (hit(w.name)) out.push(["Worker", w.name, contractorOf(w.contractorId)?.tradingName ?? "", `#/app/people`]);
+  for (const x of listNcrs(u)) if (hit(x.ref, x.title)) out.push(["NCR", `${x.ref} · ${x.title}`, projName(x.projectId), `#/app/projects/${x.projectId}/quality/ncrs/${x.id}`]);
+  for (const x of DB.incidents) if (hit(x.ref, x.title)) out.push(["Safety report", `${x.ref} · ${x.title}`, projName(x.projectId), `#/app/projects/${x.projectId}/safety/incidents/${x.id}`]);
+  for (const x of DB.permits) if (hit(x.ref, x.type, x.location)) out.push(["Permit", `${x.ref} · ${x.type} · ${x.location}`, projName(x.projectId), `#/app/projects/${x.projectId}/safety/permits/${x.id}`]);
   for (const v of listVariations(u)) if (hit(v.ref, v.title)) out.push(["Variation", `${v.ref} · ${v.title}`, projName(v.projectId), `#/app/projects/${v.projectId}/commercial`]);
   return out.slice(0, 40);
 }
 
 // --------------------------------------------- derived views (one source)
+// ---- safety extras (NCRs, permits, incidents, site access)
+const INCIDENT_TYPES = { incident: "Incident (injury or damage)", near_miss: "Near miss", hazard: "Hazard", observation: "Observation (good or bad)" };
+const PERMIT_TYPES = ["Hot work", "Working at heights", "Confined space", "Excavation", "Electrical isolation", "Crane lift", "Roof access", "Demolition"];
+const SITE_RULES = ["Sign in when you arrive and sign out when you leave.", "Stay with your host and keep to marked walkways.", "Wear the PPE you're given: hard hat, hi-vis, closed boots.", "Don't enter exclusion zones or areas behind barriers.", "In an emergency, follow the wardens to the assembly point."];
+const NCR_STEPS = [["open", "Raised"], ["corrective_action", "Corrective action"], ["verification", "Verification"], ["closed", "Closed"]];
+const permitLive = (x, day = todayYmd()) => x.status === "approved" && x.validFrom <= day && x.validTo >= day;
+const listNcrs = (u, pid) => DB.ncrs.filter((n) => (!pid || n.projectId === pid) && (u.role !== "subcontractor_admin" || n.contractorId === u.contractorId));
+const ncrCanEdit = (u, n) => n.status !== "closed" && (can(u, "ncr.manage") || (u.role === "subcontractor_admin" && u.contractorId === n.contractorId));
+/** Workers whose latest record (in the last two days) is a sign-in from an earlier day. */
+function missingSignOuts(pid) {
+  const latest = new Map();
+  for (const e of DB.attendance.filter((x) => x.projectId === pid)) { const prev = latest.get(e.workerId); if (!prev || prev.at <= e.at) latest.set(e.workerId, e); }
+  return [...latest.values()].filter((e) => e.kind === "check_in" && ymd(new Date(e.at)) !== todayYmd());
+}
+const visitorsOnSite = (pid) => DB.visitors.filter((v) => v.projectId === pid && !v.signedOutAt && ymd(new Date(v.signedInAt)) === todayYmd());
+
 function myTasks(u) {
   const out = [];
   if (can(u, "variation.approve")) for (const v of listVariations(u).filter((v) => v.status === "submitted" || v.status === "under_review"))
@@ -682,6 +702,17 @@ function myTasks(u) {
     out.push({ title: `Review ${d.number} rev ${d.revision} · ${d.title}`, sub: `${projName(d.projectId)} · uploaded ${dayMonth(d.uploadedAt)}`, href: `#/app/projects/${d.projectId}/documents/${d.id}`, tone: "blue" });
   if (can(u, "swms.submit")) for (const s of DB.swms.filter((x) => x.status === "changes_requested" && (u.role !== "subcontractor_admin" || x.contractorId === u.contractorId)))
     out.push({ title: `Revise SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · changes requested`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: "amber" });
+  if (can(u, "permit.approve")) for (const x of DB.permits.filter((x) => x.status === "requested" && x.requestedBy !== u.id))
+    out.push({ title: `Approve permit ${x.ref} · ${x.type}`, sub: `${projName(x.projectId)} · ${x.location} · from ${dayMonth(x.validFrom)}`, href: `#/app/projects/${x.projectId}/safety/permits/${x.id}`, tone: "red" });
+  if (can(u, "safety.manage")) for (const x of DB.incidents.filter((x) => x.status !== "closed" && x.type !== "observation"))
+    out.push({ title: `Investigate ${x.ref} · ${x.title}`, sub: `${projName(x.projectId)} · ${words(x.severity)} severity`, href: `#/app/projects/${x.projectId}/safety/incidents/${x.id}`, tone: x.severity === "high" || x.severity === "critical" || x.notifiable ? "red" : "amber" });
+  for (const n of listNcrs(u).filter((n) => n.status !== "closed")) {
+    if (can(u, "ncr.manage") && n.status === "verification" && n.raisedBy !== u.id)
+      out.push({ title: `Verify and close ${n.ref} · ${n.title}`, sub: projName(n.projectId), href: `#/app/projects/${n.projectId}/quality/ncrs/${n.id}`, tone: "blue" });
+    else if (u.role === "subcontractor_admin" && (!n.rootCause || !n.correctiveAction))
+      out.push({ title: `Respond to ${n.ref} · ${n.title}`, sub: `${projName(n.projectId)} · root cause and corrective action needed`, href: `#/app/projects/${n.projectId}/quality/ncrs/${n.id}`, tone: "amber" });
+  }
+  if (can(u, "attendance.manage")) for (const p of listProjects(u)) { const m = missingSignOuts(p.id); if (m.length) out.push({ title: `${m.length} missing sign-out${m.length > 1 ? "s" : ""}`, sub: `${p.name} · still signed in from an earlier day`, href: `#/app/projects/${p.id}/workforce`, tone: "amber" }); }
   if (u.role === "subcontractor_admin") for (const d of listDefects(u).filter((d) => d.status === "assigned" || d.status === "rectifying"))
     out.push({ title: `Rectify ${d.ref} · ${d.title}`, sub: projName(d.projectId), href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "amber" });
   const firstProject = listProjects(u)[0];
@@ -723,6 +754,8 @@ function notifications(u) {
       if (d <= 2) out.push({ title: `${i.ref} hold point${open.length > 1 ? "s" : ""} not released`, sub: `${projName(i.projectId)} · ${t.name} ${d < 0 ? "started" : d === 0 ? "starts today" : `starts in ${d} day${d > 1 ? "s" : ""}`}`, href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: "red" });
     }
   }
+  for (const x of DB.incidents.filter((x) => x.notifiable && x.status !== "closed")) out.push({ title: `Notifiable incident ${x.ref} open`, sub: `${projName(x.projectId)} · ${x.title}`, href: `#/app/projects/${x.projectId}/safety/incidents/${x.id}`, tone: "red" });
+  for (const x of DB.permits.filter((x) => permitLive(x) && x.validTo === todayYmd())) out.push({ title: `Permit ${x.ref} ends today`, sub: `${projName(x.projectId)} · ${x.type} · ${x.location} — close it out when work stops`, href: `#/app/projects/${x.projectId}/safety/permits/${x.id}`, tone: "amber" });
   for (const p of DB.projects) { const nm = nextMilestoneOf(p), d = daysBetween(new Date(), D(nm.date)); if (d >= 0 && d <= 7) out.push({ title: `${nm.name} in ${d} days`, sub: p.name, href: `#/app/projects/${p.id}/programme`, tone: "blue" }); }
   return out;
 }
