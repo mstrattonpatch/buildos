@@ -75,6 +75,7 @@ function resolve(path, query) {
   if (path === "/site/tasks") return { html: pageSiteTasks(u, path), title: "Tasks" };
   if (path === "/site/chat") { if (listProjects(u)[0]) markReadLocal(listProjects(u)[0].id); return { html: pageSiteChat(u, path), title: "Team chat" }; }
   if (path === "/site/contacts") return { html: pageSiteContacts(u, path), title: "Contacts" };
+  if (path === "/site/outbox") return { html: pageOutbox(u, path), title: "Outbox" };
   if (path === "/site/receipt") return { html: pageSiteReceipt(u, path), title: "Receipt" };
   if (path === "/site/note") return { html: pageSiteNote(u, path), title: "Diary note" };
   const company = {
@@ -155,6 +156,7 @@ function render() {
   if (!out) return;
   window.hideVizTip?.();
   document.getElementById("root").innerHTML = out.html;
+  updateSyncUI();
   document.title = `${out.title} · BuildOS`;
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
   afterChatRender();
@@ -583,7 +585,7 @@ const ACTIONS = {
   async sendSiteNote(fd, u, el) {
     if (!f(fd, "body")) throw new RuleError("Write what happened on site.");
     const photos = await uploadPhotos(el.querySelector("[name=photos]"), 6);
-    return (await rpc("send_site_note", { p_project: f(fd, "project"), p_body: f(fd, "body"), p_photos: photos })).message;
+    return (await rpc("send_site_note", { p_project: f(fd, "project"), p_body: f(fd, "body"), p_photos: photos, p_date: f(fd, "_savedOn") || null })).message;
   },
   async siteNote(fd) { return (await rpc("site_note_action", { p_note: f(fd, "note"), p_action: f(fd, "action") })).message; },
   // ---- timesheets & rates
@@ -678,7 +680,7 @@ const ACTIONS = {
   async swmsAck(fd) { return (await rpc("swms_acknowledge", { p_swms: f(fd, "swmsId") })).message; },
   async siteIn(fd) { return (await rpc("site_sign_in", { p_project: f(fd, "projectId") })).message; },
   async siteOut(fd) { return (await rpc("site_sign_out", { p_project: f(fd, "projectId") })).message; },
-  async diary(fd) { return (await rpc("submit_diary", { p_project: f(fd, "projectId"), p_weather: f(fd, "weather"), p_notes: f(fd, "notes"), p_delays: f(fd, "delays"), p_date: todayYmd() })).message; },
+  async diary(fd) { return (await rpc("submit_diary", { p_project: f(fd, "projectId"), p_weather: f(fd, "weather"), p_notes: f(fd, "notes"), p_delays: f(fd, "delays"), p_date: f(fd, "_savedOn") || todayYmd() })).message; },
 };
 
 document.addEventListener("submit", async (e) => {
@@ -696,6 +698,13 @@ document.addEventListener("submit", async (e) => {
   const fd = new FormData(el, sub);
   // One key per form instance, so a retried submit can't create a duplicate defect.
   el.dataset.clientKey ||= crypto.randomUUID();
+  const act = el.dataset.act;
+  // Offline: site records are kept on the device; anything needing a live check (approvals, sign-offs) waits.
+  if (!navigator.onLine && SESSION && DB) {
+    if (OUTBOX_OK.has(act)) { await keepOffline(el, act, fd); return; }
+    formError(el, "You're offline. This needs a live connection so it can be checked properly — try again when you have signal.");
+    return;
+  }
   const buttons = el.querySelectorAll("button");
   buttons.forEach((b) => (b.disabled = true));
   const label = sub?.innerHTML;
@@ -713,10 +722,18 @@ document.addEventListener("submit", async (e) => {
   } catch (err) {
     buttons.forEach((b) => (b.disabled = false));
     if (sub) sub.innerHTML = label;
+    if (OUTBOX_OK.has(act) && SESSION && DB && isNetworkError(err)) { await keepOffline(el, act, fd); return; }
     if (err instanceof RuleError) formError(el, err.message);
     else { console.error(err); formError(el, friendlyError(err)); }
   }
 });
+
+/** Keep a submission on the device and carry on as if it went (it's marked as waiting until it's sent). */
+async function keepOffline(el, act, fd) {
+  try { await saveDraft(act, el, fd); } catch (e) { formError(el, `Couldn't save it on this device: ${e.message}`); return; }
+  toast("No signal — saved on this phone. It'll be sent automatically when you're back online.");
+  if (el.dataset.done) go(el.dataset.done.slice(1)); else render();
+}
 
 document.addEventListener("click", async (e) => {
   const hz = e.target.closest("[data-add-row],[data-remove-row]");
@@ -764,7 +781,13 @@ document.addEventListener("click", async (e) => {
   const t = e.target.closest("[data-signout],[data-org],[data-export],[data-qr],[data-refresh]");
   document.querySelectorAll("details.menu[open]").forEach((d) => { if (!d.contains(e.target) || t) d.removeAttribute("open"); });
   if (!t) return;
-  if ("signout" in t.dataset) { e.preventDefault(); await sb.auth.signOut(); SESSION = null; DB = null; go("/login"); }
+  if ("signout" in t.dataset) {
+    e.preventDefault();
+    const unsent = OUTBOX.length;
+    if (unsent && !confirm(`${unsent} item${unsent > 1 ? "s haven't" : " hasn't"} been sent yet. Signing out deletes ${unsent > 1 ? "them" : "it"} from this device. Sign out anyway?`)) return;
+    await wipeOffline(); // nothing from this account stays on the device
+    await sb.auth.signOut(); SESSION = null; DB = null; go("/login");
+  }
   else if (t.dataset.org) { showLoading("Switching company…"); prefs.set(ORG_KEY, t.dataset.org); await loadCompany(t.dataset.org); go(homeFor(currentUser())); }
   else if ("refresh" in t.dataset) { e.preventDefault(); showLoading(); await enterApp(); go(DB ? homeFor(currentUser()) : "/welcome"); }
   else if (t.dataset.export) exportDefects(t.dataset.export);
@@ -844,6 +867,8 @@ function exportDefects(pid) {
 }
 
 // ------------------------------------------------------------- boot
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { /* offline start not available */ });
+
 (async function boot() {
   showLoading();
   const rawHash = location.hash;
@@ -865,7 +890,10 @@ function exportDefects(pid) {
     if (SESSION && !recovery) await enterApp();
     lastLoad = Date.now();
     render();
+    if (SESSION) { await loadOutbox(); syncOutbox(); }
   } catch (e) {
+    // No signal: open with the copy saved on this device, if there is one.
+    if (SESSION && isNetworkError(e) && (await loadSnapshot())) { await loadOutbox(); render(); return; }
     console.error(e);
     showFatal(friendlyError(e));
   }

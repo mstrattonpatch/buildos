@@ -561,3 +561,9 @@ g.xf-off { opacity: 0.25; }
 .hb-neg { justify-content: flex-end; }
 .hb-bar-l { border-radius: 4px 0 0 4px; }
 .hb-zero { width: 1px; align-self: stretch; background: #898781; margin: -2px 0; }
+/* offline */
+.sync-bar { display: block; padding: 8px 14px; margin: 0 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600; background: var(--amber-tint); color: var(--amber-text); }
+.sync-bar[data-tone="red"] { background: var(--red-tint); color: var(--red); }
+.sync-bar[data-tone="blue"] { background: var(--blue-tint); color: var(--blue); }
+.site > .sync-bar { margin: 8px 12px 0; }
+.sync-bar[hidden] { display: none; }

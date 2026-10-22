@@ -131,6 +131,14 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **Self-service links** (no account needed): give a worker their link to see their cards and upload new ones; give a contractor theirs to update contacts and upload insurance certificates and company documents. Uploads wait for the office to check them. Links can be replaced at any time, and uploads through a link can only go into that link's own folder.
 - **Contractor profile** (*People → a company*): contacts and emergency contact, approved trades, prequalification (approval needs an expiry), insurances with cover limits and certificates, company documents, workers and their compliance, projects, and performance — defects assigned, average close-out, NCRs, agreed backcharges.
 
+## Working without a signal
+
+- The app keeps its own files on the device (a service worker), and an **encrypted** copy of the last data it loaded, so the site app still opens with no signal.
+- With no signal, **defects, inspections, site diary entries, diary notes, hours, receipts and finished tasks** are saved on the phone — photos included, encrypted — and sent automatically when the connection returns. A bar at the top shows what's waiting, sending or couldn't be sent; *Outbox* in the site app lists each item, with Send now and Discard.
+- If the server refuses something when it's sent (for example, the diary was already submitted), it stays in the Outbox with the reason — nothing is silently lost. Defects can't be duplicated by a retry.
+- **Approvals never work offline** — releasing a hold point, approving a permit, timesheet, bill or claim needs a live permission check, so the app says so instead of pretending it's saved.
+- **Signing out deletes everything** this account stored on the device (with a warning if anything hasn't been sent yet).
+
 ## Roles
 
 | Role | Can |

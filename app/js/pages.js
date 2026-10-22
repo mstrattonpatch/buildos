@@ -108,7 +108,7 @@ function appShell(u, route, inner) {
           <button class="menu-item" type="button" data-signout>${icon("logout")} Sign out</button>
         </div></details>
       </header>
-      <main class="content">${inner}</main>
+      <main class="content">${SNAPSHOT_AT ? `<div class="notice notice-warn">${icon("cloudoff")}<span>You're offline — showing what was on this device at ${timeOf(SNAPSHOT_AT)}. Changes that need approval are paused until you're back online.</span></div>` : ""}${syncBar()}${inner}</main>
     </div>
     <nav class="bottom-tabs" aria-label="Primary">${tabs.map(([h, l, ic, ex]) => `<a href="${h}"${isActive(route, h, ex) ? ' aria-current="page"' : ""}>${icon(ic, 20)}${l}</a>`).join("")}</nav>
   </div>`;
@@ -1841,7 +1841,7 @@ const notFound = (msg = "That page or record doesn't exist, or your role can't s
 
 // ===================================================== mobile site app
 const siteTabs = (route) => { const fp = DB.projects[0]; const t = (h, l, ic) => `<a href="${h}"${route === h.slice(1) ? ' aria-current="page"' : ""}>${icon(ic, 21)}${l}</a>`; return `<nav class="site-tabs" aria-label="Site app">${t("#/site", "Today", "calendar")}${t("#/site/tasks", `Tasks${(() => { const n = DB.siteTasks.filter((x) => x.assigneeId === SESSION?.user.id && x.status === "open").length; return n ? ` <i class="tab-n">${n}</i>` : ""; })()}`, "listchecks")}<a href="#/site/defect" aria-label="Raise defect"><span class="fab">${icon("plus", 26)}</span></a>${t("#/site/chat", `Chat${fp && currentUser() && unreadCount(currentUser(), fp.id) ? ` <i class="tab-n">${unreadCount(currentUser(), fp.id)}</i>` : ""}`, "users")}${t("#/site/sign-in", "Me", "user")}</nav>`; };
-const siteWrap = (inner) => `<div class="site-wrap"><div class="site">${inner}</div></div>`;
+const siteWrap = (inner) => `<div class="site-wrap"><div class="site">${syncBar()}${inner}</div></div>`;
 function pageSiteToday(u, route) {
   const p = listProjects(u)[0];
   if (!p) return siteWrap(`<div class="site-body" style="padding-top:40px"><h1 style="font-size:24px">No projects yet</h1><p class="muted">Once a project is set up it shows here.</p><a class="btn btn-lg btn-block" href="#/app">Go to the office app</a></div>`);

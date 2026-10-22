@@ -30,9 +30,12 @@ the extras are added.
 | Reports & handover | Weekly site, client progress, cost, quality and diary pack reports with internal/client views; handover readiness, printable pack, defects liability period |
 | Worker wallets & contractor profiles | Credential verification workflow, project site requirements, no-account self-service links for workers and contractors, contractor profiles with insurances, documents and performance |
 | Insights & dashboards | Charts in overviews and reports; interactive Insights page with slicers, cross-filtering, what-if and live refresh |
+| Offline site work | Service worker, encrypted offline snapshot and outbox for site records, sync status and Outbox, approvals blocked offline, wipe on sign-out |
 | Variations (basic), claims register, budget view, site diary, sign-in | |
 
 ## Next, in order
+
+- **Notification & automation engine** (blueprint §12) — rules with triggers, conditions, recipients and frequency limits; reminders and escalations by email; saved report views.
 
 1. **AI features** (needs an Anthropic API key in Supabase secrets, called from an Edge Function — never from the browser) — invoice/receipt reading, estimate document review, subcontractor ITP conversion, diary drafting, report writing, Ask Claude.
 

@@ -147,6 +147,8 @@ async function loadCompany(orgId) {
   await signPhotos(db);
   await signFiles(db);
   DB = db;
+  SNAPSHOT_AT = null;
+  saveSnapshot(); // encrypted copy so the app still opens offline
 }
 
 // Private photos are shown through short-lived signed links.
