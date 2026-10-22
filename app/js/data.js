@@ -64,15 +64,17 @@ async function loadCompany(orgId) {
   const T = [
     "memberships", "contractors", "insurances", "workers", "inductions", "credentials", "projects", "locations", "tasks",
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
-    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs",
+    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads",
   ];
-  const [orgRes, profRes, attendance, audit, invitations, timesheets, visitors, ...rows] = await Promise.all([
+  const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
     sb.from("profiles").select("*"),
     selectAll("attendance", (q) => q.gte("at", twoDaysAgo)),
     selectAll("audit_events", (q) => q.order("at", { ascending: false }).limit(300)),
     selectAll("invitations", (q) => q.is("accepted_at", null)),
     selectAll("timesheets", (q) => q.gte("date", ymd(new Date(Date.now() - 120 * 86400000)))),
+    selectAll("messages", (q) => q.order("created_at", { ascending: false }).limit(500)),
+    selectAll("site_notes", (q) => q.gte("date", ymd(new Date(Date.now() - 30 * 86400000)))),
     selectAll("visitors", (q) => q.gte("signed_in_at", new Date(Date.now() - 14 * 86400000).toISOString()).order("signed_in_at", { ascending: false })),
     ...T.map((t) => selectAll(t)),
   ]);
@@ -115,6 +117,10 @@ async function loadCompany(orgId) {
     timesheetCosts: r.timesheet_costs,
     rateCards: r.rate_cards.sort((a, b) => a.name.localeCompare(b.name)),
     rateRules: r.rate_rules,
+    messages: messages.map((m) => ({ ...m, photos: m.photos || [] })).reverse(),
+    chatReads: r.chat_reads,
+    siteTasks: r.site_tasks.map((t) => ({ ...t, evidence: t.evidence || [] })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    siteNotes: siteNotes.map((n) => ({ ...n, photos: n.photos || [] })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     attendance,
     budgetLines: r.budget_lines.sort((a, b) => a.costCode.localeCompare(b.costCode)),
     variations: r.variations.sort((a, b) => a.ref.localeCompare(b.ref)),
@@ -131,7 +137,8 @@ async function loadCompany(orgId) {
 
 // Private photos are shown through short-lived signed links.
 async function signPhotos(db) {
-  const paths = uniq([...db.defects.flatMap((d) => [...d.photos, ...d.evidencePhotos]), ...db.itps.flatMap((i) => i.points.flatMap((p) => p.photos))].filter((p) => p && p.startsWith(db.org.id + "/")));
+  const paths = uniq([...db.defects.flatMap((d) => [...d.photos, ...d.evidencePhotos]), ...db.itps.flatMap((i) => i.points.flatMap((p) => p.photos)),
+    ...db.messages.flatMap((m) => m.photos), ...db.siteTasks.flatMap((t) => t.evidence), ...db.siteNotes.flatMap((n) => n.photos)].filter((p) => p && p.startsWith(db.org.id + "/") && !db.photoUrls[p]));
   if (!paths.length) return;
   const { data } = await sb.storage.from("photos").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.photoUrls[x.path] = x.signedUrl;
@@ -163,6 +170,20 @@ async function uploadDocumentWithInfo(input) {
 }
 
 /** Downscale and upload photos to the company's private folder. Returns storage paths. */
+/** New chat messages since the last one we have (polled while a chat is open). Returns true if any arrived. */
+async function pollMessages(pid) {
+  const last = chatFor(pid).at(-1)?.createdAt;
+  let q = sb.from("messages").select("*").eq("project_id", pid).order("created_at", { ascending: true }).limit(100);
+  if (last) q = q.gt("created_at", last);
+  const { data, error } = await q;
+  if (error || !data?.length) return false;
+  const fresh = data.map(camel).map((m) => ({ ...m, photos: m.photos || [] })).filter((m) => !DB.messages.some((x) => x.id === m.id));
+  if (!fresh.length) return false;
+  DB.messages.push(...fresh);
+  await signPhotos(DB);
+  return true;
+}
+
 async function uploadPhotos(input, max = 6) {
   const files = [...(input?.files || [])].slice(0, max);
   const paths = [];

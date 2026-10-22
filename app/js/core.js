@@ -338,10 +338,10 @@ function createSeed(now = new Date()) {
 const SAFETY = ["ncr.manage", "permit.request", "permit.approve", "safety.report", "safety.manage", "attendance.manage"];
 const TIME = ["timesheet.submit", "timesheet.approve", "timesheet.process", "rates.manage"];
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME],
-  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY, "timesheet.submit", "timesheet.approve"],
-  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve", "ncr.manage", "safety.report"],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign"],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign"],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY, "timesheet.submit", "timesheet.approve", "task.assign"],
+  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve", "ncr.manage", "safety.report", "task.assign"],
   subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload", "permit.request", "safety.report", "timesheet.submit"],
   worker: ["defect.create", "permit.request", "safety.report", "timesheet.submit"],
 };
@@ -726,6 +726,16 @@ function rateFor(workerId, projectId, code) {
   return out;
 }
 
+// ---- team chat, phone tasks, site notes
+const chatFor = (pid) => DB.messages.filter((m) => m.projectId === pid);
+function unreadCount(u, pid) {
+  const read = DB.chatReads.find((r) => r.projectId === pid)?.readAt ?? "";
+  return chatFor(pid).filter((m) => m.authorId !== u.id && m.createdAt > read).length;
+}
+const canCheckTask = (u, t) => t.status === "submitted" && t.assigneeId !== u.id && (can(u, "task.assign") || t.createdBy === u.id);
+const taskLink = (t) => { const d = t.defectId && DB.defects.find((x) => x.id === t.defectId); if (d) return [`#/app/projects/${t.projectId}/quality/defects/${d.id}`, d.ref];
+  const i = t.itpPointId && DB.itps.find((x) => x.points.some((p) => p.id === t.itpPointId)); return i ? [`#/app/projects/${t.projectId}/quality/itp/${i.id}`, `${i.ref} · ${i.points.find((p) => p.id === t.itpPointId).name}`] : null; };
+
 function myTasks(u) {
   const out = [];
   if (can(u, "variation.approve")) for (const v of listVariations(u).filter((v) => v.status === "submitted" || v.status === "under_review"))
@@ -757,6 +767,13 @@ function myTasks(u) {
     else if (u.role === "subcontractor_admin" && (!n.rootCause || !n.correctiveAction))
       out.push({ title: `Respond to ${n.ref} · ${n.title}`, sub: `${projName(n.projectId)} · root cause and corrective action needed`, href: `#/app/projects/${n.projectId}/quality/ncrs/${n.id}`, tone: "amber" });
   }
+  for (const t of DB.siteTasks.filter((t) => t.assigneeId === u.id && t.status === "open")) {
+    const late = t.dueDate && t.dueDate < todayYmd();
+    out.push({ title: `${t.sentBack ? "Redo" : "Task"} ${t.ref} · ${t.title}`, sub: `${projName(t.projectId)}${t.dueDate ? ` · due ${dayMonth(t.dueDate)}` : ""}${t.sentBack && t.reviewNote ? ` · sent back: ${t.reviewNote}` : ""}`, href: "#/site/tasks", tone: late || t.sentBack ? "red" : "amber" });
+  }
+  for (const t of DB.siteTasks.filter((t) => canCheckTask(u, t)))
+    out.push({ title: `Check ${t.ref} · ${t.title}`, sub: `${projName(t.projectId)} · done by ${userById(t.assigneeId)?.name ?? ""}`, href: `#/app/projects/${t.projectId}/from-site`, tone: "blue" });
+  if (can(u, "diary.submit")) for (const p of listProjects(u)) { const n = DB.siteNotes.filter((x) => x.projectId === p.id && x.status === "pending").length; if (n) out.push({ title: `${n} site note${n > 1 ? "s" : ""} for the diary`, sub: `${p.name} · accept or dismiss`, href: `#/app/projects/${p.id}/from-site`, tone: "blue" }); }
   if (can(u, "timesheet.approve")) for (const p of listProjects(u)) {
     const n = DB.timesheets.filter((t) => t.projectId === p.id && t.status === "pending" && t.workerId !== u.workerId);
     if (n.length) out.push({ title: `Approve ${n.length} timesheet${n.length > 1 ? "s" : ""} · ${fmtH(n.reduce((a, t) => a + Number(t.hours), 0))}`, sub: p.name, href: `#/app/projects/${p.id}/workforce/timesheets?week=${weekStart(n.map((t) => t.date).sort()[0])}`, tone: "blue" });
@@ -808,6 +825,7 @@ function notifications(u) {
   }
   for (const x of DB.incidents.filter((x) => x.notifiable && x.status !== "closed")) out.push({ title: `Notifiable incident ${x.ref} open`, sub: `${projName(x.projectId)} · ${x.title}`, href: `#/app/projects/${x.projectId}/safety/incidents/${x.id}`, tone: "red" });
   for (const x of DB.permits.filter((x) => permitLive(x) && x.validTo === todayYmd())) out.push({ title: `Permit ${x.ref} ends today`, sub: `${projName(x.projectId)} · ${x.type} · ${x.location} — close it out when work stops`, href: `#/app/projects/${x.projectId}/safety/permits/${x.id}`, tone: "amber" });
+  for (const p of listProjects(u)) { const n = unreadCount(u, p.id); if (n) out.push({ title: `${n} new message${n > 1 ? "s" : ""} in team chat`, sub: p.name, href: `#/app/projects/${p.id}/chat`, tone: "blue" }); }
   for (const p of DB.projects) { const nm = nextMilestoneOf(p), d = daysBetween(new Date(), D(nm.date)); if (d >= 0 && d <= 7) out.push({ title: `${nm.name} in ${d} days`, sub: p.name, href: `#/app/projects/${p.id}/programme`, tone: "blue" }); }
   return out;
 }

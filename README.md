@@ -69,14 +69,22 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **Rates** (*Rates*, PMs and directors only) — rate cards, a personal rate per person, company cost-code rates and job rates. The most specific wins: job + person + cost code → job + person → job + cost code → company cost-code rate → personal rate → rate card. Supervisors and subcontractors never see rates or labour cost.
 - **Payroll** — *Timesheets* lists every project by week, exports a payroll CSV of approved and processed hours split into ordinary and overtime (over 38 h a week), and prints a weekly timesheet per person with sign-off lines.
 
+## Team chat & phone tasks
+
+- **Team chat** — each project has a chat (*Team chat* in the office, *Chat* in the site app) for everyone in the company, with photos. Open chats check for new messages every few seconds, and unread counts show on the menu and the phone's tab bar.
+- **Tasks to a phone** — supervisors, PMs, directors and quality managers give someone a task (due date, photos needed), from the chat page, the site app, or straight from a defect or ITP point (*Send to someone's phone*). The person marks it done with a note and photos; whoever gave it, or a supervisor, accepts it or sends it back with what's still needed. Nobody checks their own work. Each step is posted in the chat.
+- **Site notes** — anyone sends a note and photos for the site diary from the site app (*Diary note*). A supervisor adds it to the day's diary or dismisses it; notes accepted after the diary is submitted are marked as late additions, so the original entry is never changed.
+- **From site** (office) — finished tasks to check, site notes waiting, and hours sent in from phones, in one place.
+- **Contacts** (site app) — the team with call and email buttons, and crew with a phone number.
+
 ## Roles
 
 | Role | Can |
 | --- | --- |
 | Director | Everything, including approving variations of any size |
-| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety, approving and processing timesheets, rates |
-| Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress, NCRs, approving permits, investigating incidents, the site register and visitors, entering and approving timesheets |
-| Quality manager | Defects, ITP templates and hold-point sign-off, NCRs |
+| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety, approving and processing timesheets, rates, giving and checking tasks |
+| Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress, NCRs, approving permits, investigating incidents, the site register and visitors, entering and approving timesheets, giving and checking tasks, accepting site notes |
+| Quality manager | Defects, ITP templates and hold-point sign-off, NCRs, giving and checking tasks |
 | Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations, answering their NCRs, requesting permits, reporting incidents, entering their workers' hours |
 | Worker | Raise defects, report hazards and incidents, request permits, acknowledge SWMS, sign in to site, log their own hours |
 

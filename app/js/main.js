@@ -70,6 +70,10 @@ function resolve(path, query) {
   if (path === "/site/defect") return { html: pageSiteDefect(u), title: "New defect" };
   if (path === "/site/sign-in") return { html: pageSiteSignIn(u, path), title: "Site sign-in" };
   if (path === "/site/drawings") return { html: pageSiteDrawings(u, path, query), title: "Drawings" };
+  if (path === "/site/tasks") return { html: pageSiteTasks(u, path), title: "Tasks" };
+  if (path === "/site/chat") { if (listProjects(u)[0]) markReadLocal(listProjects(u)[0].id); return { html: pageSiteChat(u, path), title: "Team chat" }; }
+  if (path === "/site/contacts") return { html: pageSiteContacts(u, path), title: "Contacts" };
+  if (path === "/site/note") return { html: pageSiteNote(u, path), title: "Diary note" };
   const company = {
     "/app": [pageControlCentre, "Company overview"], "/app/projects": [pageProjects, "Projects"], "/app/projects/new": [pageNewProject, "New project"],
     "/app/tasks": [pageTasks, "My tasks"], "/app/people": [pagePeople, "People & contractors"], "/app/reports": [(x) => pageReports(x, query), "Reports"],
@@ -107,6 +111,8 @@ function resolve(path, query) {
     else if (sub === "safety/toolbox") { html = pageToolbox(u, p); title = "Toolbox talks"; }
     else if (sub === "safety/access") { html = pageSiteAccess(u, p); title = "Site access"; }
     else if (sub === "workforce") { html = pageWorkforce(u, p); title = "Workforce"; }
+    else if (sub === "chat") { markReadLocal(p.id); html = pageProjectChat(u, p); title = "Team chat"; }
+    else if (sub === "from-site") { html = pageFromSite(u, p); title = "From site"; }
     else if (sub === "workforce/muster") { html = pageMuster(u, p); title = "Muster list"; }
     else if (sub === "workforce/timesheets") { html = pageProjectTimesheets(u, p, query); title = "Timesheets"; }
     else if ((mm = sub.match(/^workforce\/timesheets\/(.+)$/))) { html = pageTimesheet(u, p, mm[1]); title = "Timesheet"; }
@@ -135,6 +141,38 @@ function render() {
   document.getElementById("root").innerHTML = out.html;
   document.title = `${out.title} · BuildOS`;
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
+  afterChatRender();
+}
+
+// ---- open chat: keep it scrolled to the newest message, mark it read, and check for new messages every 4 s
+let chatTimer = null;
+function afterChatRender() {
+  const list = document.getElementById("chat-list");
+  clearInterval(chatTimer); chatTimer = null;
+  if (!list || !DB) return;
+  const pid = list.dataset.chat;
+  list.scrollTop = list.scrollHeight;
+  markRead(pid);
+  chatTimer = setInterval(async () => {
+    if (document.visibilityState !== "visible") return;
+    try {
+      if (!(await pollMessages(pid))) return;
+      const cur = document.getElementById("chat-list");
+      if (!cur || cur.dataset.chat !== pid) return;
+      cur.outerHTML = chatList(currentUser(), pid);
+      document.getElementById("chat-list").scrollTop = 1e9;
+      markRead(pid);
+    } catch { /* try again next tick */ }
+  }, 4000);
+}
+/** Opening a chat counts as reading it, so its unread badge clears on this render. */
+function markReadLocal(pid) {
+  const now = new Date().toISOString(), r = DB.chatReads.find((x) => x.projectId === pid);
+  if (r) r.readAt = now; else DB.chatReads.push({ projectId: pid, userId: SESSION.user.id, readAt: now });
+}
+async function markRead(pid) {
+  markReadLocal(pid);
+  try { await rpc("mark_chat_read", { p_project: pid }); } catch { /* not important */ }
 }
 window.addEventListener("hashchange", async () => {
   render();
@@ -371,6 +409,31 @@ const ACTIONS = {
     const s = DB.swms.find((x) => x.id === f(fd, "swmsId"));
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
+  // ---- team chat, phone tasks, site notes
+  async postMessage(fd, u, el) {
+    const pid = f(fd, "project"), input = el.querySelector("[name=photos]");
+    if (!f(fd, "body") && !input?.files?.length) throw new RuleError("Write a message or add a photo.");
+    const photos = await uploadPhotos(input, 4);
+    await rpc("post_message", { p_project: pid, p_body: f(fd, "body"), p_photos: photos });
+    await pollMessages(pid);
+    return { msg: "Sent.", noReload: true, quiet: true, focus: "[name=body]" };
+  },
+  async createSiteTask(fd) {
+    return (await rpc("create_site_task", { p_project: f(fd, "project"), p: Object.fromEntries(["title", "assignee_id", "due_date", "photos_required", "details", "defect_id", "itp_point_id"].map((k) => [k, f(fd, k)])) })).message;
+  },
+  async taskDone(fd, u, el) {
+    const t = DB.siteTasks.find((x) => x.id === f(fd, "task")), input = el.querySelector("[name=photos]");
+    if ((input?.files?.length || 0) < t.photosRequired) throw new RuleError(`Add at least ${t.photosRequired} photo${t.photosRequired > 1 ? "s" : ""} of the finished work.`);
+    const photos = await uploadPhotos(input, 10);
+    return (await rpc("site_task_action", { p_task: t.id, p_action: "submit", p: { note: f(fd, "note"), photos } })).message;
+  },
+  async taskCheck(fd) { return (await rpc("site_task_action", { p_task: f(fd, "task"), p_action: f(fd, "action"), p: { note: f(fd, "note") } })).message; },
+  async sendSiteNote(fd, u, el) {
+    if (!f(fd, "body")) throw new RuleError("Write what happened on site.");
+    const photos = await uploadPhotos(el.querySelector("[name=photos]"), 6);
+    return (await rpc("send_site_note", { p_project: f(fd, "project"), p_body: f(fd, "body"), p_photos: photos })).message;
+  },
+  async siteNote(fd) { return (await rpc("site_note_action", { p_note: f(fd, "note"), p_action: f(fd, "action") })).message; },
   // ---- timesheets & rates
   async createTimesheet(fd, u, el) {
     // The site app form has no billable box: workers' hours are billable unless the office says otherwise.
@@ -490,10 +553,11 @@ document.addEventListener("submit", async (e) => {
     const res = typeof r === "string" ? { msg: r } : r;
     if (res.stay) { el.innerHTML = `<div class="notice notice-ok">${icon("checkcircle")}<span>${esc(res.msg)}</span></div>`; return; }
     if (!res.noReload) await refresh();
-    toast(res.msg);
+    if (!res.quiet) toast(res.msg);
     const keep = el.closest("tr")?.id;
     if (res.go) go(res.go);
     else { pendingScroll = keep || null; const y = window.scrollY; render(); if (!keep) window.scrollTo(0, y); }
+    if (res.focus) document.querySelector(res.focus)?.focus();
   } catch (err) {
     buttons.forEach((b) => (b.disabled = false));
     if (sub) sub.innerHTML = label;
@@ -544,6 +608,7 @@ document.addEventListener("change", async (e) => {
     const { path } = parseRoute(), cur = path.match(/^\/app\/projects\/([^/]+)(\/[^/]+)?/);
     go(el.value ? `/app/projects/${el.value}${cur?.[2] && !/defects|itp|new/.test(path) ? cur[2] : ""}` : "/app");
   }
+  if (el.matches("[data-count-files]")) { const box = el.closest("form").querySelector("[data-file-count]"); if (box) box.textContent = el.files.length ? `${el.files.length} photo${el.files.length > 1 ? "s" : ""} attached` : ""; return; }
   if (el.matches("[data-check-all]")) { el.closest("form").querySelectorAll("input[name=ids]").forEach((c) => (c.checked = el.checked)); return; }
   if (el.matches("[data-doc-number]")) {
     // Typing an existing number fills in its title and category.

@@ -61,7 +61,7 @@ const ganttKey = (crit = false) => `<div class="row wrap small muted" style="gap
 
 // ===================================================== internal app shell
 const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/people", "People & contractors", "users"], ["#/app/timesheets", "Timesheets", "clock", false, null, "timesheet.approve"], ["#/app/rates", "Rates", "dollar", false, null, "rates.manage"], ["#/app/templates", "ITP templates", "clipboard"], ["#/app/reports", "Reports", "chart"]];
-const projectNav = (id, money) => { const b = `#/app/projects/${id}`; return [[b, "Overview", "home", true], [`${b}/programme`, "Programme", "calendar"], [`${b}/quality`, "Quality", "clipboard", false, "defects"], [`${b}/safety`, "Safety", "shield"], [`${b}/workforce`, "Workforce & time", "hardhat"], [`${b}/documents`, "Documents", "file"], ...(money ? [[`${b}/commercial`, "Commercial", "dollar"]] : []), [`${b}/diary`, "Site diary", "notebook"], [`${b}/reports`, "Reports", "chart"], [`${b}/handover`, "Handover", "package"]]; };
+const projectNav = (id, money) => { const b = `#/app/projects/${id}`; return [[b, "Overview", "home", true], [`${b}/programme`, "Programme", "calendar"], [`${b}/quality`, "Quality", "clipboard", false, "defects"], [`${b}/safety`, "Safety", "shield"], [`${b}/workforce`, "Workforce & time", "hardhat"], [`${b}/chat`, "Team chat", "users", false, "chat"], [`${b}/from-site`, "From site", "phone", false, "fromSite"], [`${b}/documents`, "Documents", "file"], ...(money ? [[`${b}/commercial`, "Commercial", "dollar"]] : []), [`${b}/diary`, "Site diary", "notebook"], [`${b}/reports`, "Reports", "chart"], [`${b}/handover`, "Handover", "package"]]; };
 const isActive = (cur, href, exact) => { const h = href.slice(1); return exact ? cur === h : cur === h || cur.startsWith(h + "/"); };
 function navLink([href, label, ic, exact, countKey], cur, counts) {
   const c = countKey ? counts[countKey] : 0;
@@ -70,11 +70,12 @@ function navLink([href, label, ic, exact, countKey], cur, counts) {
 function appShell(u, route, inner) {
   const projects = listProjects(u), pid = route.match(/^\/app\/projects\/([^/?]+)/)?.[1];
   const project = projects.find((p) => p.id === pid);
-  const counts = { tasks: myTasks(u).length, defects: project ? openDefects(u, project.id).length : 0 };
+  const counts = { tasks: myTasks(u).length, defects: project ? openDefects(u, project.id).length : 0, chat: project ? unreadCount(u, project.id) : 0,
+    fromSite: project ? DB.siteTasks.filter((t) => t.projectId === project.id && canCheckTask(u, t)).length + (can(u, "diary.submit") ? DB.siteNotes.filter((n) => n.projectId === project.id && n.status === "pending").length : 0) : 0 };
   const side = project
     ? `<a class="nav" href="#/app" title="Company overview">${icon("arrowleft", 16)}<span class="nav-text small">Company overview</span></a>
        <div class="proj-card"><div class="label">Project</div><div style="color:#fff;font-weight:600;font-size:13.5px">${esc(project.name)}</div><div class="mono" style="font-size:11.5px;color:#8fa59b">${project.code}</div></div>
-       ${projectNav(project.id, can(u, "commercial.view")).map((n) => navLink(n, route, counts)).join("")}
+       ${projectNav(project.id, can(u, "commercial.view")).filter((n) => !n[0].endsWith("/from-site") || can(u, "task.assign") || can(u, "diary.submit")).map((n) => navLink(n, route, counts)).join("")}
        <div class="bottom"><a class="nav" href="#/app/settings" title="Settings">${icon("settings", 17)}<span class="nav-text">Project settings</span></a></div>`
     : `<div class="nav-label">Company</div>${companyNav.filter((n) => !n[5] || can(u, n[5])).map((n) => navLink(n, route, counts)).join("")}
        <div class="nav-label">Recent projects</div>${projects.map((p) => `<a class="nav" href="#/app/projects/${p.id}" title="${esc(p.name)}"><span class="recent-dot"></span><span class="nav-text">${esc(p.name)}</span></a>`).join("")}
@@ -334,7 +335,7 @@ function pageDefect(u, p, id) {
         <li><span class="dot"></span><div><b style="font-weight:600">Defect raised</b> by ${esc(userById(d.raisedBy)?.name)} · <span class="muted">${dateTime(d.raisedAt)}</span></div></li>
       </ul></div></section>
     </div>
-    <aside class="stack-lg">${panels.join("")}</aside>
+    <aside class="stack-lg">${panels.join("")}${d.status !== "closed" ? sendToPhone(u, p, { defect: d.id, title: `Fix ${d.ref} · ${d.title}`, photos: true }) : ""}</aside>
   </div>`;
 }
 
@@ -367,6 +368,7 @@ function pointCard(u, itp, pt, n) {
     ${pt.status === "submitted" && pt.requiredSignoffs > 1 ? `<div class="small"><b>${approvals.length} of ${pt.requiredSignoffs}</b> sign-offs${approvals.length ? ` — ${approvals.map((x) => esc(userById(x.userId)?.name ?? "—")).join(", ")}` : ""}</div>` : ""}
     ${pt.status === "released" ? `<div class="small green-text">${icon("check", 13)} Released by ${esc(userById(pt.releasedBy)?.name ?? "—")}${pt.releasedAt ? ` · ${dateTime(pt.releasedAt)}` : ""}${pt.requiredSignoffs > 1 ? ` (${approvals.map((x) => esc(userById(x.userId)?.name ?? "—")).join(" + ")})` : ""}</div>` : ""}
     ${action}
+    ${pt.status === "pending" || pt.status === "rejected" ? (() => { const p = DB.projects.find((x) => x.id === itp.projectId); return can(u, "task.assign") ? `<details class="no-print"><summary class="link small" style="cursor:pointer">${icon("phone", 13)} Send to someone's phone</summary><div style="margin-top:10px">${taskForm(u, p, { point: pt.id, title: `Complete ${itp.ref} · ${pt.name}`, photos: pt.evidenceRequired > 0 })}</div></details>` : ""; })() : ""}
   </div></section>`;
 }
 
@@ -1062,6 +1064,116 @@ function siteHours(u, p, w) {
     <details class="card card-pad"><summary class="link" style="cursor:pointer;font-size:15px">+ Log hours</summary><div style="margin-top:12px">${form("createTimesheet", `${hidden("project", p.id)}${tsFields(u, p, null, { worker: w.id, mobile: true })}<button class="btn btn-primary btn-lg btn-block" style="margin-top:12px">Send for approval</button>`)}</div></details>`;
 }
 
+// ===================================================== team chat, phone tasks, site notes
+const photoStrip = (paths) => paths.length ? `<div class="row wrap" style="gap:6px;margin-top:6px">${paths.map((x) => DB.photoUrls[x] ? `<a href="${DB.photoUrls[x]}" target="_blank" rel="noopener" class="thumb" style="background-image:url('${DB.photoUrls[x]}')" aria-label="Open photo"></a>` : '<span class="thumb"></span>').join("")}</div>` : "";
+const dayLabel = (iso) => { const d = ymd(new Date(iso)); return d === todayYmd() ? "Today" : d === addDays(todayYmd(), -1) ? "Yesterday" : D(d).toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "short" }); };
+
+function chatList(u, pid) {
+  const list = chatFor(pid).slice(-200);
+  let day = "";
+  return `<div class="chat-list" id="chat-list" data-chat="${pid}" aria-live="polite">${list.map((m) => {
+    const sep = dayLabel(m.createdAt) !== day ? `<div class="chat-day">${(day = dayLabel(m.createdAt))}</div>` : "";
+    const who = userById(m.authorId)?.name ?? "Someone";
+    if (m.kind === "event") return `${sep}<div class="chat-event">${icon("listchecks", 13)} <b>${esc(who)}</b> ${esc(m.body)} · ${timeOf(m.createdAt)}</div>`;
+    const mine = m.authorId === u.id;
+    return `${sep}<div class="chat-msg${mine ? " mine" : ""}"><div class="chat-meta">${mine ? "You" : esc(who)} · ${timeOf(m.createdAt)}</div>${m.body ? `<div class="chat-body">${esc(m.body)}</div>` : ""}${photoStrip(m.photos)}</div>`;
+  }).join("") || '<p class="muted small" style="text-align:center;padding:30px 0">No messages yet. Say hello to the team.</p>'}</div>`;
+}
+const chatComposer = (pid) => form("postMessage", `${hidden("project", pid)}<div class="chat-compose"><label class="icon-btn" title="Add photos" style="cursor:pointer">${icon("camera", 18)}<input type="file" name="photos" accept="image/*" multiple class="sr-only" data-count-files></label><textarea name="body" class="input" rows="1" placeholder="Message the team" aria-label="Message"></textarea><button class="btn btn-primary">Send</button></div><div class="small muted" data-file-count></div>`);
+
+function taskForm(u, p, link = {}) {
+  const people = DB.users.filter((x) => x.id !== u.id).sort((a, b) => a.name.localeCompare(b.name));
+  return form("createSiteTask", `${hidden("project", p.id)}${hidden("defect_id", link.defect ?? "")}${hidden("itp_point_id", link.point ?? "")}<div class="form-grid">
+    ${field("What needs doing?", `<input name="title" class="input" value="${esc(link.title ?? "")}" placeholder="e.g. Clean up L2 slab edge">`, "full")}
+    ${field("Give it to", `<select name="assignee_id" class="input"><option value="">Choose…</option>${people.map((x) => `<option value="${x.id}">${esc(x.name)} · ${ROLE_LABEL[x.role]}</option>`).join("")}</select>`)}
+    ${field("Due", `<input name="due_date" type="date" class="input" min="${todayYmd()}">`)}
+    ${field("Photos needed when done", `<select name="photos_required" class="input"><option value="0">None</option><option value="1"${link.photos ? " selected" : ""}>At least 1</option><option value="2">At least 2</option><option value="3">At least 3</option></select>`)}
+    ${field("Details", `<input name="details" class="input">`)}
+  </div><div style="margin-top:12px"><button class="btn btn-primary">Send to their phone</button></div>`);
+}
+const sendToPhone = (u, p, link) => can(u, "task.assign") ? `<section class="card card-pad no-print"><details><summary class="link" style="cursor:pointer">${icon("phone", 14)} Send to someone's phone</summary><div style="margin-top:12px">${taskForm(u, p, link)}</div></details></section>` : "";
+
+function taskRow(u, t, { done = false } = {}) {
+  const link = taskLink(t), late = t.status === "open" && t.dueDate && t.dueDate < todayYmd();
+  return `<div class="task-card${late ? " late" : ""}"><div class="row" style="gap:8px;align-items:flex-start"><span class="mono small muted">${esc(t.ref)}</span><b style="flex:1">${esc(t.title)}</b>${badge(t.status === "submitted" ? "in_review" : t.status === "accepted" ? "complete" : t.status === "cancelled" ? "superseded" : late ? "overdue" : "open", t.status === "submitted" ? "Done — to check" : t.status === "cancelled" ? "Cancelled" : null)}</div>
+    <div class="small muted">${esc(projName(t.projectId))} · for ${esc(userById(t.assigneeId)?.name ?? "—")} · from ${esc(userById(t.createdBy)?.name ?? "—")}${t.dueDate ? ` · due ${dayMonth(t.dueDate)}` : ""}${t.photosRequired ? ` · ${t.photosRequired} photo${t.photosRequired > 1 ? "s" : ""} needed` : ""}</div>
+    ${t.details ? `<p class="small" style="margin-top:4px">${esc(t.details)}</p>` : ""}${link ? `<a class="link small" href="${link[0]}">Open ${esc(link[1])}</a>` : ""}
+    ${t.status === "open" && t.sentBack && t.reviewNote ? `<div class="notice notice-warn small" style="margin-top:8px">${icon("rotate", 14)}<span>Sent back by ${esc(userById(t.reviewedBy)?.name ?? "")}: ${esc(t.reviewNote)}</span></div>` : ""}
+    ${t.submitNote ? `<p class="small" style="margin-top:6px"><span class="muted">Done:</span> ${esc(t.submitNote)}</p>` : ""}${t.status !== "open" ? photoStrip(t.evidence) : ""}
+    ${!done && t.status === "open" && t.assigneeId === u.id ? `<details style="margin-top:10px"><summary class="btn btn-primary btn-block" style="list-style:none;justify-content:center">Mark done</summary><div style="margin-top:10px">${form("taskDone", `${hidden("task", t.id)}<div class="stack">${field("What did you do?", '<textarea name="note" class="input"></textarea>')}${field(`Photos${t.photosRequired ? ` <span class="req">(at least ${t.photosRequired})</span>` : ""}`, '<input type="file" name="photos" accept="image/*" multiple capture="environment" class="input" style="padding:8px">')}<button class="btn btn-primary btn-lg btn-block">Send for checking</button></div>`)}</div></details>` : ""}
+    ${!done && canCheckTask(u, t) ? form("taskCheck", `${hidden("task", t.id)}<div class="row wrap" style="gap:6px;margin-top:10px"><button class="btn btn-primary btn-sm" name="action" value="accept">Accept</button><input name="note" class="input" placeholder="What still needs doing?" style="height:30px;flex:1;min-width:160px" aria-label="Send back note"><button class="btn btn-sm" name="action" value="send_back">Send back</button></div>`) : ""}
+  </div>`;
+}
+
+function pageProjectChat(u, p) {
+  const tasks = DB.siteTasks.filter((t) => t.projectId === p.id && (t.status === "open" || t.status === "submitted"));
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Team chat &amp; tasks", meta: `<span>Everyone in ${esc(DB.org.name)} can read this chat. Photos and tasks show on phones in the site app.</span>` })}
+  <div class="cc-grid"><section class="card chat-card"><div class="card-head"><h2>Chat</h2></div>${chatList(u, p.id)}${chatComposer(p.id)}</section>
+  <aside class="stack-lg"><section class="card card-pad" id="tasks"><div class="row" style="margin-bottom:10px"><h2>Open tasks</h2><span class="spacer"></span><span class="small muted">${tasks.length}</span></div>
+    <div class="stack" style="gap:10px">${tasks.map((t) => taskRow(u, t)).join("") || '<p class="small muted">No open tasks.</p>'}</div></section>
+    ${can(u, "task.assign") ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Give someone a task</h2>${taskForm(u, p)}</section>` : ""}
+  </aside></div>`;
+}
+
+function pageFromSite(u, p) {
+  if (!can(u, "task.assign") && !can(u, "diary.submit")) return notFound();
+  const tasks = DB.siteTasks.filter((t) => t.projectId === p.id && t.status === "submitted"), notes = DB.siteNotes.filter((n) => n.projectId === p.id && n.status === "pending");
+  const hours = DB.timesheets.filter((t) => t.projectId === p.id && t.status === "pending" && t.source === "site_app");
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "From site", meta: "<span>Work, notes and hours sent in from phones. Check them before they go on the record.</span>" })}
+  <div class="metrics">${metric("Tasks to check", tasks.length)}${metric("Site notes", notes.length, "For the site diary")}${metric("Hours from phones", hours.length, "Pending approval")}</div>
+  <section class="card card-pad"><h2 style="margin-bottom:12px">Finished tasks to check</h2><div class="stack" style="gap:10px">${tasks.map((t) => taskRow(u, t)).join("") || '<p class="small muted">Nothing to check.</p>'}</div></section>
+  <section class="card card-pad"><h2 style="margin-bottom:12px">Site notes for the diary</h2><div class="stack" style="gap:10px">${notes.map((n) => { const late = DB.diary.some((e) => e.projectId === p.id && e.date === n.date);
+    return `<div class="task-card"><div class="small muted">${esc(userById(n.authorId)?.name ?? "")} · for ${shortDate(n.date)} · sent ${dateTime(n.createdAt)}${late ? ' · <span class="amber-text">diary already submitted — will be a late addition</span>' : ""}</div><p style="margin-top:4px">${esc(n.body)}</p>${photoStrip(n.photos)}
+      ${can(u, "diary.submit") ? form("siteNote", `${hidden("note", n.id)}<div class="row" style="gap:6px;margin-top:10px"><button class="btn btn-primary btn-sm" name="action" value="accept">Add to diary</button><button class="btn btn-sm" name="action" value="dismiss">Dismiss</button></div>`) : ""}</div>`; }).join("") || '<p class="small muted">No notes waiting.</p>'}</div></section>
+  <section class="card card-pad"><div class="row"><h2>Hours from phones</h2><span class="spacer"></span>${hours.length ? `<a class="link small" href="#/app/projects/${p.id}/workforce/timesheets?week=${weekStart(hours[0].date)}">Approve on Timesheets →</a>` : ""}</div>
+    ${hours.length ? `<p class="small" style="margin-top:8px">${hours.map((t) => `${esc(workerName(t.workerId))} ${dayMonth(t.date)} ${fmtH(t.hours)}`).join(" · ")}</p>` : '<p class="small muted" style="margin-top:8px">None pending.</p>'}</section>`;
+}
+
+/** Accepted site notes shown under that day's diary entry. */
+const diaryNotes = (pid, date) => { const ns = DB.siteNotes.filter((n) => n.projectId === pid && n.date === date && n.status === "accepted"); const e = DB.diary.find((x) => x.projectId === pid && x.date === date);
+  return ns.length ? `<div class="stack" style="gap:6px;margin-top:8px">${ns.map((n) => `<div class="site-note"><span class="small muted">Site note · ${esc(userById(n.authorId)?.name ?? "")}${e && n.reviewedAt && e.id && DB.audit.some((a) => a.recordId === e.id && a.at < n.reviewedAt) ? " · added after submission" : ""}</span><div>${esc(n.body)}</div>${photoStrip(n.photos)}</div>`).join("")}</div>` : ""; };
+
+// ---- site app: tasks, chat, contacts, diary note
+function pageSiteTasks(u, route) {
+  const p = listProjects(u)[0];
+  if (!p) return pageSiteToday(u, route);
+  const mine = DB.siteTasks.filter((t) => t.assigneeId === u.id && t.status === "open"), waiting = DB.siteTasks.filter((t) => t.assigneeId === u.id && t.status === "submitted");
+  const given = DB.siteTasks.filter((t) => t.createdBy === u.id && (t.status === "open" || t.status === "submitted")), other = myTasks(u).filter((x) => x.href !== "#/site/tasks");
+  return siteWrap(`<div class="site-top"><a href="#/site" class="link">Back</a><b>Tasks</b><span style="width:40px"></span></div><div class="site-body">
+    <div class="label">To do (${mine.length})</div><div class="stack" style="gap:10px">${mine.map((t) => taskRow(u, t)).join("") || '<p class="muted small">Nothing to do right now.</p>'}</div>
+    ${waiting.length ? `<div class="label">Waiting for a check</div><div class="stack" style="gap:10px">${waiting.map((t) => taskRow(u, t, { done: true })).join("")}</div>` : ""}
+    ${given.length ? `<div class="label">Tasks you gave</div><div class="stack" style="gap:10px">${given.map((t) => taskRow(u, t)).join("")}</div>` : ""}
+    ${can(u, "task.assign") ? `<details class="card card-pad"><summary class="link" style="cursor:pointer;font-size:15px">+ Give someone a task</summary><div style="margin-top:12px">${taskForm(u, p)}</div></details>` : ""}
+    ${other.length ? `<a class="btn btn-lg btn-block" href="#/app/tasks">${other.length} other thing${other.length > 1 ? "s" : ""} waiting on you</a>` : ""}
+  </div>${siteTabs(route)}`);
+}
+function pageSiteChat(u, route) {
+  const p = listProjects(u)[0];
+  if (!p) return pageSiteToday(u, route);
+  return siteWrap(`<div class="site-top"><a href="#/site" class="link">Back</a><b>${esc(p.name)} chat</b><span style="width:40px"></span></div><div class="site-body site-chat">${chatList(u, p.id)}${chatComposer(p.id)}</div>${siteTabs(route)}`);
+}
+function pageSiteContacts(u, route) {
+  const tel = (n) => (n ? `<a class="btn btn-sm" href="tel:${esc(n.replace(/[^\d+]/g, ""))}">${icon("phone", 14)} Call</a>` : "");
+  const team = DB.users.filter((x) => x.id !== u.id && x.role !== "worker").sort((a, b) => a.name.localeCompare(b.name));
+  const crews = DB.workers.filter((w) => w.phone).sort((a, b) => a.name.localeCompare(b.name));
+  const li = (name, sub, phone, email) => `<div class="li" style="justify-content:space-between;gap:10px"><span><b style="display:block;font-size:15px">${esc(name)}</b><span class="muted small">${esc(sub)}</span></span><span class="row" style="gap:6px">${tel(phone)}${email ? `<a class="btn btn-sm" href="mailto:${esc(email)}">Email</a>` : ""}</span></div>`;
+  return siteWrap(`<div class="site-top"><a href="#/site" class="link">Back</a><b>Contacts</b><span style="width:40px"></span></div><div class="site-body">
+    <div class="label">${esc(DB.org.name)} team</div><div class="list-card">${team.map((x) => li(x.name, `${ROLE_LABEL[x.role]}${x.title ? ` · ${x.title}` : ""}`, x.phone, x.email)).join("") || '<div class="li muted">No one else yet.</div>'}</div>
+    ${crews.length ? `<div class="label">Crew</div><div class="list-card">${crews.map((w) => li(w.name, contractorOf(w.contractorId)?.tradingName ?? "", w.phone)).join("")}</div>` : ""}
+    <p class="small muted">Add your mobile under <a class="link" href="#/app/profile">My profile</a> so the team can call you.</p>
+  </div>${siteTabs(route)}`);
+}
+function pageSiteNote(u, route) {
+  const p = listProjects(u)[0];
+  if (!p) return pageSiteToday(u, route);
+  const mine = DB.siteNotes.filter((n) => n.authorId === u.id).slice(0, 5);
+  return siteWrap(`<div class="site-top"><a href="#/site" class="link">Back</a><b>Note for the diary</b><span style="width:40px"></span></div><div class="site-body">
+    ${form("sendSiteNote", `${hidden("project", p.id)}<div class="stack">${field("What happened on site?", '<textarea name="body" class="input" rows="4" placeholder="e.g. Crane stood down 10–11 am for wind"></textarea>')}${field("Photos", '<input type="file" name="photos" accept="image/*" multiple capture="environment" class="input" style="padding:8px">')}<button class="btn btn-primary btn-lg btn-block">Send to the site diary</button></div>`)}
+    <p class="small muted">A supervisor checks notes before they go into the day's diary.</p>
+    ${mine.length ? `<div class="label">Your recent notes</div><div class="list-card">${mine.map((n) => `<div class="li" style="justify-content:space-between;gap:10px"><span class="small">${esc(n.body)}</span>${badge(n.status === "accepted" ? "approved" : n.status === "dismissed" ? "superseded" : "pending", n.status === "accepted" ? "In diary" : n.status === "dismissed" ? "Dismissed" : "Waiting")}</div>`).join("")}</div>` : ""}
+  </div>${siteTabs(route)}`);
+}
+
 function pageWorkforce(u, p) {
   const base = `#/app/projects/${p.id}`, here = onSiteNow(p.id), hereIds = new Set(here.map((e) => e.workerId)), office = can(u, "attendance.manage");
   const workers = DB.workers.filter((w) => w.inductedProjectIds.includes(p.id) || hereIds.has(w.id) || DB.tasks.some((t) => t.projectId === p.id && t.contractorId === w.contractorId));
@@ -1169,9 +1281,9 @@ function pageDiary(u, p) {
     : `<p class="muted">Only the site team can submit the diary.</p>`;
   return `${pageHeader({ crumbs: crumbsFor(p), title: "Site diary", meta: `<span>${longToday()}</span>` })}
   <div class="po-grid">
-    <section class="card card-pad"><h2 style="margin-bottom:4px">Today</h2><p class="muted small" style="margin-bottom:14px">Pulled in automatically: <b>${onSiteNow(p.id).length} workers</b> checked in, <b>${insp}</b> inspection sign-offs today.</p>${formHtml}</section>
+    <section class="card card-pad"><h2 style="margin-bottom:4px">Today</h2><p class="muted small" style="margin-bottom:14px">Pulled in automatically: <b>${onSiteNow(p.id).length} workers</b> checked in, <b>${insp}</b> inspection sign-offs today.</p>${(() => { const n = DB.siteNotes.filter((x) => x.projectId === p.id && x.status === "pending").length; return n && can(u, "diary.submit") ? `<div class="notice notice-info">${icon("phone")}<span>${n} site note${n > 1 ? "s" : ""} from phones waiting. <a class="link" href="#/app/projects/${p.id}/from-site">Review them</a></span></div>` : ""; })()}${done ? "" : diaryNotes(p.id, todayYmd())}${formHtml}</section>
     <section class="card"><div class="card-head"><h2>Previous entries</h2></div><div class="card-body stack">
-      ${entries.map((e) => `<div style="border-bottom:1px solid var(--border);padding-bottom:12px"><div class="row wrap small muted" style="gap:12px"><b style="color:var(--ink)">${shortDate(e.date)}</b><span>${esc(e.weather)}</span><span>${e.workersOnSite} workers · ${e.companiesOnSite} companies</span>${badge("submitted")}</div><p style="margin-top:6px">${esc(e.notes)}</p>${e.delays ? `<p class="small amber-text" style="margin-top:4px">Delay: ${esc(e.delays)}</p>` : ""}<p class="small muted" style="margin-top:4px">By ${esc(userById(e.authorId)?.name)}</p></div>`).join("") || '<p class="muted">No entries yet.</p>'}
+      ${entries.map((e) => `<div style="border-bottom:1px solid var(--border);padding-bottom:12px"><div class="row wrap small muted" style="gap:12px"><b style="color:var(--ink)">${shortDate(e.date)}</b><span>${esc(e.weather)}</span><span>${e.workersOnSite} workers · ${e.companiesOnSite} companies</span>${badge("submitted")}</div><p style="margin-top:6px">${esc(e.notes)}</p>${e.delays ? `<p class="small amber-text" style="margin-top:4px">Delay: ${esc(e.delays)}</p>` : ""}${diaryNotes(p.id, e.date)}<p class="small muted" style="margin-top:4px">By ${esc(userById(e.authorId)?.name)}</p></div>`).join("") || '<p class="muted">No entries yet.</p>'}
     </div></section>
   </div>`;
 }
@@ -1301,7 +1413,7 @@ function pageNewProject(u) {
 const notFound = (msg = "That page or record doesn't exist, or your role can't see it.") => `<section class="card">${emptyState("search", "Not found", msg, '<a class="btn" href="#/app">Back to overview</a>')}</section>`;
 
 // ===================================================== mobile site app
-const siteTabs = (route) => { const fp = DB.projects[0]; const t = (h, l, ic) => `<a href="${h}"${route === h.slice(1) ? ' aria-current="page"' : ""}>${icon(ic, 21)}${l}</a>`; return `<nav class="site-tabs" aria-label="Site app">${t("#/site", "Today", "calendar")}${t("#/app/tasks", "Tasks", "listchecks")}<a href="#/site/defect" aria-label="Raise defect"><span class="fab">${icon("plus", 26)}</span></a>${t("#/site/drawings", "Drawings", "file")}${t("#/site/sign-in", "Me", "user")}</nav>`; };
+const siteTabs = (route) => { const fp = DB.projects[0]; const t = (h, l, ic) => `<a href="${h}"${route === h.slice(1) ? ' aria-current="page"' : ""}>${icon(ic, 21)}${l}</a>`; return `<nav class="site-tabs" aria-label="Site app">${t("#/site", "Today", "calendar")}${t("#/site/tasks", `Tasks${(() => { const n = DB.siteTasks.filter((x) => x.assigneeId === SESSION?.user.id && x.status === "open").length; return n ? ` <i class="tab-n">${n}</i>` : ""; })()}`, "listchecks")}<a href="#/site/defect" aria-label="Raise defect"><span class="fab">${icon("plus", 26)}</span></a>${t("#/site/chat", `Chat${fp && currentUser() && unreadCount(currentUser(), fp.id) ? ` <i class="tab-n">${unreadCount(currentUser(), fp.id)}</i>` : ""}`, "users")}${t("#/site/sign-in", "Me", "user")}</nav>`; };
 const siteWrap = (inner) => `<div class="site-wrap"><div class="site">${inner}</div></div>`;
 function pageSiteToday(u, route) {
   const p = listProjects(u)[0];
@@ -1313,7 +1425,7 @@ function pageSiteToday(u, route) {
     <div class="site-stats"><div><b>${onSiteNow(p.id).length}</b><span>On site</span></div><div><b>${todays.length}</b><span>Inspections</span></div><div><b style="color:#f1b56b">${overdueDefects(u, p.id).length}</b><span>Overdue</span></div></div>
   </header>
   <div class="site-body">
-    <div class="big-actions"><a href="#/site/defect" class="big-action primary">${icon("camera", 22)}Raise defect</a><a href="#/app/projects/${p.id}/quality" class="big-action">${icon("clipboard", 22)}Inspect</a><a href="#/site/sign-in" class="big-action">${icon("qr", 22)}Site sign-in</a><a href="#/app/projects/${p.id}/diary" class="big-action">${icon("notebook", 22)}Site diary</a><a href="#/app/projects/${p.id}/safety/incidents#report" class="big-action">${icon("alert", 22)}Report hazard</a>${can(u, "permit.request") ? `<a href="#/app/projects/${p.id}/safety/permits#request" class="big-action">${icon("filewarn", 22)}Request permit</a>` : ""}</div>
+    <div class="big-actions"><a href="#/site/defect" class="big-action primary">${icon("camera", 22)}Raise defect</a><a href="#/app/projects/${p.id}/quality" class="big-action">${icon("clipboard", 22)}Inspect</a><a href="#/site/sign-in" class="big-action">${icon("qr", 22)}Site sign-in</a><a href="#/app/projects/${p.id}/diary" class="big-action">${icon("notebook", 22)}Site diary</a><a href="#/site/drawings" class="big-action">${icon("file", 22)}Drawings</a><a href="#/site/note" class="big-action">${icon("notebook", 22)}Diary note</a><a href="#/site/contacts" class="big-action">${icon("phone", 22)}Contacts</a><a href="#/app/projects/${p.id}/safety/incidents#report" class="big-action">${icon("alert", 22)}Report hazard</a>${can(u, "permit.request") ? `<a href="#/app/projects/${p.id}/safety/permits#request" class="big-action">${icon("filewarn", 22)}Request permit</a>` : ""}</div>
     <div class="label">Inspections today</div>
     <div class="list-card">${todays.map(({ i, pt }) => `<a href="#/app/projects/${p.id}/quality/itp/${i.id}"><span class="li-icon" style="background:${pt.type === "hold" ? "var(--red-tint)" : "var(--blue-tint)"};color:${pt.type === "hold" ? "var(--red)" : "var(--blue)"}">${icon(pt.type === "hold" ? "lock" : "clock", 18)}</span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">${esc(pt.type === "hold" ? `${i.title.split("—")[0].trim()} ${pt.name.toLowerCase()}` : i.title.split("·")[0].trim())}</b><span class="muted small">${i.ref} · ${pt.type === "hold" ? "Hold point" : pt.type} · ${pt.status === "submitted" ? "awaiting release" : "to do"}</span></span><span class="muted">${icon("chevron", 18)}</span></a>`).join("") || '<div class="li muted">No inspections today.</div>'}</div>
   </div>${siteTabs(route)}`);
