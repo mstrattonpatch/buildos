@@ -8,7 +8,9 @@ import { handle } from "./handler.ts";
 const key = Deno.env.get("ANTHROPIC_API_KEY");
 const anthropic = key ? new Anthropic({ apiKey: key }) : null;
 const url = Deno.env.get("SUPABASE_URL")!;
-const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+// Newer projects provide publishable keys as a JSON dictionary; older ones the legacy anon key.
+const publishable = (() => { try { return Object.values(JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") || "{}"))[0] as string | undefined; } catch { return undefined; } })();
+const anonKey = publishable || Deno.env.get("SUPABASE_ANON_KEY")!;
 
 Deno.serve((req) => handle(req, {
   anthropic,
