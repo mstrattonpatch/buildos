@@ -88,6 +88,7 @@ function resolve(path, query) {
   if (path === "/app/timesheets/sheet") return { html: appShell(u, path, pageWeeklySheet(u, query)), title: "Weekly timesheet" };
   const pp = path.match(/^\/app\/people\/(workers|contractors)\/([^/]+)$/);
   if (pp) return { html: appShell(u, path, pp[1] === "workers" ? pageWorker(u, pp[2]) : pageContractor(u, pp[2])), title: pp[1] === "workers" ? "Worker" : "Contractor" };
+  if (path === "/app/scan") return { html: appShell(u, path, pageScan(u)), title: "Scan a document" };
   if (path === "/app/insights") return { html: appShell(u, path, pageInsights(u, query)), title: "Insights" };
   if (path === "/app/estimates") return { html: appShell(u, path, pageEstimates(u)), title: "Estimates" };
   const em = path.match(/^\/app\/estimates\/([^/]+)(\/quote)?$/);
@@ -161,6 +162,8 @@ function render() {
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
   afterChatRender();
   afterInsightsRender();
+  afterAiRender();
+  renderHelp();
 }
 
 // ---- open chat: keep it scrolled to the newest message, mark it read, and check for new messages every 4 s
@@ -429,6 +432,7 @@ const ACTIONS = {
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
   // ---- wallets & contractor profiles
+  async setAi(fd) { return (await rpc("set_ai_enabled", { p_org: DB.org.id, p_enabled: f(fd, "enabled") === "1" })).message; },
   async addCred(fd, u, el) {
     const file = el.querySelector("[name=file]")?.files?.length ? await uploadDocumentWithInfo(el.querySelector("[name=file]")) : null;
     return (await rpc("add_credential", { p_worker: f(fd, "worker"), p: { type: f(fd, "type"), number: f(fd, "number"), issuer: f(fd, "issuer"), expires: f(fd, "expires"), file_path: file?.path ?? "", sighted: fd.get("sighted") === "on", method: f(fd, "method") } })).message;

@@ -14,6 +14,8 @@ GitHub Pages (static files)          Supabase (Sydney)
   app/index.html  ──supabase-js──▶     Auth: accounts, passwords, sessions
   app/js/*.js                          Postgres: all records + security rules
                                        Storage: private "photos" bucket
+                                       Edge Function "ai" ──▶ Claude API
+                                         (holds the AI key as a secret)
 ```
 
 - **Security lives in the database.** Every table has Row Level Security: people only read their own company's rows, subcontractors only see their own company's defects and workers, and only commercial roles see variations, budgets and claims. Nothing is written to tables directly — every change goes through a database function (`supabase/migrations/…`) that checks the role, validates the workflow step and writes an audit event.
@@ -30,7 +32,9 @@ app/js/core.js                     helpers, display rules, sample dataset
 app/js/data.js                     loading data, calling database functions, photo upload
 app/js/pages.js, auth.js, main.js  screens, sign-in, routing and actions
 app/styles.css                     design system
+app/js/ai.js                       Read with AI, Scan a document, help chat
 supabase/migrations/               database schema, security rules, workflow functions
+supabase/functions/ai/             Edge Function that calls the AI (the key never reaches the browser)
 ```
 
 ## First-time setup checklist (Supabase dashboard)
@@ -38,6 +42,7 @@ supabase/migrations/               database schema, security rules, workflow fun
 1. **Authentication → URL Configuration:** set *Site URL* to `https://mstrattonpatch.github.io/buildos/app/` and add the same address under *Redirect URLs*. Email confirmation and password-reset links use this.
 2. **Authentication → Sign In / Providers → Email:** keep *Confirm email* on for real use. Supabase's built-in email sender only sends a few emails per hour — set up custom SMTP before inviting many people.
 3. Check the migration ran: **Database → Tables** should list `projects`, `defects` and so on.
+4. **AI help** (optional): see *AI help* below to add the key and deploy the function.
 
 ## Programme
 
@@ -138,6 +143,21 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - If the server refuses something when it's sent (for example, the diary was already submitted), it stays in the Outbox with the reason — nothing is silently lost. Defects can't be duplicated by a retry.
 - **Approvals never work offline** — releasing a hold point, approving a permit, timesheet, bill or claim needs a live permission check, so the app says so instead of pretending it's saved.
 - **Signing out deletes everything** this account stored on the device (with a warning if anything hasn't been sent yet).
+
+## AI help
+
+- **Read with AI** on receipts, bills, credentials, insurance certificates, company documents and drawings: choose the file, press the button, and the details it can read are filled in and highlighted. Nothing is saved until the person checks the values and presses save. It also warns about expired tickets, a document that's the wrong kind, a supplier that isn't set up yet, and anything it wasn't sure of.
+- **Scan a document** (*Company → Scan a document*): upload any of those documents, check what was read, pick the project, worker or company (matched for you where possible), and the right form opens with the details and the file filled in.
+- **Help** (button at the bottom right of every page): ask how to do something and get short steps with links to the right page. It knows the pages, the person's role and their projects. It can't see or change records.
+- **Limits and records:** 40 documents and 80 questions per person per hour, 1,000 calls per company per day; every call is logged (*Team & roles → AI help* shows the last 30 days). Directors and PMs can switch AI help off for the company.
+- **Privacy:** files go to the AI service to be read and aren't stored there; they're only saved in BuildOS when the form is saved.
+
+**Setting it up (once):**
+
+1. Get an API key from https://console.anthropic.com → *API keys* (it starts with `sk-ant-api…`). Add billing credit there.
+2. In Supabase: **Edge Functions → Secrets → Add new secret**, name `ANTHROPIC_API_KEY`, value = the key. Never put the key in this repository or the app's files — the repository is public.
+3. Deploy the function: either the Supabase CLI (`supabase login`, `supabase link --project-ref <your ref>`, `supabase functions deploy ai`) or **Edge Functions → Deploy a new function → Via editor**, name it `ai`, and paste in `supabase/functions/ai/index.ts`, `handler.ts`, `guide.ts` and `deno.json`.
+4. Open the app, press **Help** and ask a question. If it says AI isn't set up, the secret is missing; if it says the key isn't valid, re-check the key. If every call says "Please sign in again", turn off *Verify JWT* in the function's settings (the function checks the sign-in itself).
 
 ## Roles
 

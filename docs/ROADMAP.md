@@ -30,6 +30,7 @@ the extras are added.
 | Reports & handover | Weekly site, client progress, cost, quality and diary pack reports with internal/client views; handover readiness, printable pack, defects liability period |
 | Worker wallets & contractor profiles | Credential verification workflow, project site requirements, no-account self-service links for workers and contractors, contractor profiles with insurances, documents and performance |
 | Insights & dashboards | Charts in overviews and reports; interactive Insights page with slicers, cross-filtering, what-if and live refresh |
+| AI help | Read with AI on receipts, bills, credentials, insurances, company documents and drawings; Scan a document; help chat that knows the pages and the person's role; per-person limits, usage log, company on/off switch |
 | Offline site work | Service worker, encrypted offline snapshot and outbox for site records, sync status and Outbox, approvals blocked offline, wipe on sign-out |
 | Variations (basic), claims register, budget view, site diary, sign-in | |
 
@@ -37,7 +38,7 @@ the extras are added.
 
 - **Notification & automation engine** (blueprint §12) — rules with triggers, conditions, recipients and frequency limits; reminders and escalations by email; saved report views.
 
-1. **AI features** (needs an Anthropic API key in Supabase secrets, called from an Edge Function — never from the browser) — invoice/receipt reading, estimate document review, subcontractor ITP conversion, diary drafting, report writing, Ask Claude.
+- **More AI** (same Edge Function) — estimate document review, subcontractor ITP conversion, SWMS hazard extraction, diary drafting, report writing.
 
 Also from the earlier build, folded into the steps above: programme phases with
 drag-to-edit bars, short-term (look-ahead) programme, delays and EOT notices,

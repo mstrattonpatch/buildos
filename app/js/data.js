@@ -66,7 +66,7 @@ async function loadCompany(orgId) {
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
     "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads", "contract_items", "purchase_orders", "bills", "receipts", "internal_charges", "backcharges", "estimates", "estimate_items", "estimate_quotes", "assemblies", "handovers", "contractor_docs", "project_requirements", "portal_links",
   ];
-  const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, ...rows] = await Promise.all([
+  const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, aiUsage, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
     sb.from("profiles").select("*"),
     selectAll("attendance", (q) => q.gte("at", twoDaysAgo)),
@@ -76,6 +76,7 @@ async function loadCompany(orgId) {
     selectAll("messages", (q) => q.order("created_at", { ascending: false }).limit(500)),
     selectAll("site_notes", (q) => q.gte("date", ymd(new Date(Date.now() - 30 * 86400000)))),
     selectAll("visitors", (q) => q.gte("signed_in_at", new Date(Date.now() - 14 * 86400000).toISOString()).order("signed_in_at", { ascending: false })),
+    selectAll("ai_usage", (q) => q.gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())).catch(() => []), // until the AI migration has run
     ...T.map((t) => selectAll(t)),
   ]);
   if (orgRes.error) throw new Error(friendlyError(orgRes.error));
@@ -116,6 +117,7 @@ async function loadCompany(orgId) {
     incidents: r.incidents.sort((a, b) => b.reportedAt.localeCompare(a.reportedAt)),
     toolbox: r.toolbox_talks.map((t) => ({ ...t, attendees: r.toolbox_attendees.filter((a) => a.talkId === t.id).map((a) => a.workerId) })).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)),
     visitors,
+    aiUsage,
     timesheets: timesheets.sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || "").localeCompare(b.startTime || "")),
     timesheetCosts: r.timesheet_costs,
     rateCards: r.rate_cards.sort((a, b) => a.name.localeCompare(b.name)),

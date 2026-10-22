@@ -73,12 +73,21 @@ async function loadOutbox() {
   return OUTBOX;
 }
 
-/** Send everything waiting, oldest first. A refusal from the server is kept (with the reason) for the person to see. */
-async function syncOutbox({ quiet = false } = {}) {
+/** Send everything waiting, oldest first. A refusal from the server is kept (with the reason) for the person to see.
+ *  Only one send at a time: the "online" event, the 20 s timer and a second open tab can all fire together,
+ *  and two runs would send the same item twice. The flag covers this tab; the lock covers other tabs. */
+async function syncOutbox(opts = {}) {
   if (SYNCING || !navigator.onLine || !SESSION || !DB) return;
+  SYNCING = true;
+  try {
+    if (navigator.locks) await navigator.locks.request("buildos-outbox", { ifAvailable: true }, (lock) => lock && sendOutbox(opts));
+    else await sendOutbox(opts);
+  } finally { SYNCING = false; updateSyncUI(); }
+}
+async function sendOutbox({ quiet = false }) {
   const waiting = (await loadOutbox()).filter((d) => d.status !== "failed" && d.orgId === DB.org.id);
   if (!waiting.length) return;
-  SYNCING = true; updateSyncUI();
+  updateSyncUI();
   let sent = 0, failed = 0;
   for (const d of waiting) {
     try {
@@ -90,7 +99,6 @@ async function syncOutbox({ quiet = false } = {}) {
       d.status = "failed"; d.error = e.message || String(e); await idb.put(d); failed++;
     }
   }
-  SYNCING = false;
   await loadOutbox();
   if (sent) { try { await refresh(); } catch { /* shown next time */ } render(); }
   if (!quiet && (sent || failed)) toast(`${sent ? `${sent} saved item${sent > 1 ? "s" : ""} sent` : ""}${sent && failed ? " · " : ""}${failed ? `${failed} couldn't be sent — see Outbox` : ""}.`, failed ? "error" : "ok");
@@ -99,7 +107,7 @@ async function syncOutbox({ quiet = false } = {}) {
 // ---- status shown in the site app and the office top bar
 function syncText() {
   const waiting = OUTBOX.filter((d) => d.status !== "failed").length, failed = OUTBOX.filter((d) => d.status === "failed").length;
-  if (SYNCING) return ["blue", `Sending ${waiting}…`];
+  if (SYNCING && waiting) return ["blue", `Sending ${waiting}…`];
   if (failed) return ["red", `${failed} couldn't be sent`];
   if (!navigator.onLine) return ["amber", waiting ? `Offline · ${waiting} waiting to send` : SNAPSHOT_AT ? `Offline · showing data from ${timeOf(SNAPSHOT_AT)}` : "Offline"];
   if (waiting) return ["amber", `${waiting} waiting to send`];
