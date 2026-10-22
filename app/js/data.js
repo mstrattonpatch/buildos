@@ -64,6 +64,7 @@ async function loadCompany(orgId) {
   const T = [
     "memberships", "contractors", "insurances", "workers", "inductions", "credentials", "projects", "locations", "tasks",
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
+    "itp_templates", "itp_template_points", "itp_signoffs",
   ];
   const [orgRes, profRes, attendance, audit, invitations, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
@@ -92,8 +93,12 @@ async function loadCompany(orgId) {
     credentials: r.credentials,
     tasks: r.tasks.map((t) => ({ ...t, predecessorIds: t.predecessorIds || [] })),
     defects: r.defects.map((d) => ({ ...d, photos: d.photos || [], evidencePhotos: d.evidencePhotos || [] })).sort((a, b) => b.ref.localeCompare(a.ref)),
-    itps: r.itps.map((i) => ({ ...i, points: r.itp_points.filter((p) => p.itpId === i.id).sort((a, b) => a.seq - b.seq).map((p) => ({ ...p, check: p.checkText })) }))
-      .sort((a, b) => a.ref.localeCompare(b.ref)),
+    itps: r.itps.map((i) => ({ ...i, points: r.itp_points.filter((p) => p.itpId === i.id).sort((a, b) => a.seq - b.seq).map((p) => ({
+      ...p, check: p.checkText, photos: p.photos || [], requiredSignoffs: p.requiredSignoffs || 1, evidenceRequired: p.evidenceRequired || 0,
+      signoffs: r.itp_signoffs.filter((x) => x.pointId === p.id).sort((a, b) => a.at.localeCompare(b.at)),
+    })) })).sort((a, b) => a.ref.localeCompare(b.ref)),
+    itpTemplates: r.itp_templates.filter((t) => !t.archived).map((t) => ({ ...t, points: r.itp_template_points.filter((p) => p.templateId === t.id).sort((a, b) => a.seq - b.seq) }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     swms: r.swms.map((s) => ({ ...s, highRiskCategories: s.highRiskCategories || [], acknowledgedBy: r.swms_acks.filter((a) => a.swmsId === s.id).map((a) => a.workerId) })),
     documents: r.documents,
     attendance,
@@ -110,7 +115,7 @@ async function loadCompany(orgId) {
 
 // Private photos are shown through short-lived signed links.
 async function signPhotos(db) {
-  const paths = uniq(db.defects.flatMap((d) => [...d.photos, ...d.evidencePhotos]).filter((p) => p && p.startsWith(db.org.id + "/")));
+  const paths = uniq([...db.defects.flatMap((d) => [...d.photos, ...d.evidencePhotos]), ...db.itps.flatMap((i) => i.points.flatMap((p) => p.photos))].filter((p) => p && p.startsWith(db.org.id + "/")));
   if (!paths.length) return;
   const { data } = await sb.storage.from("photos").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.photoUrls[x.path] = x.signedUrl;

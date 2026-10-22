@@ -55,6 +55,9 @@ function resolve(path, query) {
     "/app/search": [(x) => pageSearch(x, query), "Search"], "/app/settings": [pageSettings, "Team & roles"], "/app/profile": [pageProfile, "My profile"],
   };
   if (company[path]) return { html: appShell(u, path, company[path][0](u)), title: company[path][1] };
+  if (path === "/app/templates") return { html: appShell(u, path, pageTemplates(u)), title: "ITP templates" };
+  const tm = path.match(/^\/app\/templates\/([^/]+)$/);
+  if (tm) return { html: appShell(u, path, pageTemplate(u, tm[1])), title: "ITP template" };
   const m = path.match(/^\/app\/projects\/([^/]+)(?:\/(.*))?$/);
   if (m) {
     const p = getProject(u, m[1]);
@@ -96,7 +99,14 @@ function render() {
   document.title = `${out.title} · BuildOS`;
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
 }
-window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", async () => {
+  render();
+  window.scrollTo(0, 0);
+  // Pick up colleagues' changes when moving between pages.
+  if (DB && Date.now() - lastLoad > 15000) {
+    try { await refresh(); if (!document.querySelector("form[data-act] :is(input, textarea, select):focus")) render(); } catch { /* keep showing what we have */ }
+  }
+});
 
 function showLoading(msg = "Loading…") {
   document.getElementById("root").innerHTML = `<div class="auth-wrap"><div class="row muted" style="gap:10px">${icon("rotate", 18, "animation:spin 1s linear infinite")} ${esc(msg)}</div></div>`;
@@ -143,6 +153,14 @@ function parseMoney(v) {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 const f = (fd, k) => String(fd.get(k) ?? "").trim();
+const templatePayload = (fd, el) => ({
+  name: f(fd, "name"), trade: f(fd, "trade"), description: f(fd, "description"),
+  points: [...el.querySelectorAll(".pt-row")].map((r) => ({
+    name: r.querySelector("[name=pt_name]").value.trim(), type: r.querySelector("[name=pt_type]").value, check_text: r.querySelector("[name=pt_check]").value.trim(),
+    evidence_required: parseInt(r.querySelector("[name=pt_photos]").value || "0", 10) || 0, measurement_label: r.querySelector("[name=pt_measure]").value.trim(),
+    required_signoffs: parseInt(r.querySelector("[name=pt_signoffs]").value, 10) || 1,
+  })).filter((p) => p.name || p.check_text),
+});
 const taskPayload = (fd) => ({
   name: f(fd, "name"), is_milestone: fd.get("is_milestone") === "on", forecast_start: f(fd, "forecast_start"), forecast_finish: f(fd, "forecast_finish"),
   trade: f(fd, "trade"), contractor_id: f(fd, "contractor_id"), predecessor_ids: fd.getAll("predecessor_ids"), itp_id: f(fd, "itp_id"), swms_id: f(fd, "swms_id"), cost_code: f(fd, "cost_code"),
@@ -244,6 +262,22 @@ const ACTIONS = {
     return { msg: r.message, go: `/app/projects/${f(fd, "project")}/programme` };
   },
   async rebaseline(fd) { return (await rpc("rebaseline_programme", { p_project: f(fd, "project"), p_reason: f(fd, "reason") })).message; },
+  // ---- ITPs
+  async loadStarters() {
+    for (const t of STARTER_TEMPLATES) await rpc("create_itp_template", { p_org: DB.org.id, p: t });
+    return `${STARTER_TEMPLATES.length} starter templates added.`;
+  },
+  async createTemplate(fd, u, el) { return (await rpc("create_itp_template", { p_org: DB.org.id, p: templatePayload(fd, el) })).message; },
+  async updateTemplate(fd, u, el) { return (await rpc("update_itp_template", { p_template: f(fd, "template"), p: templatePayload(fd, el) })).message; },
+  async archiveTemplate(fd) { const r = await rpc("archive_itp_template", { p_template: f(fd, "template") }); return { msg: r.message, go: "/app/templates" }; },
+  async applyTemplate(fd) {
+    const r = await rpc("apply_itp_template", { p_template: f(fd, "template"), p_project: f(fd, "project"), p_task: f(fd, "task") || null, p_title: f(fd, "title") });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/quality/itp/${r.id}` };
+  },
+  async submitPoint(fd, u, el) {
+    const photos = await uploadPhotos(el.querySelector('[name="photos"]'), 10);
+    return (await rpc("submit_itp_point", { p_point: f(fd, "point"), p: { photos, measurement: f(fd, "measurement"), note: f(fd, "note") } })).message;
+  },
   // ---- workflows
   async createDefect(fd, u, el) {
     const draft = fd.get("mode") === "draft";
@@ -310,6 +344,13 @@ document.addEventListener("submit", async (e) => {
 });
 
 document.addEventListener("click", async (e) => {
+  const pt = e.target.closest("[data-add-point],[data-remove-point]");
+  if (pt) {
+    const rows = pt.closest("form").querySelector(".pt-rows");
+    if ("addPoint" in pt.dataset) { rows.insertAdjacentHTML("beforeend", templatePointRow()); rows.lastElementChild.querySelector("input").focus(); }
+    else if (rows.children.length > 1) pt.closest(".pt-row").remove();
+    return;
+  }
   const t = e.target.closest("[data-signout],[data-org],[data-export],[data-qr],[data-refresh]");
   document.querySelectorAll("details.menu[open]").forEach((d) => { if (!d.contains(e.target) || t) d.removeAttribute("open"); });
   if (!t) return;

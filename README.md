@@ -43,14 +43,20 @@ supabase/migrations/               database schema, security rules, workflow fun
 
 Tasks and milestones with finish-to-start dependencies (loops are refused), forecast vs baseline dates, critical path and float, site progress updates (0–100%, or flagged blocked with a reason), and delay reasons whenever a forecast finish moves later. Re-baselining copies forecasts to the baseline and is recorded in the history. Project progress is calculated from task progress weighted by duration.
 
+## Inspection & test plans (ITPs)
+
+Company templates (**ITP templates** in the sidebar, with a starter set for concrete slabs, wet-area waterproofing and fire stopping) list the points in order: hold, witness, inspection, test or review, each with acceptance criteria, minimum photos, an optional measurement and one or two required sign-offs. Saving a template creates a new version; ITPs already on projects keep the version they were created from.
+
+On a project, add an ITP from a template and link it to a programme task. Points are completed in order — nothing after an unreleased hold point can be submitted. Hold and witness points are signed off by a director, PM or quality manager, never by the person who submitted them. Rejecting a point raises a "Failed inspection" defect; rejecting a hold point also flags the linked task as blocked. ITPs can be printed or saved as PDF.
+
 ## Roles
 
 | Role | Can |
 | --- | --- |
 | Director | Everything, including approving variations of any size |
 | Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial |
-| Site supervisor | People, defects, SWMS review, site diary |
-| Quality manager | Defects and ITP hold points |
+| Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress |
+| Quality manager | Defects, ITP templates and hold-point sign-off |
 | Subcontractor admin | Their own company's defects (rectify) and raising variations |
 | Worker | Raise defects, acknowledge SWMS, sign in to site |
 

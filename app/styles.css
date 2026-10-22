@@ -400,3 +400,19 @@ noscript { display: block; padding: 40px; text-align: center; }
 .task-form:has([name=is_milestone]:checked) .when-task, .task-form:has([name=is_milestone]:checked) .finish-field { display: none; }
 .range { flex: 1; accent-color: var(--green); }
 aside .task-form { grid-template-columns: 1fr; }
+.pt-rows { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 10px; }
+.pt-row { display: grid; grid-template-columns: 1.3fr 150px 2fr 90px 160px 110px 38px; gap: 8px; align-items: end; padding: 10px; border: 1px solid var(--border); border-radius: var(--r-input); background: #fafbf9; }
+.pt-row .pt-small { display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 1100px) { .pt-row { grid-template-columns: 1fr 1fr; } .pt-row .pt-wide { grid-column: 1 / -1; } }
+.point-card[data-status="released"] { border-color: #b9d9c8; }
+.point-card[data-status="rejected"] { border-color: #e7bcb8; }
+.pt-num { width: 28px; height: 28px; border-radius: 50%; background: var(--canvas); border: 1px solid var(--border); display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; }
+.print-only { display: none; }
+@media print {
+  .sidebar-col, .topbar, .bottom-tabs, .no-print, .toast, form[data-act] { display: none !important; }
+  .shell { display: block; }
+  .content { padding: 0; max-width: none; }
+  .card { break-inside: avoid; }
+  .print-only { display: block; }
+  body { background: #fff; }
+}

@@ -60,7 +60,7 @@ function gantt(tasks, fromOffset = -2, days = 14, opts = {}) {
 const ganttKey = (crit = false) => `<div class="row wrap small muted" style="gap:14px;margin-top:12px">${crit ? '<span class="row" style="gap:5px"><i class="key crit-key"></i>Critical path</span>' : ""}<span class="row" style="gap:5px"><i class="key" style="background:var(--green)"></i>In progress</span><span class="row" style="gap:5px"><i class="key" style="background:var(--amber)"></i>At risk (forecast past baseline)</span><span class="row" style="gap:5px"><i class="key" style="background:var(--blue)"></i>Starting</span><span class="row" style="gap:5px"><i class="key" style="background:var(--red);width:9px;height:9px;transform:rotate(45deg)"></i>Milestone blocked</span><span class="row" style="gap:5px"><i class="key" style="background:#c9cfc8;height:3px"></i>Baseline</span></div>`;
 
 // ===================================================== internal app shell
-const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/people", "People & contractors", "users"], ["#/app/reports", "Reports", "chart"]];
+const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/people", "People & contractors", "users"], ["#/app/templates", "ITP templates", "clipboard"], ["#/app/reports", "Reports", "chart"]];
 const projectNav = (id, money) => { const b = `#/app/projects/${id}`; return [[b, "Overview", "home", true], [`${b}/programme`, "Programme", "calendar"], [`${b}/quality`, "Quality", "clipboard", false, "defects"], [`${b}/safety`, "Safety", "shield"], [`${b}/workforce`, "Workforce & time", "hardhat"], [`${b}/documents`, "Documents", "file"], ...(money ? [[`${b}/commercial`, "Commercial", "dollar"]] : []), [`${b}/diary`, "Site diary", "notebook"], [`${b}/reports`, "Reports", "chart"], [`${b}/handover`, "Handover", "package"]]; };
 const isActive = (cur, href, exact) => { const h = href.slice(1); return exact ? cur === h : cur === h || cur.startsWith(h + "/"); };
 function navLink([href, label, ic, exact, countKey], cur, counts) {
@@ -258,8 +258,13 @@ function pageQuality(u, p, f) {
     <div class="row wrap" style="gap:6px;margin-bottom:12px">${DB.locations.filter((l) => l.projectId === p.id).map((l) => `<span class="tag">${esc([l.building, l.level, l.zone].filter(Boolean).join(" › "))}</span>`).join("")}</div>
     ${can(u, "defect.assign") ? form("createLocation", `${hidden("project", p.id)}<div class="row wrap" style="gap:8px"><input name="building" class="input" placeholder="Building (e.g. B)" style="width:150px;height:34px"><input name="level" class="input" placeholder="Level (e.g. L3)" style="width:150px;height:34px"><input name="zone" class="input" placeholder="Zone / unit (e.g. Units 301–308)" style="width:230px;height:34px"><button class="btn" style="height:34px">Add location</button></div>`) : ""}
   </section>
-  <section class="card" id="inspections"><div class="card-head"><h2>Inspection &amp; test plans</h2><div class="spacer"></div><span class="small muted">From company templates</span></div>
-    ${itps.length ? "" : '<p class="muted small" style="padding:0 20px 18px">No inspection plans on this project yet. ITP templates arrive in the next build.</p>'}<div class="table-wrap"${itps.length ? "" : ' hidden'}><table class="register"><thead><tr><th>Ref</th><th>Title</th><th>Points</th><th>Hold points</th><th>Status</th></tr></thead><tbody>${itps.map((i) => {
+  <section class="card" id="inspections"><div class="card-head"><h2>Inspection &amp; test plans</h2><div class="spacer"></div><a class="link small" href="#/app/templates">Company templates →</a></div>
+    ${can(u, "itp.manage") ? (DB.itpTemplates.length ? `<div style="padding:0 20px 16px">${form("applyTemplate", `${hidden("project", p.id)}<div class="row wrap" style="gap:8px;align-items:flex-end">
+      <label class="field"><span>Template</span><select name="template" class="input" style="height:36px">${DB.itpTemplates.map((t) => `<option value="${t.id}">${esc(t.name)} · v${t.version} · ${t.points.length} points</option>`).join("")}</select></label>
+      <label class="field"><span>For programme task <span class="muted">(optional)</span></span><select name="task" class="input" style="height:36px"><option value="">—</option>${DB.tasks.filter((t) => t.projectId === p.id && t.status !== "complete").map((t) => `<option value="${t.id}">${esc(t.name)} · ${dayMonth(t.forecastStart)}</option>`).join("")}</select></label>
+      <label class="field"><span>Title <span class="muted">(optional)</span></span><input name="title" class="input" placeholder="e.g. L4 slab — concrete" style="height:36px"></label>
+      <button class="btn btn-primary" style="height:36px">Add ITP</button></div>`)}</div>` : `<p class="small muted" style="padding:0 20px 16px">No templates yet — <a class="link" href="#/app/templates">create one or load the starter set</a>, then add it here.</p>`) : ""}
+    ${itps.length ? "" : '<p class="muted small" style="padding:0 20px 18px">No inspection plans on this project yet.</p>'}<div class="table-wrap"${itps.length ? "" : ' hidden'}><table class="register"><thead><tr><th>Ref</th><th>Title</th><th>Points</th><th>Hold points</th><th>Status</th></tr></thead><tbody>${itps.map((i) => {
       const holds = i.points.filter((x) => x.type === "hold"), openH = holds.filter((x) => x.status !== "released"), h = `${base}/quality/itp/${i.id}`;
       const st = i.points.some((x) => x.status === "rejected") ? "rejected" : i.points.some((x) => x.status === "submitted") ? "in_review" : i.points.some((x) => x.status === "pending") ? "open" : "complete";
       return `<tr><td><a class="mono link" href="${h}">${i.ref}</a></td><td><a class="rowlink" href="${h}">${esc(i.title)}</a><div class="muted small">Template v${i.templateVersion}</div></td><td class="small">${i.points.filter((x) => x.status === "released").length} / ${i.points.length} released</td><td>${!holds.length ? '<span class="muted small">—</span>' : openH.length ? badge("hold", `${openH.length} hold`) : badge("released")}</td><td>${badge(st)}</td></tr>`;
@@ -331,22 +336,96 @@ function pageDefect(u, p, id) {
   </div>`;
 }
 
+function pointCard(u, itp, pt, n) {
+  const blocker = holdBlocking(itp, pt), signs = currentSignoffs(pt), approvals = signs.filter((x) => x.decision === "approve");
+  const mine = pt.submittedBy === u.id && (pt.type === "hold" || pt.type === "witness"), signed = signs.some((x) => x.userId === u.id);
+  const reqs = [pt.evidenceRequired ? `${pt.evidenceRequired} photo${pt.evidenceRequired > 1 ? "s" : ""}` : "", pt.measurementLabel ? esc(pt.measurementLabel) : "", pt.requiredSignoffs > 1 ? "2 sign-offs" : ""].filter(Boolean);
+  const lastReject = [...pt.signoffs].reverse().find((x) => x.decision === "reject");
+  let action = "";
+  if ((pt.status === "pending" || pt.status === "rejected") && can(u, "itp.submit")) {
+    action = blocker ? `<div class="notice notice-info no-print">${icon("lock")}<span>Waiting on hold point <b>${esc(blocker.name)}</b> to be released.</span></div>`
+      : form("submitPoint", `${hidden("point", pt.id)}<div class="stack" style="gap:8px">
+        <label class="field"><span>Photos${pt.evidenceRequired ? ` <span class="req">*</span> <span class="muted">(at least ${pt.evidenceRequired})</span>` : ' <span class="muted">(optional)</span>'}</span><input type="file" name="photos" accept="image/*" capture="environment" multiple class="input" style="padding-top:7px"></label>
+        ${pt.measurementLabel ? `<label class="field"><span>${esc(pt.measurementLabel)} <span class="req">*</span></span><input name="measurement" class="input" inputmode="decimal" style="max-width:200px"></label>` : ""}
+        <label class="field"><span>Note</span><input name="note" class="input" placeholder="What was checked"></label>
+        <div><button class="btn btn-primary">${pt.status === "rejected" ? "Resubmit" : "Submit for sign-off"}</button></div></div>`, 'class="no-print"');
+  } else if (pt.status === "submitted" && canSignOff(u, pt)) {
+    action = mine ? `<p class="small muted no-print">You submitted this — another authorised person must sign it off.</p>`
+      : signed ? `<p class="small muted no-print">You've signed this off. Waiting for a second person.</p>`
+      : form("hold", `${hidden("pointId", pt.id)}<div class="row wrap" style="gap:8px"><input name="comment" class="input" placeholder="Comment (required to reject)" style="height:36px;max-width:320px"><button class="btn btn-primary" name="decision" value="release">${pt.type === "hold" ? "Release hold point" : "Accept"}</button><button class="btn btn-danger" name="decision" value="reject">Reject</button></div>`,
+        `class="no-print" data-confirm="${pt.type === "hold" ? "Release this hold point" : "Accept this point"}? Your name and the time are recorded." data-confirm-for="release"`);
+  } else if (pt.status === "submitted") action = '<p class="small muted no-print">Awaiting an authorised reviewer.</p>';
+  return `<section class="card point-card" data-status="${pt.status}"><div class="card-pad stack" style="gap:10px">
+    <div class="row wrap" style="gap:10px;align-items:flex-start"><span class="pt-num">${n}</span><div style="flex:1;min-width:200px"><h3>${esc(pt.name)}</h3><p class="small muted">${esc(pt.check ?? "")}</p></div>
+      ${pt.type === "hold" ? badge("hold", "Hold point") : `<span class="tag">${POINT_TYPES[pt.type]}</span>`}${badge(pt.status)}</div>
+    ${reqs.length ? `<div class="small muted">Needs: ${reqs.join(" · ")}</div>` : ""}
+    ${pt.status !== "pending" && (pt.submittedAt || pt.evidence) ? `<div class="small">${pt.submittedAt ? `Submitted by <b>${esc(userById(pt.submittedBy)?.name ?? "—")}</b> · ${dateTime(pt.submittedAt)}` : `${pt.evidence} photo${pt.evidence === 1 ? "" : "s"} on record`}${pt.measurementValue ? ` · ${esc(pt.measurementLabel ?? "Measured")}: <b>${esc(pt.measurementValue)}</b>` : ""}${pt.submitNote ? `<div class="muted">${esc(pt.submitNote)}</div>` : ""}</div>` : ""}
+    ${pt.photos.length ? `<div class="photo-grid">${pt.photos.map((ph) => photoTile(ph, "min-height:90px")).join("")}</div>` : ""}
+    ${pt.status === "rejected" && lastReject ? `<div class="notice notice-error">${icon("xcircle")}<span>Rejected by ${esc(userById(lastReject.userId)?.name ?? "—")}: ${esc(lastReject.comment ?? "")}</span></div>` : ""}
+    ${pt.status === "submitted" && pt.requiredSignoffs > 1 ? `<div class="small"><b>${approvals.length} of ${pt.requiredSignoffs}</b> sign-offs${approvals.length ? ` — ${approvals.map((x) => esc(userById(x.userId)?.name ?? "—")).join(", ")}` : ""}</div>` : ""}
+    ${pt.status === "released" ? `<div class="small green-text">${icon("check", 13)} Released by ${esc(userById(pt.releasedBy)?.name ?? "—")}${pt.releasedAt ? ` · ${dateTime(pt.releasedAt)}` : ""}${pt.requiredSignoffs > 1 ? ` (${approvals.map((x) => esc(userById(x.userId)?.name ?? "—")).join(" + ")})` : ""}</div>` : ""}
+    ${action}
+  </div></section>`;
+}
+
 function pageItp(u, p, id) {
   const itp = DB.itps.find((i) => i.id === id && i.projectId === p.id);
   if (!itp) return notFound();
-  const base = `#/app/projects/${p.id}`, task = DB.tasks.find((t) => t.id === itp.taskId), mayRelease = can(u, "itp.release_hold");
-  const TYPE = { hold: "Hold point", witness: "Witness point", inspection: "Inspection", test: "Test" };
-  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/quality`, "Quality"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${itp.ref}</span>${esc(itp.title)}`, meta: `<span>Template v${itp.templateVersion} — template changes don't silently alter this active ITP</span>${task ? `<span>Task: <a class="link" href="${base}/programme">${esc(task.name)}</a></span>` : ""}` })}
-  ${itp.points.some((x) => x.type === "hold" && x.status !== "released") ? `<div class="notice notice-error">${icon("lock")}<span><b>Hold point open.</b> Work covered by this hold must not proceed until a designated person releases it. BuildOS flags the hold and records who released it — it doesn't replace contractual requirements.</span></div>` : ""}
-  <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Point</th><th>Type</th><th>Acceptance check</th><th>Evidence</th><th>Status</th><th style="min-width:250px">Sign-off</th></tr></thead><tbody>
-  ${itp.points.map((pt) => `<tr><td style="font-weight:600">${esc(pt.name)}</td><td>${pt.type === "hold" ? badge("hold", "Hold") : `<span class="tag">${TYPE[pt.type]}</span>`}</td><td class="small">${esc(pt.check)}</td><td class="small">${pt.evidence ? `${pt.evidence} photo${pt.evidence > 1 ? "s" : ""}` : '<span class="muted">None</span>'}</td><td>${badge(pt.status)}</td><td>
-    ${pt.status === "released" ? `<span class="small muted">Released by ${esc(userById(pt.releasedBy)?.name)} · ${pt.releasedAt ? dateTime(pt.releasedAt) : ""}</span>` : ""}
-    ${pt.status === "submitted" && mayRelease ? form("hold", `${hidden("itpId", itp.id)}${hidden("pointId", pt.id)}<div class="stack" style="gap:8px"><input name="comment" class="input" placeholder="Comment (required to reject)" style="height:34px"><div class="row"><button class="btn btn-primary" name="decision" value="release">${pt.type === "hold" ? "Release hold point" : "Accept"}</button><button class="btn btn-danger" name="decision" value="reject">Reject</button></div></div>`, `data-confirm="${pt.type === "hold" ? "Release this hold point" : "Accept this point"}? Your name and the time are recorded." data-confirm-for="release"`) : ""}
-    ${pt.status === "submitted" && !mayRelease ? '<span class="small muted">Awaiting an authorised reviewer</span>' : ""}
-    ${pt.status === "pending" ? '<span class="small muted">Not yet submitted from site</span>' : ""}
-    ${pt.status === "rejected" ? '<span class="small red-text">Rejected — rework and resubmit</span>' : ""}
-  </td></tr>`).join("")}</tbody></table></div></section>
-  <p class="small muted">Releasing a hold point records quality acceptance. It doesn't mark the programme task complete — quality acceptance and physical progress are separate facts.</p>`;
+  const base = `#/app/projects/${p.id}`, task = DB.tasks.find((t) => t.id === itp.taskId), tpl = DB.itpTemplates.find((t) => t.id === itp.templateId);
+  const done = itp.points.filter((x) => x.status === "released").length, total = itp.points.length;
+  const openHolds = itp.points.filter((x) => x.type === "hold" && x.status !== "released");
+  const due = task ? daysBetween(new Date(), D(task.forecastStart)) : null;
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/quality`, "Quality"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${itp.ref}</span>${esc(itp.title)}`,
+    meta: `<span>${tpl ? `From template <b>${esc(tpl.name)}</b> v${itp.templateVersion}${tpl.version > itp.templateVersion ? ` <span class="muted">(template is now v${tpl.version}; this ITP keeps its version)</span>` : ""}` : `Template v${itp.templateVersion}`}</span>${task ? `<span>Task: <a class="link" href="${base}/programme/${task.id}">${esc(task.name)}</a> · ${dayMonth(task.forecastStart)}</span>` : ""}<span><b>${done} of ${total}</b> points released</span>`,
+    actions: `<button class="btn no-print" type="button" onclick="window.print()">${icon("download", 15)} Print / save PDF</button>` })}
+  <div class="bar" style="height:8px"><span class="actual" style="width:${total ? (done / total) * 100 : 0}%"></span></div>
+  ${openHolds.length ? `<div class="notice ${due !== null && due <= 2 ? "notice-error" : "notice-warn"}">${icon("lock")}<span><b>${openHolds.length} hold point${openHolds.length > 1 ? "s" : ""} open.</b> Work covered by a hold point must not proceed until a designated person releases it${task ? ` — ${esc(task.name)} ${due < 0 ? "has started" : due === 0 ? "starts today" : `starts in ${due} day${due > 1 ? "s" : ""}`}` : ""}. BuildOS records who released it; it doesn't replace contractual requirements.</span></div>` : done === total && total ? `<div class="notice notice-ok">${icon("checkcircle")}<span>All points released. Quality acceptance is recorded — it doesn't by itself mark the work complete or approve payment.</span></div>` : ""}
+  <div class="stack">${itp.points.map((pt, n) => pointCard(u, itp, pt, n + 1)).join("")}</div>
+  <section class="card print-only"><div class="card-pad small">Printed ${dateTime(new Date().toISOString())} by ${esc(u.name)} · ${esc(DB.org.name)} · ${esc(p.name)} (${esc(p.code)})</div></section>`;
+}
+
+// ===================================================== ITP templates
+const templatePointRow = (pt = {}) => `<div class="pt-row">
+  <input name="pt_name" class="input" placeholder="Point, e.g. Reinforcement" value="${esc(pt.name ?? "")}" aria-label="Point name">
+  <select name="pt_type" class="input" aria-label="Type">${Object.entries(POINT_TYPES).map(([k, l]) => `<option value="${k}"${(pt.type ?? "inspection") === k ? " selected" : ""}>${l}</option>`).join("")}</select>
+  <input name="pt_check" class="input pt-wide" placeholder="Acceptance criteria, e.g. Bar size, spacing and cover to S-201" value="${esc(pt.checkText ?? pt.check_text ?? "")}" aria-label="Acceptance criteria">
+  <label class="pt-small"><span class="small muted">Min photos</span><input name="pt_photos" type="number" min="0" max="10" class="input" value="${pt.evidenceRequired ?? pt.evidence_required ?? 0}"></label>
+  <label class="pt-small"><span class="small muted">Measurement</span><input name="pt_measure" class="input" placeholder="e.g. Cover (mm)" value="${esc(pt.measurementLabel ?? pt.measurement_label ?? "")}"></label>
+  <label class="pt-small"><span class="small muted">Sign-offs</span><select name="pt_signoffs" class="input"><option value="1">1 person</option><option value="2"${(pt.requiredSignoffs ?? pt.required_signoffs) === 2 ? " selected" : ""}>2 people</option></select></label>
+  <button type="button" class="icon-btn" data-remove-point title="Remove point" aria-label="Remove point">${icon("x", 15)}</button>
+</div>`;
+
+function templateForm(act, t = null) {
+  return form(act, `${t ? hidden("template", t.id) : ""}<div class="form-grid">
+    <label class="field"><span>Template name <span class="req">*</span></span><input name="name" class="input" value="${esc(t?.name ?? "")}" placeholder="e.g. Concrete slab"></label>
+    <label class="field"><span>Trade</span><input name="trade" class="input" value="${esc(t?.trade ?? "")}" placeholder="e.g. Concrete"></label>
+    <label class="field full"><span>Description</span><input name="description" class="input" value="${esc(t?.description ?? "")}"></label>
+    <div class="field full"><span>Inspection points, in order</span>
+      <p class="small muted">Hold points stop later points being submitted until released. Hold and witness points need a director, PM or quality manager to sign off.</p>
+      <div class="pt-rows">${(t?.points?.length ? t.points : [{}]).map(templatePointRow).join("")}</div>
+      <div><button type="button" class="btn" data-add-point>${icon("plus", 15)} Add point</button></div></div>
+    <div class="full"><button class="btn btn-primary">${t ? "Save as new version" : "Create template"}</button></div></div>`);
+}
+
+function pageTemplates(u) {
+  const manage = can(u, "itp.manage"), list = DB.itpTemplates;
+  const uses = (t) => DB.itps.filter((i) => i.templateId === t.id).length;
+  return `${pageHeader({ title: "ITP templates", meta: "<span>Build an inspection and test plan once, reuse it on every project.</span>" })}
+  ${list.length ? `<section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Template</th><th>Trade</th><th>Points</th><th>Hold points</th><th>Version</th><th>Used on</th></tr></thead><tbody>
+    ${list.map((t) => `<tr><td><a class="rowlink" href="#/app/templates/${t.id}">${esc(t.name)}</a><div class="muted small">${esc(t.description ?? "")}</div></td><td class="small">${esc(t.trade ?? "—")}</td><td class="small">${t.points.length}</td><td class="small">${t.points.filter((x) => x.type === "hold").length}</td><td class="mono">v${t.version}</td><td class="small">${uses(t)} ITP${uses(t) === 1 ? "" : "s"}</td></tr>`).join("")}
+  </tbody></table></div></section>`
+    : `<section class="card">${emptyState("clipboard", "No templates yet", 'Start from the starter set (concrete slab, wet-area waterproofing, fire stopping) or build your own.', manage ? form("loadStarters", '<button class="btn btn-primary">Load starter templates</button>') : "")}</section>`}
+  ${manage ? `<section class="card card-pad" id="new-template"><h2 style="margin-bottom:12px">New template</h2>${templateForm("createTemplate")}</section>` : ""}`;
+}
+
+function pageTemplate(u, id) {
+  const t = DB.itpTemplates.find((x) => x.id === id);
+  if (!t) return notFound("That template doesn't exist or has been archived.");
+  const manage = can(u, "itp.manage"), used = DB.itps.filter((i) => i.templateId === t.id);
+  return `${pageHeader({ crumbs: [["#/app/templates", "ITP templates"]], title: esc(t.name), meta: `<span>Version <b>${t.version}</b></span><span>${t.points.length} points</span><span>Used on ${used.length} ITP${used.length === 1 ? "" : "s"}</span>` })}
+  ${manage ? `<section class="card card-pad"><h2 style="margin-bottom:4px">Edit template</h2><p class="small muted" style="margin-bottom:12px">Saving creates version ${t.version + 1}. ITPs already on projects keep the version they were created from.</p>${templateForm("updateTemplate", t)}</section>
+    <section class="card card-pad"><h2 style="margin-bottom:6px">Archive</h2><p class="small muted" style="margin-bottom:12px">Hides the template so it can't be added to new projects. Existing ITPs are unaffected.</p>${form("archiveTemplate", hidden("template", t.id) + '<button class="btn btn-danger">Archive template</button>', `data-confirm="Archive ${esc(t.name)}?"`)}</section>`
+    : `<section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>#</th><th>Point</th><th>Type</th><th>Acceptance criteria</th></tr></thead><tbody>${t.points.map((pt, n) => `<tr><td>${n + 1}</td><td style="font-weight:600">${esc(pt.name)}</td><td>${POINT_TYPES[pt.type]}</td><td class="small">${esc(pt.checkText ?? "")}</td></tr>`).join("")}</tbody></table></div></section>`}`;
 }
 
 // ===================================================== other project modules

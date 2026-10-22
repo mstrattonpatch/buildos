@@ -336,11 +336,11 @@ function createSeed(now = new Date()) {
 // Mirror of role_can() in the database. Used only to decide which buttons
 // to show — the database refuses anything a role isn't allowed to do.
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
-  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "swms.review", "diary.submit", "people.manage"],
-  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold"],
-  subcontractor_admin: ["defect.rectify", "variation.create"],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.review", "diary.submit", "people.manage"],
+  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit"],
+  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit"],
   worker: ["defect.create"],
 };
 const VARIATION_LIMIT = { project_manager: 5000000, director: Infinity };
@@ -568,6 +568,42 @@ function nextMilestoneOf(p) {
   return m ? { name: m.name, date: m.forecastStart } : p.nextMilestone;
 }
 
+// ---------------------------------------------------------------- ITPs
+const POINT_TYPES = { hold: "Hold point", witness: "Witness point", inspection: "Inspection", test: "Test", review: "Review" };
+
+/** Who may sign off a point (mirrors itp_point_action in the database). */
+const canSignOff = (u, pt) => (pt.type === "hold" || pt.type === "witness" ? can(u, "itp.release_hold") : can(u, "itp.release_hold") || can(u, "defect.verify"));
+
+/** The unreleased hold point that stops this point being submitted, if any. */
+const holdBlocking = (itp, pt) => itp.points.find((x) => x.type === "hold" && x.seq < pt.seq && x.status !== "released");
+
+/** Approvals on the current submission. */
+const currentSignoffs = (pt) => pt.signoffs.filter((s) => !pt.submittedAt || s.at >= pt.submittedAt);
+
+/** Starter templates (blueprint §4.3 example plus common trades). */
+const STARTER_TEMPLATES = [
+  { name: "Concrete slab", trade: "Concrete", description: "Suspended or on-ground slab, from formwork to curing.", points: [
+    { name: "Formwork", type: "inspection", check_text: "Dimensions, levels and stability checked against drawings", evidence_required: 1 },
+    { name: "Reinforcement", type: "hold", check_text: "Bar size, spacing and cover checked against structural drawings", evidence_required: 2, measurement_label: "Cover (mm)" },
+    { name: "Pre-pour services & embeds", type: "hold", check_text: "Services, sleeves, cast-ins and embeds confirmed in position", evidence_required: 1 },
+    { name: "Structural engineer", type: "witness", check_text: "Engineer's pre-pour inspection", evidence_required: 0 },
+    { name: "Concrete delivery", type: "test", check_text: "Batch dockets checked; slump and cylinder samples taken", evidence_required: 1, measurement_label: "Slump (mm)" },
+    { name: "Finish & curing", type: "inspection", check_text: "Finish tolerance and curing regime in place", evidence_required: 1 },
+  ] },
+  { name: "Wet area waterproofing", trade: "Waterproofing", description: "Bathrooms, ensuites and laundries to AS 3740.", points: [
+    { name: "Substrate & falls", type: "inspection", check_text: "Substrate clean and sound; falls to waste", evidence_required: 1 },
+    { name: "Bond breakers & puddle flanges", type: "hold", check_text: "Bond breakers at junctions; puddle flanges set at every waste", evidence_required: 2 },
+    { name: "Membrane application", type: "inspection", check_text: "Membrane coats, laps and upturn heights to spec", evidence_required: 2, measurement_label: "Upturn height (mm)" },
+    { name: "Flood test", type: "test", check_text: "24-hour flood test with no drop in level", evidence_required: 1 },
+    { name: "Certificate", type: "review", check_text: "Installer's waterproofing certificate received", evidence_required: 1 },
+  ] },
+  { name: "Fire stopping", trade: "Fire services", description: "Penetrations through fire-rated walls and floors.", points: [
+    { name: "Penetration register", type: "review", check_text: "All penetrations listed with tested system", evidence_required: 0 },
+    { name: "Installation", type: "hold", check_text: "Each penetration sealed with the approved system before close-up", evidence_required: 2, required_signoffs: 2 },
+    { name: "Labels & certification", type: "inspection", check_text: "Labels fixed; installer certificate received", evidence_required: 1 },
+  ] },
+];
+
 function search(u, q) {
   const n = q.trim().toLowerCase();
   if (!n) return [];
@@ -586,8 +622,13 @@ function myTasks(u) {
   const out = [];
   if (can(u, "variation.approve")) for (const v of listVariations(u).filter((v) => v.status === "submitted" || v.status === "under_review"))
     out.push({ title: `Approve ${v.ref} · ${v.title}`, sub: `${projName(v.projectId)} · ${money(v.amount)}`, href: `#/app/projects/${v.projectId}/commercial`, tone: "red" });
-  if (can(u, "itp.release_hold")) for (const i of DB.itps) for (const p of i.points.filter((p) => p.status === "submitted"))
-    out.push({ title: `${p.type === "hold" ? "Release hold point" : "Review"} · ${i.ref} ${p.name}`, sub: `${projName(i.projectId)} · ${p.evidence} photos attached`, href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: p.type === "hold" ? "red" : "blue" });
+  for (const i of DB.itps) for (const p of i.points) {
+    const mine = p.submittedBy === u.id && (p.type === "hold" || p.type === "witness"), signed = currentSignoffs(p).some((x) => x.userId === u.id);
+    if (p.status === "submitted" && canSignOff(u, p) && !mine && !signed)
+      out.push({ title: `${p.type === "hold" ? "Release hold point" : "Sign off"} · ${i.ref} ${p.name}`, sub: `${projName(i.projectId)} · ${p.evidence} photos attached`, href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: p.type === "hold" ? "red" : "blue" });
+    if (p.status === "rejected" && can(u, "itp.submit"))
+      out.push({ title: `Redo inspection · ${i.ref} ${p.name}`, sub: `${projName(i.projectId)} · rejected, resubmit with new evidence`, href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: "amber" });
+  }
   if (can(u, "defect.verify")) for (const d of listDefects(u).filter((d) => d.status === "ready_for_verification"))
     out.push({ title: `Verify ${d.ref} · ${d.title}`, sub: `${projName(d.projectId)} · ${contractorOf(d.contractorId)?.tradingName ?? ""}`, href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "blue" });
   if (can(u, "swms.review")) for (const s of DB.swms.filter((s) => s.status === "submitted" || s.status === "in_review"))
@@ -622,6 +663,15 @@ function notifications(u) {
   if (od.length) out.push({ title: `${od.length} defects overdue`, sub: "Across active projects", href: "#/app/reports?view=overdue", tone: "amber" });
   for (const c of complianceExpiring(14)) out.push({ title: `${c.who} — ${c.what}`, sub: c.days < 0 ? "Expired" : `Expires in ${c.days} days`, href: "#/app/people", tone: c.days < 0 ? "red" : "amber" });
   for (const i of DB.itps) for (const p of i.points.filter((p) => p.status === "rejected")) out.push({ title: `Inspection rejected · ${i.ref} ${p.name}`, sub: projName(i.projectId), href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: "red" });
+  // Hold points that need releasing before their task starts.
+  for (const i of DB.itps) {
+    const t = DB.tasks.find((x) => x.id === i.taskId);
+    const open = i.points.filter((p) => p.type === "hold" && p.status !== "released");
+    if (t && open.length && t.status !== "complete") {
+      const d = daysBetween(new Date(), D(t.forecastStart));
+      if (d <= 2) out.push({ title: `${i.ref} hold point${open.length > 1 ? "s" : ""} not released`, sub: `${projName(i.projectId)} · ${t.name} ${d < 0 ? "started" : d === 0 ? "starts today" : `starts in ${d} day${d > 1 ? "s" : ""}`}`, href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: "red" });
+    }
+  }
   for (const p of DB.projects) { const nm = nextMilestoneOf(p), d = daysBetween(new Date(), D(nm.date)); if (d >= 0 && d <= 7) out.push({ title: `${nm.name} in ${d} days`, sub: p.name, href: `#/app/projects/${p.id}/programme`, tone: "blue" }); }
   return out;
 }
