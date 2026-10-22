@@ -73,6 +73,7 @@ function resolve(path, query) {
     else if ((mm = sub.match(/^programme\/(.+)$/))) { html = pageTask(u, p, mm[1]); title = "Task"; }
     else if (sub === "commercial") { html = pageCommercial(u, p); title = "Commercial"; }
     else if (sub === "safety") { html = pageSafety(u, p); title = "Safety"; }
+    else if ((mm = sub.match(/^safety\/swms\/(.+)$/))) { html = pageSwms(u, p, mm[1]); title = "SWMS"; }
     else if (sub === "workforce") { html = pageWorkforce(u, p); title = "Workforce"; }
     else if (sub === "documents") { html = pageDocuments(u, p); title = "Documents"; }
     else if (sub === "diary") { html = pageDiary(u, p); title = "Site diary"; }
@@ -160,6 +161,11 @@ const templatePayload = (fd, el) => ({
     evidence_required: parseInt(r.querySelector("[name=pt_photos]").value || "0", 10) || 0, measurement_label: r.querySelector("[name=pt_measure]").value.trim(),
     required_signoffs: parseInt(r.querySelector("[name=pt_signoffs]").value, 10) || 1,
   })).filter((p) => p.name || p.check_text),
+});
+const swmsPayload = (fd, el) => ({
+  title: f(fd, "title"), activity: f(fd, "activity"), notes: f(fd, "notes"), high_risk_categories: fd.getAll("hrcw"), task_ids: fd.getAll("task_ids"),
+  hazards: [...el.querySelectorAll(".hz-row")].map((r) => ({ hazard: r.querySelector("[name=hz_hazard]").value.trim(), controls: r.querySelector("[name=hz_controls]").value.trim(), responsible: r.querySelector("[name=hz_responsible]").value.trim() }))
+    .filter((h) => h.hazard || h.controls),
 });
 const taskPayload = (fd) => ({
   name: f(fd, "name"), is_milestone: fd.get("is_milestone") === "on", forecast_start: f(fd, "forecast_start"), forecast_finish: f(fd, "forecast_finish"),
@@ -300,7 +306,18 @@ const ACTIONS = {
   },
   async variation(fd) { return (await rpc("variation_action", { p_variation: f(fd, "variationId"), p_type: f(fd, "type"), p_reason: f(fd, "reason") })).message; },
   async hold(fd) { return (await rpc("itp_point_action", { p_point: f(fd, "pointId"), p_decision: f(fd, "decision"), p_comment: f(fd, "comment") })).message; },
-  async swms(fd) { return (await rpc("swms_review", { p_swms: f(fd, "swmsId"), p_decision: f(fd, "decision"), p_comment: f(fd, "comment") })).message; },
+  async swmsReview(fd) { return (await rpc("swms_review", { p_swms: f(fd, "swmsId"), p_decision: f(fd, "decision"), p_comment: f(fd, "comment"), p_review_months: parseInt(f(fd, "months") || "12", 10) })).message; },
+  async submitSwms(fd, u, el) {
+    const file_path = await uploadDocument(el.querySelector('[name="file"]'));
+    const r = await rpc("submit_swms", { p_project: f(fd, "project"), p: { ...swmsPayload(fd, el), contractor_id: f(fd, "contractor_id"), file_path } });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/safety/swms/${r.id}` };
+  },
+  async reviseSwms(fd, u, el) {
+    const file_path = await uploadDocument(el.querySelector('[name="file"]'));
+    const r = await rpc("revise_swms", { p_swms: f(fd, "swmsId"), p: { ...swmsPayload(fd, el), file_path, requires_reack: fd.get("requires_reack") === "on" } });
+    const s = DB.swms.find((x) => x.id === f(fd, "swmsId"));
+    return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
+  },
   async swmsAck(fd) { return (await rpc("swms_acknowledge", { p_swms: f(fd, "swmsId") })).message; },
   async siteIn(fd) { return (await rpc("site_sign_in", { p_project: f(fd, "projectId") })).message; },
   async siteOut(fd) { return (await rpc("site_sign_out", { p_project: f(fd, "projectId") })).message; },
@@ -344,6 +361,13 @@ document.addEventListener("submit", async (e) => {
 });
 
 document.addEventListener("click", async (e) => {
+  const hz = e.target.closest("[data-add-row],[data-remove-row]");
+  if (hz) {
+    const rows = hz.closest("form").querySelector(".hz-rows");
+    if (hz.dataset.addRow) { rows.insertAdjacentHTML("beforeend", hazardRow()); rows.lastElementChild.querySelector("input").focus(); }
+    else if (rows.children.length > 1) hz.closest(".hz-row").remove();
+    return;
+  }
   const pt = e.target.closest("[data-add-point],[data-remove-point]");
   if (pt) {
     const rows = pt.closest("form").querySelector(".pt-rows");

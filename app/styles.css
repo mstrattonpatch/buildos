@@ -416,3 +416,12 @@ aside .task-form { grid-template-columns: 1fr; }
   .print-only { display: block; }
   body { background: #fff; }
 }
+.hrcw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-input); background: #fafbf9; }
+.hz-rows { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; }
+.hz-row { display: grid; grid-template-columns: 1fr 1.4fr 160px 38px; gap: 8px; }
+@media (max-width: 900px) { .hz-row { grid-template-columns: 1fr 38px; } .hz-row [name=hz_controls], .hz-row [name=hz_responsible] { grid-column: 1; } }
+aside .form-grid { grid-template-columns: 1fr; }
+aside .hz-row { grid-template-columns: 1fr 38px; }
+aside .hz-row [name=hz_controls], aside .hz-row [name=hz_responsible] { grid-column: 1; }
+aside .hrcw-grid { grid-template-columns: 1fr; max-height: 220px; overflow-y: auto; }
+aside .hz-row { padding: 8px; border: 1px solid var(--border); border-radius: var(--r-input); background: #fafbf9; }

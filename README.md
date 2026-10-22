@@ -49,6 +49,10 @@ Company templates (**ITP templates** in the sidebar, with a starter set for conc
 
 On a project, add an ITP from a template and link it to a programme task. Points are completed in order — nothing after an unreleased hold point can be submitted. Hold and witness points are signed off by a director, PM or quality manager, never by the person who submitted them. Rejecting a point raises a "Failed inspection" defect; rejecting a hold point also flags the linked task as blocked. ITPs can be printed or saved as PDF.
 
+## SWMS
+
+Contractors (or the site team on their behalf) submit a Safe Work Method Statement with the work activity, high-risk construction work categories, hazards and controls, the document itself and the programme tasks it covers. A supervisor, PM or director approves it (with a periodic review date) or requests changes. Each revision is a new version: the approved version stays in force — and keeps controlling site sign-in — until the revision is approved. Revisions require workers to acknowledge again unless marked as a minor correction. Every version keeps who submitted, reviewed and acknowledged it.
+
 ## Roles
 
 | Role | Can |
@@ -57,7 +61,7 @@ On a project, add an ITP from a template and link it to a programme task. Points
 | Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial |
 | Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress |
 | Quality manager | Defects, ITP templates and hold-point sign-off |
-| Subcontractor admin | Their own company's defects (rectify) and raising variations |
+| Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations |
 | Worker | Raise defects, acknowledge SWMS, sign in to site |
 
 Company **admins** (the person who created the company, plus anyone they tick as admin) can invite people and change roles.

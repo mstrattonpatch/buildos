@@ -177,7 +177,7 @@ function pageProject(u, p) {
   for (const [trade, list] of Object.entries(byTrade)) attn.push(["amber", "alert", `<b>${list.length} ${esc(trade.toLowerCase())} defect${list.length > 1 ? "s" : ""}</b> overdue`, "Open", `${base}/quality?status=overdue&trade=${encodeURIComponent(trade)}`]);
   for (const s of DB.swms.filter((s) => s.projectId === p.id && s.status === "approved")) {
     const missing = DB.workers.filter((w) => w.contractorId === s.contractorId && w.inductedProjectIds.includes(p.id) && !s.acknowledgedBy.includes(w.id)).length;
-    if (missing) attn.push(["blue", "clock", `<b>SWMS · ${esc(s.title)} v${s.version}</b> needs worker acknowledgement (${missing})`, "Chase", `${base}/safety`]);
+    if (missing) attn.push(["blue", "clock", `<b>SWMS · ${esc(s.title)} v${s.version}</b> needs worker acknowledgement (${missing})`, "Chase", `${base}/safety/swms/${s.id}`]);
   }
   for (const d of DB.documents.filter((x) => x.projectId === p.id && x.status === "in_review")) attn.push(["blue", "file", `<b>${d.number} rev ${d.revision}</b> uploaded — review before it becomes current`, "Review", `${base}/documents`]);
   const cnt = (s) => ready?.items.filter((i) => i.state === s).length ?? 0;
@@ -575,17 +575,103 @@ function pageCommercial(u, p) {
   <div class="notice notice-warn">${icon("alert")}<span>A completed task or signed ITP doesn't automatically entitle a contractor to payment. Security-of-payment deadlines need specialist legal review before they're automated.</span></div>`;
 }
 
+const hazardRow = (h = {}) => `<div class="hz-row">
+  <input name="hz_hazard" class="input" placeholder="Hazard, e.g. Pump boom near power lines" value="${esc(h.hazard ?? "")}" aria-label="Hazard">
+  <input name="hz_controls" class="input" placeholder="Controls, e.g. Spotter; 4 m exclusion zone" value="${esc(h.controls ?? "")}" aria-label="Controls">
+  <input name="hz_responsible" class="input" placeholder="Responsible" value="${esc(h.responsible ?? "")}" aria-label="Responsible">
+  <button type="button" class="icon-btn" data-remove-row title="Remove hazard" aria-label="Remove hazard">${icon("x", 15)}</button>
+</div>`;
+
+function swmsFields(u, p, s = null) {
+  const sub = u.role === "subcontractor_admin";
+  const tasks = DB.tasks.filter((t) => t.projectId === p.id && t.status !== "complete");
+  return `<div class="form-grid">
+    <label class="field"><span>Title <span class="req">*</span></span><input name="title" class="input" value="${esc(s?.title ?? "")}" placeholder="e.g. Concrete placement"></label>
+    ${s ? `<label class="field"><span>Contractor</span><input class="input" value="${esc(contractorOf(s.contractorId)?.tradingName ?? "")}" disabled></label>`
+      : sub ? `<label class="field"><span>Contractor</span><input class="input" value="${esc(contractorOf(u.contractorId)?.tradingName ?? "")}" disabled></label>`
+      : `<label class="field"><span>Contractor <span class="req">*</span></span><select name="contractor_id" class="input"><option value="">Select…</option>${DB.contractors.map((c) => `<option value="${c.id}">${esc(c.tradingName)}</option>`).join("")}</select></label>`}
+    <label class="field full"><span>Work activity <span class="req">*</span></span><input name="activity" class="input" value="${esc(s?.activity ?? "")}" placeholder="e.g. Concrete pumping and placement, L4 slab"></label>
+    <div class="field full"><span>High-risk construction work</span><div class="hrcw-grid">${HRCW.map((h) => `<label class="row small" style="gap:8px;align-items:flex-start"><input type="checkbox" name="hrcw" value="${esc(h)}"${s?.highRiskCategories.includes(h) ? " checked" : ""}> ${esc(h)}</label>`).join("")}</div></div>
+    <div class="field full"><span>Hazards &amp; controls <span class="req">*</span></span><div class="hz-rows">${(s?.hazards?.length ? s.hazards : [{}]).map(hazardRow).join("")}</div><div><button type="button" class="btn" data-add-row="hazard">${icon("plus", 15)} Add hazard</button></div></div>
+    ${tasks.length ? `<div class="field full"><span>Covers these programme tasks</span><div class="pick-list">${tasks.map((t) => `<label class="row small" style="gap:8px"><input type="checkbox" name="task_ids" value="${t.id}"${s && t.swmsId === s.id ? " checked" : ""}>${esc(t.name)} <span class="muted">· ${dayMonth(t.forecastStart)}</span></label>`).join("")}</div></div>` : ""}
+    <label class="field"><span>SWMS document <span class="muted">(PDF, Word or photo${s?.filePath ? " — leave empty to keep the current file" : ""})</span></span><input type="file" name="file" accept=".pdf,.doc,.docx,image/*" class="input" style="padding-top:7px"></label>
+    <label class="field"><span>Notes</span><input name="notes" class="input" value="${esc(s?.notes ?? "")}"></label>
+    ${s ? `<label class="row small full" style="gap:8px;align-items:flex-start"><input type="checkbox" name="requires_reack" checked><span>Workers must acknowledge this version again <span class="muted">(untick only for a minor correction that doesn't change the method)</span></span></label>` : ""}
+  </div>`;
+}
+
 function pageSafety(u, p) {
-  const sw = DB.swms.filter((s) => s.projectId === p.id);
-  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance" })}
-  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>SWMS register</h2><div class="spacer"></div><span class="small muted">Submit → review → approve → workers acknowledge the current version</span></div>
-  <div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Activity</th><th>Contractor</th><th>High-risk work</th><th>Acknowledged</th><th>Status</th><th style="min-width:250px">Review</th></tr></thead><tbody>
-  ${sw.map((s) => { const crew = DB.workers.filter((w) => w.contractorId === s.contractorId && w.inductedProjectIds.includes(p.id)); return `<tr><td class="mono">${s.ref} v${s.version}</td><td><b style="font-weight:600">${esc(s.title)}</b><div class="muted small">${esc(s.activity)}</div></td><td class="small">${esc(contractorOf(s.contractorId)?.tradingName)}</td><td class="small">${esc(s.highRiskCategories.join(", "))}</td><td class="small">${s.status === "approved" ? `${s.acknowledgedBy.length} of ${crew.length} workers` : "—"}</td><td>${badge(s.status)}</td><td>${(s.status === "submitted" || s.status === "in_review") && can(u, "swms.review") ? form("swms", `${hidden("swmsId", s.id)}<div class="stack" style="gap:6px"><input name="comment" class="input" placeholder="Comment (required for changes)" style="height:32px"><div class="row"><button class="btn btn-primary" name="decision" value="approve">Approve</button><button class="btn btn-danger" name="decision" value="changes">Request changes</button></div></div>`) : '<span class="muted small">—</span>'}</td></tr>`; }).join("")}
-  </tbody></table></div></section>
+  const base = `#/app/projects/${p.id}`, series = swmsSeries(p.id);
+  const visible = series.filter((x) => u.role !== "subcontractor_admin" || x.latest.contractorId === u.contractorId || x.current);
+  const rows = visible.map(({ current, pending, latest }) => {
+    const s = current || latest;
+    const crew = DB.workers.filter((w) => w.contractorId === s.contractorId && w.inductedProjectIds.includes(p.id));
+    const due = current?.reviewDue ? daysBetween(new Date(), D(current.reviewDue)) : null;
+    return `<tr><td><a class="rowlink mono" href="${base}/safety/swms/${s.id}">${esc(s.ref)}</a></td>
+      <td><a class="rowlink" href="${base}/safety/swms/${s.id}">${esc(s.title)}</a><div class="muted small">${esc(s.activity ?? "")}</div></td>
+      <td class="small">${esc(contractorOf(s.contractorId)?.tradingName ?? "—")}</td>
+      <td class="small">${current ? `v${current.version} in force` : "—"}${pending ? `<div><a class="link" href="${base}/safety/swms/${pending.id}">v${pending.version} ${pending.status === "changes_requested" ? "needs changes" : "awaiting review"}</a></div>` : ""}</td>
+      <td class="small">${current ? `${current.acknowledgedBy.length} of ${crew.length} workers` : "—"}</td>
+      <td class="small ${due !== null && due <= 14 ? (due < 0 ? "red-text" : "amber-text") : ""}">${current?.reviewDue ? dayMonth(current.reviewDue) : "—"}</td>
+      <td>${current ? badge("approved") : badge(latest.status)}</td></tr>`;
+  }).join("");
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance", actions: can(u, "swms.submit") ? `<a class="btn btn-dark" href="${base}/safety#new-swms">Submit a SWMS</a>` : "" })}
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>SWMS register</h2><div class="spacer"></div><span class="small muted">Submit → review → approve → workers acknowledge the version in force</span></div>
+  ${visible.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Activity</th><th>Contractor</th><th>Version</th><th>Acknowledged</th><th>Review due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : emptyState("shield", "No SWMS yet", "Contractors submit a Safe Work Method Statement for high-risk work. Once approved, their workers must acknowledge it before signing in to site.")}</section>
+  ${can(u, "swms.submit") ? `<section class="card card-pad" id="new-swms"><h2 style="margin-bottom:12px">Submit a SWMS</h2>${form("submitSwms", `${hidden("project", p.id)}${swmsFields(u, p)}<div style="margin-top:14px"><button class="btn btn-primary">Submit for review</button></div>`)}</section>` : ""}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
-    <section class="card">${emptyState("filewarn", "Permits to work", "Configurable permit types and approvers per project. A permit is never issued just because a form is complete. Planned for phase 3.")}</section>
-    <section class="card">${emptyState("octagon", "Incidents & observations", "Hazard, near-miss and incident reports with investigation and corrective actions. Planned for phase 3.")}</section>
-    <section class="card">${emptyState("listchecks", "Toolbox talks", "Record talks and attendance, linked to the day's site diary. Planned for phase 3.")}</section>
+    <section class="card">${emptyState("filewarn", "Permits to work", "Configurable permit types and approvers per project. A permit is never issued just because a form is complete. Planned for a later phase.")}</section>
+    <section class="card">${emptyState("octagon", "Incidents & observations", "Hazard, near-miss and incident reports with investigation and corrective actions. Planned for a later phase.")}</section>
+    <section class="card">${emptyState("listchecks", "Toolbox talks", "Record talks and attendance, linked to the day's site diary. Planned for a later phase.")}</section>
+  </div>`;
+}
+
+function pageSwms(u, p, id) {
+  const s = DB.swms.find((x) => x.id === id && x.projectId === p.id);
+  if (!s) return notFound();
+  const base = `#/app/projects/${p.id}`, series = swmsSeries(p.id).find((x) => x.versions.some((v) => v.id === s.id));
+  const isSub = u.role === "subcontractor_admin", ownSub = isSub && u.contractorId === s.contractorId;
+  const crew = DB.workers.filter((w) => w.contractorId === s.contractorId && w.inductedProjectIds.includes(p.id));
+  const tasks = DB.tasks.filter((t) => t.swmsId === s.id);
+  const canRevise = can(u, "swms.submit") && (!isSub || ownSub) && s.status !== "superseded" && !(series.pending && series.pending.id !== s.id);
+  const reviewable = can(u, "swms.review") && (s.status === "submitted" || s.status === "in_review");
+  const fileUrl = s.filePath ? DB.fileUrls[s.filePath] : null;
+  const worker = u.workerId ? DB.workers.find((w) => w.id === u.workerId) : null;
+  return `${pageHeader({ crumbs: [[base, p.name], [`${base}/safety`, "Safety"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${esc(s.ref)} v${s.version}</span>${esc(s.title)}`,
+    meta: `<span class="row wrap" style="gap:8px">${badge(s.status)}<span>${esc(contractorOf(s.contractorId)?.tradingName ?? "")}</span></span>` })}
+  ${s.status === "superseded" && series.current ? `<div class="notice notice-info">${icon("clock")}<span>This version has been replaced. <a class="link" href="${base}/safety/swms/${series.current.id}">View v${series.current.version}, the version in force</a>.</span></div>` : ""}
+  ${s.status === "changes_requested" ? `<div class="notice notice-warn">${icon("alert")}<span><b>Changes requested</b> by ${esc(userById(s.reviewedBy)?.name ?? "reviewer")}: ${esc(s.reviewComment ?? "")}</span></div>` : ""}
+  ${(s.status === "submitted" || s.status === "in_review") && series.current ? `<div class="notice notice-info">${icon("clock")}<span>Waiting for review. Until it's approved, <a class="link" href="${base}/safety/swms/${series.current.id}">v${series.current.version}</a> stays in force.${s.requiresReack ? " Once approved, workers must acknowledge this version before signing in." : " It's marked as a minor change, so acknowledgements will carry over."}</span></div>` : ""}
+  <div class="cc-grid">
+    <div class="stack-lg" style="min-width:0">
+      <section class="card"><div class="card-head"><h2>Work method</h2>${fileUrl ? `<div class="spacer"></div><a class="btn" href="${fileUrl}" target="_blank" rel="noopener">${icon("file", 15)} Open document</a>` : ""}</div><div class="card-body stack">
+        <p>${esc(s.activity ?? "")}</p>
+        ${s.highRiskCategories.length ? `<div class="row wrap" style="gap:6px">${s.highRiskCategories.map((h) => `<span class="badge badge-amber">${icon("alert", 12)}${esc(h)}</span>`).join("")}</div>` : ""}
+        ${s.hazards.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Hazard</th><th>Controls</th><th>Responsible</th></tr></thead><tbody>${s.hazards.map((h) => `<tr><td style="font-weight:600">${esc(h.hazard)}</td><td class="small">${esc(h.controls)}</td><td class="small">${esc(h.responsible ?? "—")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted small">No hazards recorded on this version.</p>'}
+        ${s.notes ? `<p class="small muted">${esc(s.notes)}</p>` : ""}
+        ${tasks.length ? `<p class="small">Covers: ${tasks.map((t) => `<a class="link" href="${base}/programme/${t.id}">${esc(t.name)}</a>`).join(", ")}</p>` : ""}
+      </div></section>
+      ${s.status === "approved" ? `<section class="card"><div class="card-head"><h2>Worker acknowledgements</h2><div class="spacer"></div><span class="small muted">${s.acknowledgedBy.length} of ${crew.length} inducted workers</span></div><div class="card-body">
+        ${crew.length ? `<div class="table-wrap"><table class="register"><tbody>${crew.map((w) => { const a = s.acks.find((x) => x.workerId === w.id); return `<tr><td style="font-weight:600">${esc(w.name)}</td><td>${a ? badge("approved", `Acknowledged ${dayMonth(a.acknowledgedAt)}`) : badge("pending", "Not yet — can't sign in")}</td></tr>`; }).join("")}</tbody></table></div>`
+          : '<p class="muted small">No workers from this company are inducted to the project yet.</p>'}
+      </div></section>` : ""}
+      <section class="card"><div class="card-head"><h2>Version history</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Version</th><th>Submitted</th><th>Reviewed</th><th>Status</th></tr></thead><tbody>
+        ${series.versions.map((v) => `<tr${v.id === s.id ? ' style="background:#fafbf9"' : ""}><td><a class="link" href="${base}/safety/swms/${v.id}">v${v.version}</a>${v.id === s.id ? ' <span class="muted small">(this)</span>' : ""}${v.requiresReack || v.version === 1 ? "" : '<div class="muted small">minor change</div>'}</td>
+          <td class="small">${esc(userById(v.submittedBy)?.name ?? "—")}<div class="muted">${v.submittedAt ? dateTime(v.submittedAt) : ""}</div></td>
+          <td class="small">${v.reviewedBy ? `${esc(userById(v.reviewedBy)?.name ?? "—")}<div class="muted">${dateTime(v.reviewedAt)}${v.reviewComment ? ` · ${esc(v.reviewComment)}` : ""}</div>` : "—"}</td><td>${badge(v.status)}</td></tr>`).join("")}
+      </tbody></table></div></section>
+    </div>
+    <aside class="stack-lg">
+      ${reviewable ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Review</h2>${form("swmsReview", `${hidden("swmsId", s.id)}<div class="stack">
+        <label class="field"><span>Review again in</span><select name="months" class="input"><option value="12">12 months</option><option value="6">6 months</option><option value="3">3 months</option><option value="0">No periodic review</option></select></label>
+        <label class="field"><span>Comment <span class="muted">(required to request changes)</span></span><textarea name="comment" class="input"></textarea></label>
+        <div class="row wrap"><button class="btn btn-primary" name="decision" value="approve">Approve</button><button class="btn btn-danger" name="decision" value="changes">Request changes</button></div></div>`,
+        `data-confirm="Approve ${esc(s.ref)} v${s.version}?${series.current && s.requiresReack ? " Workers will have to acknowledge it before signing in." : ""}" data-confirm-for="approve"`)}</section>` : ""}
+      ${worker && worker.contractorId === s.contractorId && s.status === "approved" ? (s.acknowledgedBy.includes(worker.id) ? `<section class="card card-pad"><p class="green-text">${icon("check")} You've acknowledged this version.</p></section>`
+        : `<section class="card card-pad"><h2 style="margin-bottom:6px">Acknowledge</h2><p class="muted small" style="margin-bottom:12px">Confirm you've read and understood this SWMS. You'll need to before signing in to site.</p>${form("swmsAck", hidden("swmsId", s.id) + '<button class="btn btn-primary">I\'ve read it — acknowledge</button>')}</section>`) : ""}
+      ${canRevise ? `<section class="card card-pad"><h2 style="margin-bottom:4px">Submit a revision</h2><p class="muted small" style="margin-bottom:12px">Creates v${Math.max(...series.versions.map((v) => v.version)) + 1} for review.${s.status === "approved" ? ` v${s.version} stays in force until it's approved.` : ""}</p>${form("reviseSwms", `${hidden("swmsId", s.id)}${swmsFields(u, p, s)}<div style="margin-top:14px"><button class="btn btn-dark">Submit revision</button></div>`, 'class="aside-form"')}</section>` : ""}
+    </aside>
   </div>`;
 }
 
@@ -792,7 +878,7 @@ function pageSiteSignIn(u, route) {
   const unacked = DB.swms.filter((s) => s.projectId === p.id && s.contractorId === w.contractorId && s.status === "approved" && !s.acknowledgedBy.includes(w.id));
   return siteWrap(`<div class="site-body" style="padding-top:22px">
     <div><div class="muted small row" style="gap:4px">${icon("mappin", 14)}${esc(p.name)} · Gate 1</div><h1 style="font-size:26px">Hi ${esc(w.name.split(" ")[0])}</h1></div>
-    ${unacked.map((s) => `<div class="callout stack" style="gap:10px"><div class="row" style="gap:10px"><span style="color:var(--amber)">${icon("alert", 22)}</span><b style="font-size:17px">One step before sign-in</b></div><p>Read and acknowledge the <b>${esc(s.title)} SWMS (v${s.version})</b>. It changed since you last signed it.</p><details><summary class="link" style="cursor:pointer">Read the SWMS</summary><div class="small stack" style="margin-top:8px;gap:6px"><p><b>Activity:</b> ${esc(s.activity)}</p><p><b>High-risk work:</b> ${esc(s.highRiskCategories.join(", "))}</p><p><b>Key controls:</b> exclusion zone around the pump boom; spotter for truck movements; edge protection checked before pour; harness when within 2m of an open edge.</p></div></details>${form("swmsAck", hidden("swmsId", s.id) + '<button class="btn btn-dark btn-lg btn-block">I\'ve read it — acknowledge</button>')}</div>`).join("")}
+    ${unacked.map((s) => `<div class="callout stack" style="gap:10px"><div class="row" style="gap:10px"><span style="color:var(--amber)">${icon("alert", 22)}</span><b style="font-size:17px">One step before sign-in</b></div><p>Read and acknowledge the <b>${esc(s.title)} SWMS (v${s.version})</b>. It changed since you last signed it.</p><details><summary class="link" style="cursor:pointer">Read the SWMS</summary><div class="small stack" style="margin-top:8px;gap:6px"><p><b>Activity:</b> ${esc(s.activity)}</p>${s.highRiskCategories.length ? `<p><b>High-risk work:</b> ${esc(s.highRiskCategories.join(", "))}</p>` : ""}${s.hazards.length ? s.hazards.map((h) => `<p><b>${esc(h.hazard)}:</b> ${esc(h.controls)}</p>`).join("") : "<p><b>Key controls:</b> exclusion zone around the pump boom; spotter for truck movements; edge protection checked before pour; harness when within 2m of an open edge.</p>"}${s.filePath && DB.fileUrls[s.filePath] ? `<p><a class="link" href="${DB.fileUrls[s.filePath]}" target="_blank" rel="noopener">Open the full document</a></p>` : ""}</div></details>${form("swmsAck", hidden("swmsId", s.id) + '<button class="btn btn-dark btn-lg btn-block">I\'ve read it — acknowledge</button>')}</div>`).join("")}
     <div class="label">Your site requirements</div>
     <div class="req-list">${r.reqs.map((x) => `<div class="li"><span>${esc(x.label)}</span><b class="${x.severity === "ok" ? "green-text" : x.severity === "warning" ? "amber-text" : "red-text"}">${icon(x.severity === "ok" ? "check" : x.severity === "warning" ? "alert" : "xcircle", 14)}${esc(x.detail)}</b></div>`).join("")}</div>
     ${r.reqs.some((x) => x.severity === "warning" && /licence/i.test(x.label)) ? '<p class="small muted">A licence is expiring soon — send your supervisor a photo of the renewed card.</p>' : ""}

@@ -99,7 +99,10 @@ async function loadCompany(orgId) {
     })) })).sort((a, b) => a.ref.localeCompare(b.ref)),
     itpTemplates: r.itp_templates.filter((t) => !t.archived).map((t) => ({ ...t, points: r.itp_template_points.filter((p) => p.templateId === t.id).sort((a, b) => a.seq - b.seq) }))
       .sort((a, b) => a.name.localeCompare(b.name)),
-    swms: r.swms.map((s) => ({ ...s, highRiskCategories: s.highRiskCategories || [], acknowledgedBy: r.swms_acks.filter((a) => a.swmsId === s.id).map((a) => a.workerId) })),
+    swms: r.swms.map((s) => {
+      const acks = r.swms_acks.filter((a) => a.swmsId === s.id);
+      return { ...s, seriesId: s.seriesId || s.id, hazards: s.hazards || [], highRiskCategories: s.highRiskCategories || [], acknowledgedBy: acks.map((a) => a.workerId), acks };
+    }),
     documents: r.documents,
     attendance,
     budgetLines: r.budget_lines.sort((a, b) => a.costCode.localeCompare(b.costCode)),
@@ -108,8 +111,10 @@ async function loadCompany(orgId) {
     diary: r.diary.sort((a, b) => b.date.localeCompare(a.date)),
     audit,
     photoUrls: {},
+    fileUrls: {},
   };
   await signPhotos(db);
+  await signFiles(db);
   DB = db;
 }
 
@@ -119,6 +124,26 @@ async function signPhotos(db) {
   if (!paths.length) return;
   const { data } = await sb.storage.from("photos").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.photoUrls[x.path] = x.signedUrl;
+}
+
+async function signFiles(db) {
+  const paths = uniq(db.swms.map((s) => s.filePath).filter((p) => p && p.startsWith(db.org.id + "/")));
+  if (!paths.length) return;
+  const { data } = await sb.storage.from("documents").createSignedUrls(paths, 3600);
+  for (const x of data || []) if (x.signedUrl) db.fileUrls[x.path] = x.signedUrl;
+}
+
+/** Upload one document (PDF, image or Office file) to the private documents bucket. Returns its path or "". */
+async function uploadDocument(input) {
+  const file = input?.files?.[0];
+  if (!file) return "";
+  if (file.size > 20 * 1024 * 1024) throw new RuleError("That file is over 20 MB. Please upload a smaller copy.");
+  const ext = (file.name.match(/\.([a-z0-9]{1,5})$/i)?.[1] || "bin").toLowerCase();
+  if (!["pdf", "jpg", "jpeg", "png", "heic", "doc", "docx"].includes(ext)) throw new RuleError("Upload a PDF, Word document or photo.");
+  const path = `${DB.org.id}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from("documents").upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+  if (error) throw new RuleError(`Upload failed: ${friendlyError(error)}`);
+  return path;
 }
 
 /** Downscale and upload photos to the company's private folder. Returns storage paths. */

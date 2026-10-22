@@ -336,11 +336,11 @@ function createSeed(now = new Date()) {
 // Mirror of role_can() in the database. Used only to decide which buttons
 // to show — the database refuses anything a role isn't allowed to do.
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
-  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.review", "diary.submit", "people.manage"],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage"],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage"],
   quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit"],
-  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit"],
+  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit"],
   worker: ["defect.create"],
 };
 const VARIATION_LIMIT = { project_manager: 5000000, director: Infinity };
@@ -500,8 +500,8 @@ function readiness(pid, taskId) {
     const crew = DB.workers.filter((w) => w.contractorId === t.contractorId), missing = crew.filter((w) => !w.inductedProjectIds.includes(pid));
     items.push({ label: `${contractorOf(t.contractorId)?.trade ?? "Crew"} crew credentials`, state: missing.length ? "action" : "ready", detail: missing.length ? `${missing.length} of ${crew.length} missing induction` : "All inducted", href: `${base}/workforce` });
   }
-  const s = DB.swms.find((x) => x.id === t.swmsId);
-  if (s) items.push({ label: `SWMS · ${s.title} v${s.version}`, state: s.status === "approved" ? "ready" : "blocking", detail: s.status === "approved" ? "Approved" : "Blocking", href: `${base}/safety` });
+  const linked = DB.swms.find((x) => x.id === t.swmsId), s = swmsInForce(linked) || linked;
+  if (s) items.push({ label: `SWMS · ${s.title} v${s.version}`, state: s.status === "approved" ? "ready" : "blocking", detail: s.status === "approved" ? "Approved" : "Not approved", href: `${base}/safety/swms/${s.id}` });
   return { task: t, items };
 }
 
@@ -604,6 +604,30 @@ const STARTER_TEMPLATES = [
   ] },
 ];
 
+// ---------------------------------------------------------------- SWMS
+/** High-risk construction work categories (WHS Regulations r 291). */
+const HRCW = [
+  "Risk of a fall of more than 2 metres", "Work on a telecommunication tower", "Demolition of a load-bearing element", "Disturbing or removing asbestos",
+  "Structural alterations needing temporary support", "Work in or near a confined space", "Shaft or trench deeper than 1.5 m, or a tunnel", "Use of explosives",
+  "Work on or near pressurised gas mains or piping", "Work on or near chemical, fuel or refrigerant lines", "Work on or near energised electrical installations",
+  "Work in a contaminated or flammable atmosphere", "Tilt-up or precast concrete", "Work on or next to a road, railway or shipping lane in use",
+  "Work in an area with movement of powered mobile plant", "Work in areas with artificial extremes of temperature", "Work in or near water with a risk of drowning", "Diving work",
+];
+
+/** One entry per SWMS (all versions): the version in force, any revision waiting, and the history. */
+function swmsSeries(projectId) {
+  const groups = new Map();
+  for (const s of DB.swms.filter((x) => x.projectId === projectId)) (groups.get(s.seriesId) || groups.set(s.seriesId, []).get(s.seriesId)).push(s);
+  return [...groups.values()].map((vs) => {
+    vs.sort((a, b) => b.version - a.version);
+    const current = vs.find((v) => v.status === "approved") || null;
+    const pending = vs.find((v) => ["submitted", "in_review", "changes_requested"].includes(v.status)) || null;
+    return { current, pending, latest: vs[0], versions: vs };
+  }).sort((a, b) => a.latest.ref.localeCompare(b.latest.ref));
+}
+/** The approved version in force for any version of a SWMS. */
+const swmsInForce = (s) => (s ? DB.swms.find((x) => x.seriesId === s.seriesId && x.status === "approved") || null : null);
+
 function search(u, q) {
   const n = q.trim().toLowerCase();
   if (!n) return [];
@@ -632,9 +656,11 @@ function myTasks(u) {
   if (can(u, "defect.verify")) for (const d of listDefects(u).filter((d) => d.status === "ready_for_verification"))
     out.push({ title: `Verify ${d.ref} · ${d.title}`, sub: `${projName(d.projectId)} · ${contractorOf(d.contractorId)?.tradingName ?? ""}`, href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "blue" });
   if (can(u, "swms.review")) for (const s of DB.swms.filter((s) => s.status === "submitted" || s.status === "in_review"))
-    out.push({ title: `Review SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · ${contractorOf(s.contractorId)?.tradingName}`, href: `#/app/projects/${s.projectId}/safety`, tone: "blue" });
+    out.push({ title: `Review SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · ${contractorOf(s.contractorId)?.tradingName}`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: "blue" });
   if (can(u, "commercial.view")) for (const c of DB.claims.filter((c) => c.status === "submitted"))
     out.push({ title: `Assess progress claim ${c.ref}`, sub: `${projName(c.projectId)} · response due ${dayMonth(c.dueDate)}`, href: `#/app/projects/${c.projectId}/commercial`, tone: "amber" });
+  if (can(u, "swms.submit")) for (const s of DB.swms.filter((x) => x.status === "changes_requested" && (u.role !== "subcontractor_admin" || x.contractorId === u.contractorId)))
+    out.push({ title: `Revise SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · changes requested`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: "amber" });
   if (u.role === "subcontractor_admin") for (const d of listDefects(u).filter((d) => d.status === "assigned" || d.status === "rectifying"))
     out.push({ title: `Rectify ${d.ref} · ${d.title}`, sub: projName(d.projectId), href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "amber" });
   const firstProject = listProjects(u)[0];
@@ -663,6 +689,10 @@ function notifications(u) {
   if (od.length) out.push({ title: `${od.length} defects overdue`, sub: "Across active projects", href: "#/app/reports?view=overdue", tone: "amber" });
   for (const c of complianceExpiring(14)) out.push({ title: `${c.who} — ${c.what}`, sub: c.days < 0 ? "Expired" : `Expires in ${c.days} days`, href: "#/app/people", tone: c.days < 0 ? "red" : "amber" });
   for (const i of DB.itps) for (const p of i.points.filter((p) => p.status === "rejected")) out.push({ title: `Inspection rejected · ${i.ref} ${p.name}`, sub: projName(i.projectId), href: `#/app/projects/${i.projectId}/quality/itp/${i.id}`, tone: "red" });
+  for (const s of DB.swms.filter((x) => x.status === "approved" && x.reviewDue)) {
+    const d = daysBetween(new Date(), D(s.reviewDue));
+    if (d <= 14) out.push({ title: `SWMS review ${d < 0 ? "overdue" : "due"} · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · ${d < 0 ? `${-d} days ago` : `in ${d} days`}`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: d < 0 ? "red" : "amber" });
+  }
   // Hold points that need releasing before their task starts.
   for (const i of DB.itps) {
     const t = DB.tasks.find((x) => x.id === i.taskId);
