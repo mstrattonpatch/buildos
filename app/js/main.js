@@ -148,6 +148,7 @@ function render() {
     out = { html: u ? appShell(u, path, notFound(e.message)) : pageSignIn(), title: "Not allowed" };
   }
   if (!out) return;
+  window.hideVizTip?.();
   document.getElementById("root").innerHTML = out.html;
   document.title = `${out.title} · BuildOS`;
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }

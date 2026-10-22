@@ -101,6 +101,13 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - The **client quote** prints sell prices by package with inclusions, exclusions and acceptance lines — no rates, costs or suppliers.
 - A won estimate **converts to a job**: the contract sum, a budget line per package (at cost) and a claim schedule per package (at sell) are filled in.
 
+## Dashboards & charts
+
+- **Company overview** dashboard: contract value vs forecast cost by project, open and overdue defects by project, labour hours per week (by project), defects raised vs closed per week, and progress claims claimed vs certified. Money charts show only for PMs and directors.
+- **Project overview** dashboard: budget vs forecast by cost code, cumulative cost to date against the budget, labour hours per day, and open defects by trade.
+- **Reports** include charts in every preset (hours per day/week and by company, workers on site, defects raised vs closed, defects by trade and company, progress, cost to date, budget vs forecast, claims).
+- Every chart has a legend, a hover/keyboard tooltip and **Show as table**, so nothing relies on colour or hovering alone. Charts are plain SVG/HTML (`app/js/charts.js`), no chart library; series colours use a colour-blind-safe order.
+
 ## Reports & handover
 
 - **Project reports** (*Reports*): weekly site report, client progress report, cost report (internal only), quality report and site diary pack, for any date range. The client view leaves out internal detail. Each section notes how its figures are worked out. Print or save as PDF.
