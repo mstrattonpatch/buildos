@@ -528,3 +528,36 @@ fieldset[disabled] .input { background: #fafbf9; }
 .viz-tip b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .viz-tip span { color: var(--muted); }
 @media print { .viz-table:not([open]) { display: none; } .viz-card { break-inside: avoid; } }
+/* insights */
+.slicers { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); }
+.slicer .menu-panel { padding: 8px; }
+.slicer-opt { padding: 5px 6px; border-radius: 4px; cursor: pointer; }
+.slicer-opt:hover { background: var(--canvas); }
+.slicer .count { background: var(--green); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; margin-left: 2px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #c3c2b7; display: inline-block; }
+.live-dot.on { background: #0ca30c; box-shadow: 0 0 0 3px rgba(12, 163, 12, 0.15); }
+.kpi .m-value { font-size: 26px; }
+.kpi-delta { font-size: 12px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.kpi-delta.up-good { color: #006300; }
+.kpi-delta.up-bad { color: var(--red); }
+.hb-row.xf, .viz-hit.xf { cursor: pointer; }
+.hb-row.xf:hover { background: #f6f7f4; }
+.hb-row.xf-off .hb-bar { opacity: 0.25; }
+.hb-row.xf-off .hb-label, .hb-row.xf-off .hb-val { color: var(--muted); }
+.hb-row[aria-pressed="true"] .hb-label { font-weight: 700; }
+g.xf-off { opacity: 0.25; }
+.whatif-grid { display: grid; grid-template-columns: minmax(240px, 1fr) 2fr; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .whatif-grid { grid-template-columns: 1fr; } }
+.whatif-slider { display: flex; flex-direction: column; gap: 6px; }
+.whatif-slider input[type=range] { width: 100%; accent-color: var(--green); }
+.whatif-result { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--canvas); border-radius: 8px; }
+.whatif-result b { font-size: 18px; }
+.sort-h { color: inherit; white-space: nowrap; }
+.sort-h:hover { color: var(--ink); text-decoration: underline; }
+#ins-body { display: flex; flex-direction: column; gap: 16px; }
+#ins-body > .viz-grid, #ins-body > .metrics { margin: 0; }
+.hb-div .hb-track { gap: 0; }
+.hb-neg, .hb-pos { flex: 1; display: flex; align-items: center; gap: 6px; height: 12px; }
+.hb-neg { justify-content: flex-end; }
+.hb-bar-l { border-radius: 4px 0 0 4px; }
+.hb-zero { width: 1px; align-self: stretch; background: #898781; margin: -2px 0; }

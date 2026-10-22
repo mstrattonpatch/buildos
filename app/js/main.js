@@ -83,6 +83,7 @@ function resolve(path, query) {
   if (company[path]) return { html: appShell(u, path, company[path][0](u)), title: company[path][1] };
   if (path === "/app/timesheets") return { html: appShell(u, path, pageCompanyTimesheets(u, query)), title: "Timesheets" };
   if (path === "/app/timesheets/sheet") return { html: appShell(u, path, pageWeeklySheet(u, query)), title: "Weekly timesheet" };
+  if (path === "/app/insights") return { html: appShell(u, path, pageInsights(u, query)), title: "Insights" };
   if (path === "/app/estimates") return { html: appShell(u, path, pageEstimates(u)), title: "Estimates" };
   const em = path.match(/^\/app\/estimates\/([^/]+)(\/quote)?$/);
   if (em) return { html: appShell(u, path, em[2] ? pageQuote(u, em[1]) : pageEstimate(u, em[1])), title: em[2] ? "Client quote" : "Estimate" };
@@ -153,6 +154,7 @@ function render() {
   document.title = `${out.title} · BuildOS`;
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
   afterChatRender();
+  afterInsightsRender();
 }
 
 // ---- open chat: keep it scrolled to the newest message, mark it read, and check for new messages every 4 s

@@ -35,12 +35,24 @@ const vizEmpty = (msg) => `<p class="small muted viz-empty">${esc(msg)}</p>`;
  * Horizontal bars by category (HTML, so labels stay crisp). series: [{ name, values, color }].
  * Grouped when there is more than one series. Value printed at each bar's tip.
  */
-function hbars({ cats, series, fmt = fmtCount, max }) {
+/** Cross-filter attributes: clicking (or Enter on) a mark toggles that key in the dimension's filter. */
+const xfAttr = (xf, key, selected) => (xf && key != null ? ` data-xf="${esc(xf)}" data-key="${esc(key)}" role="button" aria-pressed="${selected?.has(String(key)) ? "true" : "false"}"` : "");
+const xfOff = (key, selected) => selected?.size && !selected.has(String(key));
+
+function hbars({ cats, series, fmt = fmtCount, max, xf, keys, selected }) {
   if (!cats.length) return vizEmpty("Nothing to show yet.");
   series = series.map((s, i) => ({ color: SERIES[i], ...s }));
-  const top = max ?? (Math.max(...series.flatMap((s) => s.values), 0) || 1);
-  const rows = cats.map((c, ci) => `<div class="hb-row" ${tipAttr(c, series.map((s) => [s.name, fmt(s.values[ci]), s.color]))}><div class="hb-label">${esc(c)}</div><div class="hb-bars">${series.map((s) => {
-    const v = s.values[ci] || 0, w = Math.max(0, Math.min(78, (v / top) * 78));
+  // With any negative value the bars grow either side of a zero line (losses to the left).
+  const neg = series.some((s) => s.values.some((v) => v < 0));
+  const top = max ?? (Math.max(...series.flatMap((s) => s.values.map(Math.abs)), 0) || 1);
+  const rows = cats.map((c, ci) => `<div class="hb-row${neg ? " hb-div" : ""}${xf ? " xf" : ""}${keys && xfOff(keys[ci], selected) ? " xf-off" : ""}" ${tipAttr(c, series.map((s) => [s.name, fmt(s.values[ci]), s.color]))}${xfAttr(xf, keys?.[ci], selected)}><div class="hb-label">${esc(c)}</div><div class="hb-bars">${series.map((s) => {
+    const v = s.values[ci] || 0;
+    if (neg) {
+      const w = Math.min(75, (Math.abs(v) / top) * 75);
+      return v < 0 ? `<div class="hb-track"><span class="hb-neg"><span class="hb-val">${esc(fmt(v))}</span><span class="hb-bar hb-bar-l" style="width:${w}%;background:${s.color}"></span></span><span class="hb-zero"></span><span class="hb-pos"></span></div>`
+        : `<div class="hb-track"><span class="hb-neg"></span><span class="hb-zero"></span><span class="hb-pos"><span class="hb-bar" style="width:${w}%;background:${s.color}"></span><span class="hb-val">${esc(fmt(v))}</span></span></div>`;
+    }
+    const w = Math.max(0, Math.min(78, (v / top) * 78));
     return `<div class="hb-track"><span class="hb-bar" style="width:${w}%;background:${s.color}"></span><span class="hb-val">${esc(fmt(v))}</span></div>`;
   }).join("")}</div></div>`).join("");
   return `<div class="hb">${rows}</div>${legend(series)}${vizTable(["", ...series.map((s) => s.name)], cats.map((c, ci) => [c, ...series.map((s) => fmt(s.values[ci] || 0))]))}`;
@@ -55,17 +67,18 @@ function frame(labels, top, fmt, W = 400, H = 200) {
   return { L, T, pw, ph, step, y, W, H, chrome: grid + xl, cross: `<line class="viz-cross" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="${AXIS}" stroke-width="1" visibility="hidden"/>` };
 }
 /** One transparent hit column per x position; it carries the tooltip for every series there. */
-const hitCols = (f, labels, series, fmt, titles = labels) => labels.map((l, i) => `<rect class="viz-hit" x="${f.L + f.step * i}" y="${f.T}" width="${f.step}" height="${f.ph}" fill="transparent" data-cx="${f.L + f.step * i + f.step / 2}" ${tipAttr(titles[i], series.map((s) => [s.name, fmt(s.values[i] || 0), s.color]))}/>`).join("");
+const hitCols = (f, labels, series, fmt, titles = labels, xf, keys, selected) => labels.map((l, i) => `<rect class="viz-hit${xf ? " xf" : ""}"${xfAttr(xf, keys?.[i], selected)} x="${f.L + f.step * i}" y="${f.T}" width="${f.step}" height="${f.ph}" fill="transparent" data-cx="${f.L + f.step * i + f.step / 2}" ${tipAttr(titles[i], series.map((s) => [s.name, fmt(s.values[i] || 0), s.color]))}/>`).join("");
 const roundTop = (x, y, w, h, r) => (h <= 0 ? "" : h < r ? `M${x},${y + h}V${y}H${x + w}V${y + h}Z` : `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`);
 
 /** Columns over time. Grouped by default; stacked: true stacks the series with 2px gaps. */
-function columns({ labels, series, fmt = fmtCount, stacked = false, tableHead = "", titles = labels }) {
+function columns({ labels, series, fmt = fmtCount, stacked = false, tableHead = "", titles = labels, xf, keys, selected }) {
   if (!labels.length || series.every((s) => s.values.every((v) => !v))) return vizEmpty("Nothing recorded in this period.");
   series = series.map((s, i) => ({ color: SERIES[i], ...s }));
   const top = stacked ? Math.max(...labels.map((_, i) => sum(series, (s) => s.values[i] || 0))) : Math.max(...series.flatMap((s) => s.values));
   const f = frame(labels, top, fmt);
   const band = Math.min(f.step * 0.7, stacked ? 24 : 24 * series.length + 2 * (series.length - 1));
-  const marks = labels.map((_, i) => {
+  const marks = labels.map((_, i) => `<g${keys && xfOff(keys[i], selected) ? ' class="xf-off"' : ""}>${colMarks(i)}</g>`).join("");
+  function colMarks(i) {
     const x0 = f.L + f.step * i + (f.step - band) / 2;
     if (stacked) {
       let acc = 0;
@@ -77,8 +90,8 @@ function columns({ labels, series, fmt = fmtCount, stacked = false, tableHead = 
     }
     const bw = (band - 2 * (series.length - 1)) / series.length;
     return series.map((s, si) => { const v = s.values[i] || 0, yy = f.y(v); return `<path d="${roundTop(x0 + si * (bw + 2), yy, bw, f.T + f.ph - yy, 4)}" fill="${s.color}"/>`; }).join("");
-  }).join("");
-  return `<div class="viz-svg"><svg viewBox="0 0 ${f.W} ${f.H}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Column chart">${f.chrome}${marks}${f.cross}${hitCols(f, labels, series, fmt, titles)}</svg></div>${legend(series)}${vizTable([tableHead, ...series.map((s) => s.name)], labels.map((l, i) => [titles[i], ...series.map((s) => fmt(s.values[i] || 0))]))}`;
+  }
+  return `<div class="viz-svg"><svg viewBox="0 0 ${f.W} ${f.H}" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Column chart">${f.chrome}${marks}${f.cross}${hitCols(f, labels, series, fmt, titles, xf, keys, selected)}</svg></div>${legend(series)}${vizTable([tableHead, ...series.map((s) => s.name)], labels.map((l, i) => [titles[i], ...series.map((s) => fmt(s.values[i] || 0))]))}`;
 }
 
 /** Lines over time; the last point of each series is marked and labelled. ref = { name, value } draws a reference rule. */

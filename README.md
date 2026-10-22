@@ -108,6 +108,17 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **Reports** include charts in every preset (hours per day/week and by company, workers on site, defects raised vs closed, defects by trade and company, progress, cost to date, budget vs forecast, claims).
 - Every chart has a legend, a hover/keyboard tooltip and **Show as table**, so nothing relies on colour or hovering alone. Charts are plain SVG/HTML (`app/js/charts.js`), no chart library; series colours use a colour-blind-safe order.
 
+## Insights (interactive dashboard)
+
+*Insights* in the company menu is a Power BI-style view of the live data:
+
+- **Pages**: Overview, Quality, Labour and Commercial (PMs and directors).
+- **Slicers** scope every visual: date range (presets or custom), projects, companies and trades. KPI tiles compare against the previous period of the same length.
+- **Cross-filtering**: click (or press Enter on) any bar or column to filter everything else by it — click again to clear. The chart you clicked keeps its other bars, dimmed.
+- **Matrix tables** sort by any column, break down by project, company or trade, open the project on click, and export to CSV.
+- **What-if**: on Quality, change the weekly close and raise rates to see when the open defects would be cleared; on Commercial, change the cost still to come and the share of unapproved variations approved to see the margin per project. Nothing is saved.
+- **Live**: the page reloads the data every 30 seconds while it's open (pause it if you like). The filters and what-if values are in the URL, so a view can be bookmarked or shared with colleagues (they see only what their role allows).
+
 ## Reports & handover
 
 - **Project reports** (*Reports*): weekly site report, client progress report, cost report (internal only), quality report and site diary pack, for any date range. The client view leaves out internal detail. Each section notes how its figures are worked out. Print or save as PDF.
