@@ -336,13 +336,14 @@ function createSeed(now = new Date()) {
 // Mirror of role_can() in the database. Used only to decide which buttons
 // to show — the database refuses anything a role isn't allowed to do.
 const SAFETY = ["ncr.manage", "permit.request", "permit.approve", "safety.report", "safety.manage", "attendance.manage"];
+const TIME = ["timesheet.submit", "timesheet.approve", "timesheet.process", "rates.manage"];
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY],
-  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY, "timesheet.submit", "timesheet.approve"],
   quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve", "ncr.manage", "safety.report"],
-  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload", "permit.request", "safety.report"],
-  worker: ["defect.create", "permit.request", "safety.report"],
+  subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload", "permit.request", "safety.report", "timesheet.submit"],
+  worker: ["defect.create", "permit.request", "safety.report", "timesheet.submit"],
 };
 const VARIATION_LIMIT = { project_manager: 5000000, director: Infinity };
 const ROLE_LABEL = { director: "Director", project_manager: "Project manager", site_supervisor: "Site supervisor", quality_manager: "Quality manager", subcontractor_admin: "Subcontractor admin", worker: "Worker" };
@@ -681,6 +682,50 @@ function missingSignOuts(pid) {
 }
 const visitorsOnSite = (pid) => DB.visitors.filter((v) => v.projectId === pid && !v.signedOutAt && ymd(new Date(v.signedInAt)) === todayYmd());
 
+// ---- timesheets & rates
+const ORDINARY_HOURS = 38; // per week; anything over is overtime in the payroll export
+const addDays = (s, n) => { const d = D(s); d.setDate(d.getDate() + n); return ymd(d); };
+const weekStart = (s = todayYmd()) => { const d = D(s); return addDays(s, -((d.getDay() + 6) % 7)); };
+const weekLabel = (w) => `${dayMonth(w)} – ${dayMonth(addDays(w, 6))}`;
+const fmtH = (h) => `${Math.round(Number(h || 0) * 100) / 100} h`;
+const hm = (t) => (t ? t.slice(0, 5) : "");
+const tsCostOf = (t) => DB.timesheetCosts.find((c) => c.timesheetId === t.id);
+const canEnterHoursFor = (u, w) => can(u, "timesheet.approve") || (u.role === "subcontractor_admin" && !!u.contractorId && w.contractorId === u.contractorId) || (u.role === "worker" && u.workerId === w.id);
+const timesheetsIn = (week, pid) => DB.timesheets.filter((t) => t.date >= week && t.date <= addDays(week, 6) && (!pid || t.projectId === pid));
+/** Splits hours into ordinary and overtime per worker, in date order: { [id]: [ordinary, overtime] }. */
+function splitOvertime(list) {
+  const run = {}, out = {};
+  for (const t of [...list].sort((a, b) => a.date.localeCompare(b.date) || hm(a.startTime).localeCompare(hm(b.startTime)))) {
+    const before = run[t.workerId] || 0, h = Number(t.hours), ord = Math.max(0, Math.min(h, ORDINARY_HOURS - before));
+    run[t.workerId] = before + h; out[t.id] = [ord, h - ord];
+  }
+  return out;
+}
+/** Mirrors resolve_rate in the database (display only — processing uses the database's answer). */
+function rateFor(workerId, projectId, code) {
+  const lc = (code || "").toLowerCase(), rules = DB.rateRules;
+  const order = [
+    [(r) => r.projectId === projectId && r.workerId === workerId && r.costCode && r.costCode.toLowerCase() === lc, "Job rate for this person and cost code"],
+    [(r) => r.projectId === projectId && r.workerId === workerId && !r.costCode, "Job rate for this person"],
+    [(r) => r.projectId === projectId && !r.workerId && r.costCode && r.costCode.toLowerCase() === lc, (r) => `Job rate for ${r.costCode}`],
+    [(r) => !r.projectId && !r.workerId && r.costCode && r.costCode.toLowerCase() === lc, (r) => `Company rate for ${r.costCode}`],
+    [(r) => !r.projectId && r.workerId === workerId && !r.costCode, "Personal rate"],
+  ];
+  const out = { cost: null, charge: null, costSource: null, chargeSource: null };
+  let card = null;
+  for (const [match, label] of order) for (const r of rules.filter(match)) {
+    const l = typeof label === "function" ? label(r) : label;
+    if (out.cost === null && r.costRate != null) { out.cost = r.costRate; out.costSource = l; }
+    if (out.charge === null && r.chargeRate != null) { out.charge = r.chargeRate; out.chargeSource = l; }
+    if (r.rateCardId) card = DB.rateCards.find((c) => c.id === r.rateCardId && !c.archived) || null;
+  }
+  if (card) {
+    if (out.cost === null) { out.cost = card.costRate; out.costSource = `Rate card: ${card.name}`; }
+    if (out.charge === null) { out.charge = card.chargeRate; out.chargeSource = `Rate card: ${card.name}`; }
+  }
+  return out;
+}
+
 function myTasks(u) {
   const out = [];
   if (can(u, "variation.approve")) for (const v of listVariations(u).filter((v) => v.status === "submitted" || v.status === "under_review"))
@@ -712,6 +757,13 @@ function myTasks(u) {
     else if (u.role === "subcontractor_admin" && (!n.rootCause || !n.correctiveAction))
       out.push({ title: `Respond to ${n.ref} · ${n.title}`, sub: `${projName(n.projectId)} · root cause and corrective action needed`, href: `#/app/projects/${n.projectId}/quality/ncrs/${n.id}`, tone: "amber" });
   }
+  if (can(u, "timesheet.approve")) for (const p of listProjects(u)) {
+    const n = DB.timesheets.filter((t) => t.projectId === p.id && t.status === "pending" && t.workerId !== u.workerId);
+    if (n.length) out.push({ title: `Approve ${n.length} timesheet${n.length > 1 ? "s" : ""} · ${fmtH(n.reduce((a, t) => a + Number(t.hours), 0))}`, sub: p.name, href: `#/app/projects/${p.id}/workforce/timesheets?week=${weekStart(n.map((t) => t.date).sort()[0])}`, tone: "blue" });
+  }
+  if (can(u, "timesheet.process")) { const n = DB.timesheets.filter((t) => t.status === "approved"); if (n.length) out.push({ title: `Process ${n.length} approved timesheet${n.length > 1 ? "s" : ""}`, sub: "Locks rates and posts labour cost", href: `#/app/timesheets?status=approved&week=${weekStart(n.map((t) => t.date).sort()[0])}`, tone: "blue" }); }
+  for (const t of DB.timesheets.filter((t) => t.status === "rejected" && (t.workerId === u.workerId || (u.role === "subcontractor_admin" && DB.workers.find((w) => w.id === t.workerId)?.contractorId === u.contractorId))))
+    out.push({ title: `Fix hours · ${DB.workers.find((w) => w.id === t.workerId)?.name ?? ""} ${dayMonth(t.date)}`, sub: `${projName(t.projectId)} · rejected: ${t.rejectReason ?? ""}`, href: u.role === "worker" ? "#/site/sign-in" : `#/app/projects/${t.projectId}/workforce/timesheets/${t.id}`, tone: "amber" });
   if (can(u, "attendance.manage")) for (const p of listProjects(u)) { const m = missingSignOuts(p.id); if (m.length) out.push({ title: `${m.length} missing sign-out${m.length > 1 ? "s" : ""}`, sub: `${p.name} · still signed in from an earlier day`, href: `#/app/projects/${p.id}/workforce`, tone: "amber" }); }
   if (u.role === "subcontractor_admin") for (const d of listDefects(u).filter((d) => d.status === "assigned" || d.status === "rectifying"))
     out.push({ title: `Rectify ${d.ref} · ${d.title}`, sub: projName(d.projectId), href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "amber" });

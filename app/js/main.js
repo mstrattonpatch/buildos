@@ -76,6 +76,9 @@ function resolve(path, query) {
     "/app/search": [(x) => pageSearch(x, query), "Search"], "/app/settings": [pageSettings, "Team & roles"], "/app/profile": [pageProfile, "My profile"],
   };
   if (company[path]) return { html: appShell(u, path, company[path][0](u)), title: company[path][1] };
+  if (path === "/app/timesheets") return { html: appShell(u, path, pageCompanyTimesheets(u, query)), title: "Timesheets" };
+  if (path === "/app/timesheets/sheet") return { html: appShell(u, path, pageWeeklySheet(u, query)), title: "Weekly timesheet" };
+  if (path === "/app/rates") return { html: appShell(u, path, pageRates(u)), title: "Rates" };
   if (path === "/app/templates") return { html: appShell(u, path, pageTemplates(u)), title: "ITP templates" };
   const tm = path.match(/^\/app\/templates\/([^/]+)$/);
   if (tm) return { html: appShell(u, path, pageTemplate(u, tm[1])), title: "ITP template" };
@@ -105,6 +108,8 @@ function resolve(path, query) {
     else if (sub === "safety/access") { html = pageSiteAccess(u, p); title = "Site access"; }
     else if (sub === "workforce") { html = pageWorkforce(u, p); title = "Workforce"; }
     else if (sub === "workforce/muster") { html = pageMuster(u, p); title = "Muster list"; }
+    else if (sub === "workforce/timesheets") { html = pageProjectTimesheets(u, p, query); title = "Timesheets"; }
+    else if ((mm = sub.match(/^workforce\/timesheets\/(.+)$/))) { html = pageTimesheet(u, p, mm[1]); title = "Timesheet"; }
     else if (sub === "documents") { html = pageDocuments(u, p, query); title = "Documents"; }
     else if ((mm = sub.match(/^documents\/(.+)$/))) { html = pageDocument(u, p, mm[1]); title = "Document"; }
     else if (sub === "diary") { html = pageDiary(u, p); title = "Site diary"; }
@@ -198,6 +203,11 @@ const swmsPayload = (fd, el) => ({
   hazards: [...el.querySelectorAll(".hz-row")].map((r) => ({ hazard: r.querySelector("[name=hz_hazard]").value.trim(), controls: r.querySelector("[name=hz_controls]").value.trim(), responsible: r.querySelector("[name=hz_responsible]").value.trim() }))
     .filter((h) => h.hazard || h.controls),
 });
+/** Hours only wins over the (pre-filled) start and finish times. */
+const tsPayload = (fd) => {
+  const hours = f(fd, "hours");
+  return { worker_id: f(fd, "worker_id"), date: f(fd, "date"), start_time: hours ? "" : f(fd, "start_time"), end_time: hours ? "" : f(fd, "end_time"), break_min: hours ? "0" : f(fd, "break_min"), hours, task_id: f(fd, "task_id"), cost_code: f(fd, "cost_code"), note: f(fd, "note") };
+};
 const taskPayload = (fd) => ({
   name: f(fd, "name"), is_milestone: fd.get("is_milestone") === "on", forecast_start: f(fd, "forecast_start"), forecast_finish: f(fd, "forecast_finish"),
   trade: f(fd, "trade"), contractor_id: f(fd, "contractor_id"), predecessor_ids: fd.getAll("predecessor_ids"), itp_id: f(fd, "itp_id"), swms_id: f(fd, "swms_id"), cost_code: f(fd, "cost_code"),
@@ -361,6 +371,38 @@ const ACTIONS = {
     const s = DB.swms.find((x) => x.id === f(fd, "swmsId"));
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
+  // ---- timesheets & rates
+  async createTimesheet(fd, u, el) {
+    // The site app form has no billable box: workers' hours are billable unless the office says otherwise.
+    const p = { ...tsPayload(fd), billable: el.querySelector("[name=billable]") ? fd.get("billable") === "on" : true };
+    return (await rpc("create_timesheet", { p_project: f(fd, "project"), p })).message;
+  },
+  async updateTimesheet(fd, u, el) {
+    const t = DB.timesheets.find((x) => x.id === f(fd, "id"));
+    if (fd.get("remove") === "1") { const r = await rpc("delete_timesheet", { p_ts: t.id }); return { msg: r.message, go: `/app/projects/${t.projectId}/workforce/timesheets?week=${weekStart(t.date)}` }; }
+    const p = tsPayload(fd);
+    p.billable = el.querySelector("[name=billable]") ? fd.get("billable") === "on" : t.billable;
+    const r = await rpc("update_timesheet", { p_ts: t.id, p });
+    return { msg: r.message, go: `/app/projects/${t.projectId}/workforce/timesheets?week=${weekStart(f(fd, "date") || t.date)}` };
+  },
+  async tsBulk(fd) {
+    const ids = fd.getAll("ids");
+    if (!ids.length) throw new RuleError("Tick the timesheets first.");
+    const cost = f(fd, "cost") ? parseMoney(f(fd, "cost")) : null, charge = f(fd, "charge") ? parseMoney(f(fd, "charge")) : null;
+    return (await rpc("timesheet_action", { p_ids: ids, p_action: f(fd, "action"), p_reason: f(fd, "reason"), p_cost: cost, p_charge: charge })).message;
+  },
+  async fromSignIns(fd) { return (await rpc("timesheets_from_sign_ins", { p_project: f(fd, "project"), p_date: f(fd, "date") })).message; },
+  async saveRateCard(fd) {
+    const cost = parseMoney(f(fd, "cost")), charge = parseMoney(f(fd, "charge"));
+    if (cost === null || charge === null) throw new RuleError("Enter both the cost and chargeout rates per hour.");
+    const p = { name: f(fd, "name"), cost_rate: cost, charge_rate: charge };
+    if (fd.has("archived")) p.archived = fd.get("archived") === "true";
+    return (await rpc("save_rate_card", { p_org: DB.org.id, p_id: f(fd, "id") || null, p })).message;
+  },
+  async setRate(fd) {
+    const money_ = (k) => (f(fd, k) ? parseMoney(f(fd, k)) : null);
+    return (await rpc("set_rate_rule", { p_org: DB.org.id, p: { project_id: f(fd, "project_id"), worker_id: f(fd, "worker_id"), cost_code: f(fd, "cost_code"), rate_card_id: f(fd, "rate_card_id"), cost_rate: money_("cost"), charge_rate: money_("charge") } })).message;
+  },
   // ---- safety extras
   async createNcr(fd) {
     const r = await rpc("create_ncr", { p_project: f(fd, "project"), p: Object.fromEntries(["title", "requirement", "location", "contractor_id", "containment"].map((k) => [k, f(fd, k)])) });
@@ -482,6 +524,8 @@ document.addEventListener("click", async (e) => {
     render(); window.scrollTo(0, 0); return;
   }
   if (e.target.closest("[data-print]")) { window.print(); return; }
+  const pay = e.target.closest("[data-payroll]");
+  if (pay) { exportPayroll(pay.dataset.payroll); return; }
   const tick = e.target.closest("[data-tick-onsite]");
   if (tick) { tick.closest("form").querySelectorAll("input[data-onsite]").forEach((c) => (c.checked = true)); return; }
   const t = e.target.closest("[data-signout],[data-org],[data-export],[data-qr],[data-refresh]");
@@ -500,6 +544,7 @@ document.addEventListener("change", async (e) => {
     const { path } = parseRoute(), cur = path.match(/^\/app\/projects\/([^/]+)(\/[^/]+)?/);
     go(el.value ? `/app/projects/${el.value}${cur?.[2] && !/defects|itp|new/.test(path) ? cur[2] : ""}` : "/app");
   }
+  if (el.matches("[data-check-all]")) { el.closest("form").querySelectorAll("input[name=ids]").forEach((c) => (c.checked = el.checked)); return; }
   if (el.matches("[data-doc-number]")) {
     // Typing an existing number fills in its title and category.
     const fm = el.closest("form"), d = DB.documents.find((x) => x.number.toLowerCase() === el.value.trim().toLowerCase());
@@ -526,6 +571,22 @@ document.addEventListener("visibilitychange", async () => {
   if (document.querySelector("form[data-act] input:focus, form[data-act] textarea:focus")) return;
   try { await refresh(); render(); } catch { /* keep showing what we have */ }
 });
+
+function downloadCsv(name, rows) {
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows.map((r) => r.map(q).join(",")).join("\r\n")], { type: "text/csv" }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+/** Approved and processed hours for the week, split into ordinary and overtime. */
+function exportPayroll(week) {
+  const list = timesheetsIn(week).filter((t) => t.status === "approved" || t.status === "processed"), ot = splitOvertime(list);
+  const rows = list.map((t) => ({ t, w: DB.workers.find((x) => x.id === t.workerId) })).sort((a, b) => (a.w?.name ?? "").localeCompare(b.w?.name ?? "") || a.t.date.localeCompare(b.t.date));
+  downloadCsv(`Payroll-${week}.csv`, [["Worker", "Company", "Date", "Project", "Start", "Finish", "Unpaid break (min)", "Hours", "Ordinary", "Overtime", "Cost code", "Task", "Billable", "Status"],
+    ...rows.map(({ t, w }) => [w?.name, contractorOf(w?.contractorId)?.tradingName, t.date, projName(t.projectId), hm(t.startTime), hm(t.endTime), t.breakMin, Number(t.hours), ot[t.id][0], ot[t.id][1], t.costCode, DB.tasks.find((x) => x.id === t.taskId)?.name, t.billable ? "Yes" : "No", t.status])]);
+}
 
 function exportDefects(pid) {
   const u = currentUser(), p = getProject(u, pid), { query } = parseRoute();

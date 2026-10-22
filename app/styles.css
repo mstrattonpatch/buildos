@@ -447,3 +447,12 @@ table.kv th { text-align: left; font-weight: 600; color: var(--muted); font-size
   .qr-box { border: 0; } .qr-box svg { max-width: 420px; }
   .qr-poster ol { text-align: left; display: inline-block; font-size: 15px; }
 }
+/* timesheets */
+.ts-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.ts-grid .full { grid-column: 1 / -1; }
+.group-row td { background: #fafbf9; border-top: 1px solid var(--border); }
+.bulk-bar { gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); align-items: center; }
+.inline-details summary { cursor: pointer; }
+.sign-lines { gap: 40px; margin-top: 40px; }
+.sign-line { border-bottom: 1px solid var(--ink); height: 40px; margin-bottom: 6px; }
+@media print { .bulk-bar { display: none; } table.weekly { font-size: 12px; } }

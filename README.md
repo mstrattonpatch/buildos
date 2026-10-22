@@ -62,15 +62,22 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **QR gate** — each project has a printable poster (*Safety → Site access & visitors*). Scanning it opens a page that needs no account. Workers enter their 6-digit worker code, read and acknowledge any SWMS, and sign in or out; the same requirements as the app apply. Visitors enter their details and accept the site rules. Gate calls are rate-limited, and **Replace QR code** stops old posters working.
 - **Workforce** — supervisors can sign someone in by hand (a reason is required, requirements still apply), sign people out, record missing sign-outs at 3:30 pm, and print an emergency **muster list** of workers and visitors on site. Visitor details are visible only to the people who run the site register.
 
+## Timesheets & rates
+
+- **Entering hours** — on a project's *Workforce → Timesheets*: start, finish and unpaid break (rounded to 15 minutes) or hours only, task, cost code and billable. Supervisors and the office enter for anyone, subcontractor admins for their own workers, and workers log their own from the site app (*Me*). Overlapping hours and more than 24 h a day are refused. **Create from sign-ins** makes one timesheet per person from their first sign-in to last sign-out (30-minute break over 5 hours).
+- **Pending → Approved → Processed** — a supervisor, PM or director approves (never their own hours) or rejects with a reason. A PM or director processes, which locks the cost and chargeout rates onto each timesheet. Processed hours show as labour cost by cost code on *Commercial*.
+- **Rates** (*Rates*, PMs and directors only) — rate cards, a personal rate per person, company cost-code rates and job rates. The most specific wins: job + person + cost code → job + person → job + cost code → company cost-code rate → personal rate → rate card. Supervisors and subcontractors never see rates or labour cost.
+- **Payroll** — *Timesheets* lists every project by week, exports a payroll CSV of approved and processed hours split into ordinary and overtime (over 38 h a week), and prints a weekly timesheet per person with sign-off lines.
+
 ## Roles
 
 | Role | Can |
 | --- | --- |
 | Director | Everything, including approving variations of any size |
-| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety |
-| Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress, NCRs, approving permits, investigating incidents, the site register and visitors |
+| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety, approving and processing timesheets, rates |
+| Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress, NCRs, approving permits, investigating incidents, the site register and visitors, entering and approving timesheets |
 | Quality manager | Defects, ITP templates and hold-point sign-off, NCRs |
-| Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations, answering their NCRs, requesting permits, reporting incidents |
-| Worker | Raise defects, report hazards and incidents, request permits, acknowledge SWMS, sign in to site |
+| Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations, answering their NCRs, requesting permits, reporting incidents, entering their workers' hours |
+| Worker | Raise defects, report hazards and incidents, request permits, acknowledge SWMS, sign in to site, log their own hours |
 
 Company **admins** (the person who created the company, plus anyone they tick as admin) can invite people and change roles.

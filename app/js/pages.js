@@ -10,7 +10,7 @@ const STATUS = {
   certified: ["green", "check", "Certified"], paid: ["green", "check", "Paid"], included_in_claim: ["green", "check", "In claim"],
   closed: ["green", "check", "Closed"], superseded: ["grey", "dashed", "Superseded"], overdue: ["amber", "alert", "Overdue"],
   expiring: ["amber", "alert", "Expiring"], changes_requested: ["amber", "alert", "Changes requested"], rejected: ["red", "xcircle", "Rejected"],
-  expired: ["red", "xcircle", "Expired"], requested: ["blue", "clock", "Awaiting approval"], investigating: ["blue", "clock", "Investigating"], corrective_action: ["blue", "clock", "Corrective action"], verification: ["blue", "clock", "Verification"], blocked: ["red-solid", "lock", "Blocked"], hold: ["red-solid", "lock", "Hold point"], offline: ["dashed", "cloudoff", "Offline"],
+  expired: ["red", "xcircle", "Expired"], requested: ["blue", "clock", "Awaiting approval"], processed: ["green", "check", "Processed"], investigating: ["blue", "clock", "Investigating"], corrective_action: ["blue", "clock", "Corrective action"], verification: ["blue", "clock", "Verification"], blocked: ["red-solid", "lock", "Blocked"], hold: ["red-solid", "lock", "Hold point"], offline: ["dashed", "cloudoff", "Offline"],
 };
 const badge = (status, label) => { const [t, i, l] = STATUS[status] || ["grey", "circle", status]; return `<span class="badge badge-${t}">${icon(i, 13, "stroke-width:2.6")}${esc(label ?? l)}</span>`; };
 const sampleTag = () => `<span class="sample-tag" title="Illustrative figures">Sample data</span>`;
@@ -60,7 +60,7 @@ function gantt(tasks, fromOffset = -2, days = 14, opts = {}) {
 const ganttKey = (crit = false) => `<div class="row wrap small muted" style="gap:14px;margin-top:12px">${crit ? '<span class="row" style="gap:5px"><i class="key crit-key"></i>Critical path</span>' : ""}<span class="row" style="gap:5px"><i class="key" style="background:var(--green)"></i>In progress</span><span class="row" style="gap:5px"><i class="key" style="background:var(--amber)"></i>At risk (forecast past baseline)</span><span class="row" style="gap:5px"><i class="key" style="background:var(--blue)"></i>Starting</span><span class="row" style="gap:5px"><i class="key" style="background:var(--red);width:9px;height:9px;transform:rotate(45deg)"></i>Milestone blocked</span><span class="row" style="gap:5px"><i class="key" style="background:#c9cfc8;height:3px"></i>Baseline</span></div>`;
 
 // ===================================================== internal app shell
-const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/people", "People & contractors", "users"], ["#/app/templates", "ITP templates", "clipboard"], ["#/app/reports", "Reports", "chart"]];
+const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/people", "People & contractors", "users"], ["#/app/timesheets", "Timesheets", "clock", false, null, "timesheet.approve"], ["#/app/rates", "Rates", "dollar", false, null, "rates.manage"], ["#/app/templates", "ITP templates", "clipboard"], ["#/app/reports", "Reports", "chart"]];
 const projectNav = (id, money) => { const b = `#/app/projects/${id}`; return [[b, "Overview", "home", true], [`${b}/programme`, "Programme", "calendar"], [`${b}/quality`, "Quality", "clipboard", false, "defects"], [`${b}/safety`, "Safety", "shield"], [`${b}/workforce`, "Workforce & time", "hardhat"], [`${b}/documents`, "Documents", "file"], ...(money ? [[`${b}/commercial`, "Commercial", "dollar"]] : []), [`${b}/diary`, "Site diary", "notebook"], [`${b}/reports`, "Reports", "chart"], [`${b}/handover`, "Handover", "package"]]; };
 const isActive = (cur, href, exact) => { const h = href.slice(1); return exact ? cur === h : cur === h || cur.startsWith(h + "/"); };
 function navLink([href, label, ic, exact, countKey], cur, counts) {
@@ -76,7 +76,7 @@ function appShell(u, route, inner) {
        <div class="proj-card"><div class="label">Project</div><div style="color:#fff;font-weight:600;font-size:13.5px">${esc(project.name)}</div><div class="mono" style="font-size:11.5px;color:#8fa59b">${project.code}</div></div>
        ${projectNav(project.id, can(u, "commercial.view")).map((n) => navLink(n, route, counts)).join("")}
        <div class="bottom"><a class="nav" href="#/app/settings" title="Settings">${icon("settings", 17)}<span class="nav-text">Project settings</span></a></div>`
-    : `<div class="nav-label">Company</div>${companyNav.map((n) => navLink(n, route, counts)).join("")}
+    : `<div class="nav-label">Company</div>${companyNav.filter((n) => !n[5] || can(u, n[5])).map((n) => navLink(n, route, counts)).join("")}
        <div class="nav-label">Recent projects</div>${projects.map((p) => `<a class="nav" href="#/app/projects/${p.id}" title="${esc(p.name)}"><span class="recent-dot"></span><span class="nav-text">${esc(p.name)}</span></a>`).join("")}
        <div class="bottom"><a class="nav" href="#/app/settings" title="Company settings">${icon("settings", 17)}<span class="nav-text">Company settings</span></a></div>`;
   const qBase = project || projects[0] ? `#/app/projects/${project?.id ?? projects[0].id}` : "#/app/projects/new";
@@ -572,6 +572,7 @@ function pageCommercial(u, p) {
   <section class="card"><div class="card-head"><h2>Budget by cost code</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Code</th><th>Description</th><th class="right">Budget</th><th class="right">Committed</th><th class="right">Actual</th><th class="right">Forecast final</th><th class="right">Variance</th></tr></thead><tbody>
     ${lines.map((l) => { const v = l.originalBudget - l.forecastFinal; return `<tr><td class="mono">${l.costCode}</td><td>${esc(l.description)}</td><td class="num">${money(l.originalBudget)}</td><td class="num">${money(l.committed)}</td><td class="num">${money(l.actual)}</td><td class="num">${money(l.forecastFinal)}</td><td class="num ${v < 0 ? "red-text" : ""}">${money(v, { sign: true })}</td></tr>`; }).join("")}
     </tbody><tfoot><tr><td></td><td>Total</td><td class="num">${money(c.budget)}</td><td class="num">${money(c.committed)}</td><td class="num">${money(c.actual)}</td><td class="num">${money(c.forecastFinalCost)}</td><td class="num">${money(c.budget - c.forecastFinalCost, { sign: true })}</td></tr></tfoot></table></div></section>
+  ${labourCard(u, p)}
   <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Progress claims</h2><div class="spacer"></div><span class="small muted">Submitted, certified and paid are tracked separately</span></div><div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>Period end</th><th>Due</th><th class="right">Claimed</th><th class="right">Certified</th><th class="right">Paid</th><th>Status</th></tr></thead><tbody>
     ${claims.map((x) => `<tr><td class="mono">${x.ref}</td><td class="small">${dayMonth(x.periodEnd)}</td><td class="small ${D(x.dueDate) < startOfDay(new Date()) && x.status !== "paid" ? "amber-text" : ""}">${dayMonth(x.dueDate)}</td><td class="num">${money(x.claimed)}</td><td class="num">${x.certified !== undefined ? money(x.certified) : "—"}</td><td class="num">${x.paid !== undefined ? money(x.paid) : "—"}</td><td>${badge(x.status)}</td></tr>`).join("")}
     </tbody></table></div></section>
@@ -685,7 +686,7 @@ const field = (label, inner, cls = "") => `<label class="field ${cls}"><span>${l
 function pageIncidents(u, p) {
   const base = `#/app/projects/${p.id}`, list = DB.incidents.filter((x) => x.projectId === p.id), open = list.filter((x) => x.status !== "closed");
   return `${pageHeader({ crumbs: crumbsFor(p), title: "Safety &amp; compliance", actions: can(u, "safety.report") ? `<a class="btn btn-dark" href="${base}/safety/incidents#report">Report something</a>` : "" })}${safetyTabs(u, p, "incidents")}
-  <div class="metrics">${metric("Open reports", open.length)}${metric("Incidents this month", list.filter((x) => x.type === "incident" && x.occurredAt.slice(0, 7) === todayYmd().slice(0, 7)).length)}${metric("Near misses &amp; hazards", list.filter((x) => x.type === "near_miss" || x.type === "hazard").length, "Reporting these is good")}${metric("Notifiable open", open.filter((x) => x.notifiable).length, "Regulator notified?", open.some((x) => x.notifiable) ? "red" : null)}</div>
+  <div class="metrics">${metric("Open reports", open.length)}${metric("Incidents this month", list.filter((x) => x.type === "incident" && x.occurredAt.slice(0, 7) === todayYmd().slice(0, 7)).length)}${metric("Near misses & hazards", list.filter((x) => x.type === "near_miss" || x.type === "hazard").length, "Reporting these is good")}${metric("Notifiable open", open.filter((x) => x.notifiable).length, "Regulator notified?", open.some((x) => x.notifiable) ? "red" : null)}</div>
   <section class="card"><div class="card-head"><h2>Register</h2><div class="spacer"></div><span class="small muted">Report → investigate → corrective action → close</span></div>
   ${list.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Ref</th><th>What happened</th><th>Type</th><th>Severity</th><th>When</th><th>Status</th></tr></thead><tbody>${list.map((x) => `<tr><td><a class="mono link" href="${base}/safety/incidents/${x.id}">${esc(x.ref)}</a></td><td><a class="rowlink" href="${base}/safety/incidents/${x.id}">${esc(x.title)}</a><div class="muted small">${esc(x.location ?? "")}${x.notifiable ? ' · <b class="red-text">Notifiable</b>' : ""}</div></td><td class="small">${esc(INCIDENT_TYPES[x.type].split(" (")[0])}</td><td>${sevBadge(x.severity)}</td><td class="small">${dateTime(x.occurredAt)}<div class="muted">${esc(userName(x.reportedBy))}</div></td><td>${badge(x.status)}</td></tr>`).join("")}</tbody></table></div>`
     : emptyState("octagon", "Nothing reported yet", "Anyone on the project can report an incident, near miss, hazard or observation from the office or their phone.")}</section>
@@ -855,7 +856,7 @@ function pageNcr(u, p, id) {
 function pageMuster(u, p) {
   if (!can(u, "attendance.manage")) return notFound();
   const here = onSiteNow(p.id).map((e) => ({ e, w: DB.workers.find((w) => w.id === e.workerId) })).filter((x) => x.w).sort((a, b) => a.w.name.localeCompare(b.w.name)), vis = visitorsOnSite(p.id);
-  return `${pageHeader({ crumbs: [[`#/app/projects/${p.id}`, p.name], [`#/app/projects/${p.id}/workforce`, "Workforce"]], title: "Emergency muster list", meta: `<span>${esc(p.name)} · ${here.length + vis.length} people on site at ${timeOf(new Date().toISOString())}, ${longToday()}</span>`, actions: `<button class="btn btn-dark no-print" type="button" data-print>${icon("download", 15)} Print</button>` })}
+  return `<div class="no-print">${workforceTabs(u, p, "muster")}</div>${pageHeader({ crumbs: [[`#/app/projects/${p.id}`, p.name], [`#/app/projects/${p.id}/workforce`, "Workforce"]], title: "Emergency muster list", meta: `<span>${esc(p.name)} · ${here.length + vis.length} people on site at ${timeOf(new Date().toISOString())}, ${longToday()}</span>`, actions: `<button class="btn btn-dark no-print" type="button" data-print>${icon("download", 15)} Print</button>` })}
   <section class="card"><div class="card-head"><h2>Workers (${here.length})</h2></div><div class="table-wrap"><table class="register muster"><thead><tr><th style="width:40px">✓</th><th>Name</th><th>Company</th><th>Phone</th><th>In</th></tr></thead><tbody>
     ${here.map(({ e, w }) => `<tr><td><span class="tick-box"></span></td><td style="font-weight:600">${esc(w.name)}</td><td class="small">${esc(contractorOf(w.contractorId)?.tradingName ?? "")}</td><td class="small">${esc(w.phone ?? "")}</td><td class="small">${timeOf(e.at)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted small">No workers signed in.</td></tr>'}
   </tbody></table></div></section>
@@ -898,6 +899,169 @@ function pageGate(code) {
     <p class="small muted" style="text-align:center">No app or account needed.</p></div>`);
 }
 
+// ===================================================== timesheets & rates
+const workforceTabs = (u, p, cur) => `<nav class="subnav" aria-label="Workforce">${[["", "Site register"], ...(can(u, "timesheet.submit") ? [["timesheets", "Timesheets"]] : []), ...(can(u, "attendance.manage") ? [["muster", "Muster list"]] : [])]
+  .map(([k, l]) => `<a href="#/app/projects/${p.id}/workforce${k ? `/${k}` : ""}"${k === cur ? ' aria-current="page"' : ""}>${l}</a>`).join("")}</nav>`;
+const workerName = (id) => DB.workers.find((w) => w.id === id)?.name ?? "—";
+const costCodes = (pid) => uniq([...DB.budgetLines.filter((l) => !pid || l.projectId === pid).map((l) => l.costCode), ...DB.tasks.filter((t) => (!pid || t.projectId === pid) && t.costCode).map((t) => t.costCode), ...DB.rateRules.filter((r) => r.costCode).map((r) => r.costCode)]).sort();
+const perHour = (c) => (c == null ? '<span class="muted">—</span>' : `${money(c)}/h`);
+
+function tsFields(u, p, t = null, opts = {}) {
+  const workers = DB.workers.filter((w) => canEnterHoursFor(u, w));
+  const tasks = DB.tasks.filter((x) => x.projectId === p.id && !x.isMilestone);
+  return `<div class="form-grid ts-grid">
+    ${t ? "" : opts.worker ? hidden("worker_id", opts.worker) : field("Worker", `<select name="worker_id" class="input"><option value="">Choose…</option>${workers.map((w) => `<option value="${w.id}">${esc(w.name)} · ${esc(contractorOf(w.contractorId)?.tradingName ?? "")}</option>`).join("")}</select>`)}
+    ${field("Date", `<input name="date" type="date" class="input" max="${todayYmd()}" value="${t?.date ?? opts.date ?? todayYmd()}">`)}
+    ${field("Start", `<input name="start_time" type="time" class="input" step="900" value="${hm(t?.startTime) || (t ? "" : "07:00")}">`)}
+    ${field("Finish", `<input name="end_time" type="time" class="input" step="900" value="${hm(t?.endTime) || (t ? "" : "15:30")}">`)}
+    ${field('Unpaid break <span class="muted">(min)</span>', `<input name="break_min" type="number" min="0" max="300" step="5" class="input" value="${t ? t.breakMin : 30}">`)}
+    ${field('Or hours only <span class="muted">(clear the times)</span>', `<input name="hours" type="number" min="0.25" max="24" step="0.25" class="input" value="${t && !t.startTime ? Number(t.hours) : ""}">`)}
+    ${tasks.length ? field("Programme task", `<select name="task_id" class="input"><option value="">—</option>${tasks.map((x) => `<option value="${x.id}"${t?.taskId === x.id ? " selected" : ""}>${esc(x.name)}${x.costCode ? ` · ${esc(x.costCode)}` : ""}</option>`).join("")}</select>`) : ""}
+    ${field('Cost code <span class="muted">(defaults to the task\'s)</span>', `<input name="cost_code" class="input" list="codes-${p.id}" value="${esc(t?.costCode ?? "")}"><datalist id="codes-${p.id}">${costCodes(p.id).map((c) => `<option value="${esc(c)}">`).join("")}</datalist>`)}
+    ${opts.mobile ? "" : `<label class="row small" style="gap:8px;align-self:end;padding-bottom:10px"><input type="checkbox" name="billable"${!t || t.billable ? " checked" : ""}> Billable to the client</label>`}
+    ${field("Note", `<input name="note" class="input" value="${esc(t?.note ?? "")}">`, "full")}
+  </div>`;
+}
+
+/** Shared timesheet table, grouped by worker, with bulk actions for approvers. */
+function tsTable(u, list, { showProject = false, base }) {
+  if (!list.length) return emptyState("clock", "No timesheets this week", "Enter hours below, or create them from the sign-in register.");
+  const ot = splitOvertime(list.filter((t) => t.status !== "rejected")), seeCost = can(u, "rates.manage"), act = can(u, "timesheet.approve");
+  const byWorker = uniq(list.map((t) => t.workerId)).map((id) => ({ w: DB.workers.find((x) => x.id === id), rows: list.filter((t) => t.workerId === id) })).sort((a, b) => (a.w?.name ?? "").localeCompare(b.w?.name ?? ""));
+  const cols = 8 + (showProject ? 1 : 0) + (seeCost ? 1 : 0) + (act ? 1 : 0);
+  const body = byWorker.map(({ w, rows }) => {
+    const live = rows.filter((t) => t.status !== "rejected"), hrs = live.reduce((a, t) => a + Number(t.hours), 0), over = live.reduce((a, t) => a + (ot[t.id]?.[1] || 0), 0);
+    return `<tr class="group-row"><td colspan="${cols}"><b>${esc(w?.name ?? "—")}</b> <span class="muted small">· ${esc(contractorOf(w?.contractorId)?.tradingName ?? "")} · ${fmtH(hrs)}${over ? ` · <span class="amber-text">${fmtH(over)} overtime</span>` : ""}</span>${showProject ? ` <a class="link small" href="#/app/timesheets/sheet?worker=${w?.id}&week=${weekStart(rows[0].date)}" style="margin-left:8px">Weekly timesheet</a>` : ""}</td></tr>` +
+      rows.map((t) => { const c = tsCostOf(t), href = `#/app/projects/${t.projectId}/workforce/timesheets/${t.id}`; return `<tr>
+        ${act ? `<td style="width:32px"><input type="checkbox" name="ids" value="${t.id}" aria-label="Select ${esc(w?.name ?? "")} ${t.date}"></td>` : ""}
+        <td class="small" style="white-space:nowrap"><a class="link" href="${href}">${D(t.date).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}</a></td>
+        ${showProject ? `<td class="small">${esc(projName(t.projectId))}</td>` : ""}
+        <td class="small mono">${t.startTime ? `${hm(t.startTime)}–${hm(t.endTime)}` : "—"}</td><td class="small">${t.breakMin ? `${t.breakMin} min` : "—"}</td>
+        <td class="num">${fmtH(t.hours)}${ot[t.id]?.[1] ? `<div class="amber-text small">${fmtH(ot[t.id][1])} OT</div>` : ""}</td>
+        <td class="small">${esc(DB.tasks.find((x) => x.id === t.taskId)?.name ?? "")}${t.costCode ? ` <span class="tag mono">${esc(t.costCode)}</span>` : ""}${t.billable ? "" : ' <span class="muted">· not billable</span>'}${t.note ? `<div class="muted">${esc(t.note)}</div>` : ""}</td>
+        <td class="small muted">${{ sign_in: "Sign-in", site_app: "Site app", manual: "Office" }[t.source]}</td>
+        ${seeCost ? `<td class="num small">${c ? `${money(Math.round(Number(t.hours) * c.costRate))}<div class="muted">${money(c.costRate)}/h</div>` : '<span class="muted">—</span>'}</td>` : ""}
+        <td>${badge(t.status)}${t.status === "rejected" ? `<div class="small muted">${esc(t.rejectReason ?? "")}</div>` : ""}</td></tr>`; }).join("");
+  }).join("");
+  const table = `<div class="table-wrap"><table class="register ts-table"><thead><tr>${act ? '<th><input type="checkbox" data-check-all aria-label="Select all"></th>' : ""}<th>Date</th>${showProject ? "<th>Project</th>" : ""}<th>Time</th><th>Break</th><th class="right">Hours</th><th>Work</th><th>From</th>${seeCost ? '<th class="right">Cost</th>' : ""}<th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  if (!act) return table;
+  return form("tsBulk", `${table}<div class="bulk-bar row wrap">
+    <span class="small muted">With ticked:</span><button class="btn btn-primary btn-sm" name="action" value="approve">Approve</button>
+    <input name="reason" class="input" placeholder="Reason, to reject" style="height:30px;width:200px" aria-label="Reason to reject"><button class="btn btn-danger btn-sm" name="action" value="reject">Reject</button>
+    ${can(u, "timesheet.process") ? `<span class="spacer"></span><details class="inline-details"><summary class="small link">Rate for people with none set up</summary><div class="row" style="gap:6px;margin-top:6px"><input name="cost" class="input" inputmode="decimal" placeholder="Cost $/h" style="height:30px;width:110px"><input name="charge" class="input" inputmode="decimal" placeholder="Chargeout $/h" style="height:30px;width:130px"></div></details>
+      <button class="btn btn-dark btn-sm" name="action" value="process">Process</button><button class="btn btn-sm" name="action" value="unprocess">Unprocess</button>` : ""}
+  </div>`, 'data-confirm="Process the ticked timesheets? This locks their cost and chargeout rates." data-confirm-for="process"');
+}
+
+const weekNav = (base, week, extra = "") => `<div class="row wrap" style="gap:8px"><a class="btn btn-sm" href="${base}?week=${addDays(week, -7)}${extra}" aria-label="Previous week">${icon("arrowleft", 14)}</a><b style="min-width:150px;text-align:center">${weekLabel(week)}</b><a class="btn btn-sm" href="${base}?week=${addDays(week, 7)}${extra}" aria-label="Next week">${icon("arrowright", 14)}</a>${week !== weekStart() ? `<a class="link small" href="${base}${extra ? `?${extra.slice(1)}` : ""}">This week</a>` : ""}</div>`;
+
+function pageProjectTimesheets(u, p, q) {
+  if (!can(u, "timesheet.submit")) return notFound();
+  const week = weekStart(q.week || todayYmd()), base = `#/app/projects/${p.id}/workforce/timesheets`, list = timesheetsIn(week, p.id);
+  const live = list.filter((t) => t.status !== "rejected"), cnt = (s) => list.filter((t) => t.status === s).length;
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Workforce &amp; time", actions: can(u, "timesheet.approve") ? `<a class="btn" href="#/app/timesheets?week=${week}">All projects &amp; payroll</a>` : "" })}${workforceTabs(u, p, "timesheets")}
+  <div class="metrics">${metric("Hours this week", fmtH(live.reduce((a, t) => a + Number(t.hours), 0)), `${uniq(live.map((t) => t.workerId)).length} people`)}${metric("Pending approval", cnt("pending"), null, cnt("pending") ? "amber" : null)}${metric("Approved", cnt("approved"), "Ready to process")}${metric("Processed", cnt("processed"), "Rates locked")}</div>
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Timesheets</h2><div class="spacer"></div>${weekNav(base, week)}</div>
+    <p class="small muted" style="padding:0 20px 10px">Pending → Approved by a supervisor or PM (never your own hours) → Processed (rates locked). A sign-in is attendance; hours count once they're on an approved timesheet.</p>
+    ${tsTable(u, list, { base })}</section>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr));align-items:start">
+    <section class="card card-pad" id="add-hours"><h2 style="margin-bottom:12px">Enter hours</h2>${form("createTimesheet", `${hidden("project", p.id)}${tsFields(u, p, null, { date: week > todayYmd() ? todayYmd() : addDays(week, 6) < todayYmd() ? week : todayYmd() })}<div style="margin-top:14px"><button class="btn btn-primary">Save hours</button></div>`)}</section>
+    ${can(u, "timesheet.approve") ? `<section class="card card-pad"><h2 style="margin-bottom:6px">Create from sign-ins</h2><p class="small muted" style="margin-bottom:12px">One timesheet per person from their first sign-in to last sign-out that day, with a 30-minute break over 5 hours. People who already have hours that day are skipped.</p>${form("fromSignIns", `${hidden("project", p.id)}<div class="row" style="gap:8px;align-items:flex-end">${field("Date", `<input name="date" type="date" class="input" max="${todayYmd()}" value="${todayYmd()}">`)}<button class="btn">Create timesheets</button></div>`)}</section>` : ""}
+  </div>`;
+}
+
+function pageTimesheet(u, p, id) {
+  const t = DB.timesheets.find((x) => x.id === id && x.projectId === p.id);
+  if (!t) return notFound();
+  const w = DB.workers.find((x) => x.id === t.workerId), editable = (t.status === "pending" || t.status === "rejected") && w && canEnterHoursFor(u, w), c = tsCostOf(t);
+  return `${pageHeader({ crumbs: [[`#/app/projects/${p.id}`, p.name], [`#/app/projects/${p.id}/workforce/timesheets?week=${weekStart(t.date)}`, "Timesheets"]], title: `${esc(w?.name ?? "")} · ${dayMonth(t.date)}`, meta: `<span class="row wrap" style="gap:8px">${badge(t.status)}<span>${fmtH(t.hours)}${t.startTime ? ` · ${hm(t.startTime)}–${hm(t.endTime)}` : ""}</span></span>` })}
+  ${t.status === "rejected" ? `<div class="notice notice-warn">${icon("alert")}<span><b>Rejected</b> by ${esc(userName(t.approvedBy))}: ${esc(t.rejectReason ?? "")}. Fix it below and save to send it back for approval.</span></div>` : ""}
+  <div class="cc-grid"><div class="stack-lg" style="min-width:0">
+    ${editable ? `<section class="card card-pad"><h2 style="margin-bottom:12px">Edit hours</h2>${form("updateTimesheet", `${hidden("id", t.id)}${tsFields(u, p, t)}<div class="row" style="margin-top:14px"><button class="btn btn-primary">Save</button><span class="spacer"></span><button class="btn btn-danger" name="remove" value="1">Delete</button></div>`, 'data-confirm="Delete this timesheet?" data-confirm-for="1"')}</section>`
+      : `<section class="card card-pad"><p class="small muted">${t.status === "processed" ? "Processed timesheets are locked." : t.status === "approved" ? "Approved — to change it, an approver rejects it first." : "You can't change this timesheet."}</p></section>`}
+  </div><aside class="stack-lg"><section class="card card-pad stack small">
+    <div><span class="muted">Entered</span><br>${esc(userName(t.enteredBy))} · ${dateTime(t.enteredAt)} · ${{ sign_in: "from sign-ins", site_app: "site app", manual: "office" }[t.source]}</div>
+    ${t.approvedBy && t.status !== "rejected" ? `<div><span class="muted">Approved</span><br>${esc(userName(t.approvedBy))} · ${dateTime(t.approvedAt)}</div>` : ""}
+    ${t.processedBy ? `<div><span class="muted">Processed</span><br>${esc(userName(t.processedBy))} · ${dateTime(t.processedAt)}</div>` : ""}
+    ${c ? `<div><span class="muted">Locked rates</span><br>Cost ${money(c.costRate)}/h · chargeout ${money(c.chargeRate)}/h<div class="muted">${esc(c.source ?? "")}</div></div>` : ""}
+  </section></aside></div>`;
+}
+
+function pageCompanyTimesheets(u, q) {
+  if (!can(u, "timesheet.approve")) return notFound();
+  const week = weekStart(q.week || todayYmd()), st = q.status || "", list = timesheetsIn(week).filter((t) => !st || t.status === st);
+  const live = timesheetsIn(week).filter((t) => t.status === "approved" || t.status === "processed"), ot = splitOvertime(live);
+  const extra = st ? `&status=${st}` : "";
+  return `${pageHeader({ title: "Timesheets", meta: `<span>Every project, ${weekLabel(week)}</span>`, actions: `<button class="btn" type="button" data-payroll="${week}">${icon("download", 15)} Payroll CSV</button>${can(u, "rates.manage") ? '<a class="btn" href="#/app/rates">Rates</a>' : ""}` })}
+  <div class="metrics">${metric("Approved & processed", fmtH(live.reduce((a, t) => a + Number(t.hours), 0)), `${uniq(live.map((t) => t.workerId)).length} people`)}${metric("Overtime", fmtH(Object.values(ot).reduce((a, x) => a + x[1], 0)), `Over ${ORDINARY_HOURS} h a week`, "amber")}${metric("Pending", timesheetsIn(week).filter((t) => t.status === "pending").length, "Not in payroll until approved")}</div>
+  <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>All timesheets</h2>
+    <div class="row wrap" style="gap:6px;margin-left:12px">${[["", "All"], ["pending", "Pending"], ["approved", "Approved"], ["processed", "Processed"], ["rejected", "Rejected"]].map(([k, l]) => `<a class="chip" data-active="${st === k}" href="#/app/timesheets?week=${week}${k ? `&status=${k}` : ""}">${l}</a>`).join("")}</div>
+    <div class="spacer"></div>${weekNav("#/app/timesheets", week, extra)}</div>
+    ${tsTable(u, list, { showProject: true })}</section>
+  <p class="small muted">The payroll CSV has approved and processed hours only, split into ordinary and overtime (over ${ORDINARY_HOURS} h in the week, in date order). Enter hours on each project's <b>Workforce → Timesheets</b>.</p>`;
+}
+
+function pageWeeklySheet(u, q) {
+  const w = DB.workers.find((x) => x.id === q.worker), week = weekStart(q.week || todayYmd());
+  if (!w || !(can(u, "timesheet.approve") || canEnterHoursFor(u, w))) return notFound();
+  const list = DB.timesheets.filter((t) => t.workerId === w.id && t.date >= week && t.date <= addDays(week, 6) && t.status !== "rejected");
+  const ot = splitOvertime(list), sum = (i) => list.reduce((a, t) => a + (i === 2 ? Number(t.hours) : ot[t.id][i]), 0);
+  return `${pageHeader({ crumbs: [["#/app/timesheets?week=" + week, "Timesheets"]], title: `Weekly timesheet · ${esc(w.name)}`, meta: `<span>${esc(contractorOf(w.contractorId)?.tradingName ?? "")} · week ${weekLabel(week)} · ${esc(DB.org.name)}</span>`, actions: `<button class="btn btn-dark no-print" type="button" data-print>${icon("download", 15)} Print</button>` })}
+  <section class="card"><div class="table-wrap"><table class="register weekly"><thead><tr><th>Day</th><th>Project</th><th>Start</th><th>Finish</th><th>Break</th><th class="right">Ordinary</th><th class="right">Overtime</th><th>Cost code / task</th><th>Status</th></tr></thead><tbody>
+    ${[0, 1, 2, 3, 4, 5, 6].map((i) => { const d = addDays(week, i), rows = list.filter((t) => t.date === d); const day = D(d).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+      return rows.length ? rows.map((t, j) => `<tr><td>${j ? "" : day}</td><td class="small">${esc(projName(t.projectId))}</td><td class="mono small">${hm(t.startTime) || "—"}</td><td class="mono small">${hm(t.endTime) || "—"}</td><td class="small">${t.breakMin ? `${t.breakMin} min` : "—"}</td><td class="num">${fmtH(ot[t.id][0])}</td><td class="num">${ot[t.id][1] ? fmtH(ot[t.id][1]) : "—"}</td><td class="small">${esc(t.costCode ?? "")} ${esc(DB.tasks.find((x) => x.id === t.taskId)?.name ?? "")}</td><td class="small">${words(t.status)}</td></tr>`).join("")
+        : `<tr><td>${day}</td><td colspan="8" class="muted small">—</td></tr>`; }).join("")}
+  </tbody><tfoot><tr><td colspan="5"><b>Total ${fmtH(sum(2))}</b></td><td class="num"><b>${fmtH(sum(0))}</b></td><td class="num"><b>${fmtH(sum(1))}</b></td><td colspan="2"></td></tr></tfoot></table></div></section>
+  ${list.some((t) => t.status === "pending") ? `<div class="notice notice-warn no-print">${icon("alert")}<span>Some hours are still pending approval.</span></div>` : ""}
+  <div class="grid sign-lines" style="grid-template-columns:1fr 1fr"><div><div class="sign-line"></div><span class="small">Worker signature &amp; date</span></div><div><div class="sign-line"></div><span class="small">Supervisor signature &amp; date</span></div></div>`;
+}
+
+function pageRates(u) {
+  if (!can(u, "rates.manage")) return notFound("Rates are only visible to project managers and directors.");
+  const cards = DB.rateCards, rules = DB.rateRules, personal = (w) => rules.find((r) => !r.projectId && !r.costCode && r.workerId === w.id);
+  const scoped = rules.filter((r) => r.projectId || r.costCode).sort((a, b) => projName(a.projectId).localeCompare(projName(b.projectId)) || (a.costCode ?? "").localeCompare(b.costCode ?? ""));
+  const dollars = (c) => (c == null ? "" : (c / 100).toFixed(2));
+  return `${pageHeader({ title: "Rates", meta: "<span>Cost (what the person costs you) and chargeout (what you bill) per hour, excl. GST. Only PMs and directors can see this page.</span>" })}
+  <div class="notice notice-info">${icon("listchecks")}<span>The most specific rate wins: <b>job + person + cost code</b> → job + person → job + cost code → company cost-code rate → the person's own rate → their rate card. Cost and chargeout are worked out separately. Processing a timesheet locks its rates.</span></div>
+  <section class="card"><div class="card-head"><h2>Rate cards</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Name</th><th>Cost / h</th><th>Chargeout / h</th><th>People</th><th></th></tr></thead><tbody>
+    ${cards.map((c) => `<tr${c.archived ? ' style="opacity:.6"' : ""}>${`<td colspan="5">${form("saveRateCard", `${hidden("id", c.id)}<div class="row wrap" style="gap:8px"><input name="name" class="input" value="${esc(c.name)}" style="height:32px;width:200px" aria-label="Name"><input name="cost" class="input" inputmode="decimal" value="${dollars(c.costRate)}" style="height:32px;width:110px" aria-label="Cost per hour"><input name="charge" class="input" inputmode="decimal" value="${dollars(c.chargeRate)}" style="height:32px;width:110px" aria-label="Chargeout per hour"><span class="small muted" style="min-width:90px">${rules.filter((r) => r.rateCardId === c.id).length} people</span><button class="btn btn-sm">Save</button><button class="btn btn-sm" name="archived" value="${c.archived ? "false" : "true"}">${c.archived ? "Restore" : "Archive"}</button></div>`)}</td>`}</tr>`).join("")}
+    <tr><td colspan="5">${form("saveRateCard", `<div class="row wrap" style="gap:8px"><input name="name" class="input" placeholder="New card, e.g. Leading hand" style="height:32px;width:200px"><input name="cost" class="input" inputmode="decimal" placeholder="Cost $/h" style="height:32px;width:110px"><input name="charge" class="input" inputmode="decimal" placeholder="Chargeout $/h" style="height:32px;width:110px"><button class="btn btn-sm btn-primary">Add rate card</button></div>`)}</td></tr>
+  </tbody></table></div></section>
+  <section class="card"><div class="card-head"><h2>People</h2><div class="spacer"></div><span class="small muted">A card, plus an optional personal rate that overrides it</span></div><div class="table-wrap"><table class="register"><thead><tr><th>Person</th><th>Card &amp; personal rate</th><th>Resolves to</th></tr></thead><tbody>
+    ${DB.workers.map((w) => { const r = personal(w), eff = rateFor(w.id, null, null); return `<tr><td style="font-weight:600">${esc(w.name)}<div class="muted small" style="font-weight:400">${esc(contractorOf(w.contractorId)?.tradingName ?? "")}</div></td>
+      <td>${form("setRate", `${hidden("worker_id", w.id)}<div class="row wrap" style="gap:6px"><select name="rate_card_id" class="input" style="height:32px;width:170px" aria-label="Rate card"><option value="">No card</option>${cards.filter((c) => !c.archived).map((c) => `<option value="${c.id}"${r?.rateCardId === c.id ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select><input name="cost" class="input" inputmode="decimal" placeholder="Cost $/h" value="${dollars(r?.costRate)}" style="height:32px;width:100px" aria-label="Personal cost per hour"><input name="charge" class="input" inputmode="decimal" placeholder="Charge $/h" value="${dollars(r?.chargeRate)}" style="height:32px;width:100px" aria-label="Personal chargeout per hour"><button class="btn btn-sm">Save</button></div>`)}</td>
+      <td class="small">${eff.cost == null && eff.charge == null ? '<span class="amber-text">No rate — set one before processing</span>' : `${perHour(eff.cost)} cost · ${perHour(eff.charge)} charge<div class="muted">${esc(eff.costSource ?? eff.chargeSource ?? "")}</div>`}</td></tr>`; }).join("") || '<tr><td colspan="3" class="muted small">No workers yet.</td></tr>'}
+  </tbody></table></div></section>
+  <section class="card"><div class="card-head"><h2>Job and cost-code rates</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Job</th><th>Person</th><th>Cost code</th><th>Cost / h</th><th>Chargeout / h</th><th></th></tr></thead><tbody>
+    ${scoped.map((r) => `<tr><td class="small">${r.projectId ? esc(projName(r.projectId)) : '<span class="muted">All jobs</span>'}</td><td class="small">${r.workerId ? esc(workerName(r.workerId)) : '<span class="muted">Anyone</span>'}</td><td class="mono small">${esc(r.costCode ?? "Any")}</td><td class="small">${perHour(r.costRate)}</td><td class="small">${perHour(r.chargeRate)}</td>
+      <td>${form("setRate", `${hidden("project_id", r.projectId ?? "")}${hidden("worker_id", r.workerId ?? "")}${hidden("cost_code", r.costCode ?? "")}<button class="btn btn-sm btn-danger">Remove</button>`)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted small">None yet — people use their own rate or card on every job.</td></tr>'}
+    <tr><td colspan="6">${form("setRate", `<div class="row wrap" style="gap:6px"><select name="project_id" class="input" style="height:32px;width:170px" aria-label="Job"><option value="">All jobs</option>${DB.projects.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select>
+      <select name="worker_id" class="input" style="height:32px;width:170px" aria-label="Person"><option value="">Anyone</option>${DB.workers.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("")}</select>
+      <input name="cost_code" class="input" list="all-codes" placeholder="Cost code (any)" style="height:32px;width:140px" aria-label="Cost code"><datalist id="all-codes">${costCodes().map((c) => `<option value="${esc(c)}">`).join("")}</datalist>
+      <input name="cost" class="input" inputmode="decimal" placeholder="Cost $/h" style="height:32px;width:100px" aria-label="Cost per hour"><input name="charge" class="input" inputmode="decimal" placeholder="Charge $/h" style="height:32px;width:100px" aria-label="Chargeout per hour"><button class="btn btn-sm btn-primary">Add rate</button></div>`)}</td></tr>
+  </tbody></table></div></section>`;
+}
+
+/** Processed labour on a project, by cost code (commercial page). */
+function labourCard(u, p) {
+  const done = DB.timesheets.filter((t) => t.projectId === p.id && t.status === "processed"), waiting = DB.timesheets.filter((t) => t.projectId === p.id && t.status === "approved");
+  const rows = uniq(done.map((t) => t.costCode || "")).sort().map((code) => { const ts = done.filter((t) => (t.costCode || "") === code); const c = (k) => ts.reduce((a, t) => a + Math.round(Number(t.hours) * (tsCostOf(t)?.[k] || 0)), 0); return { code, h: ts.reduce((a, t) => a + Number(t.hours), 0), cost: c("costRate"), charge: c("chargeRate") }; });
+  const tot = (k) => rows.reduce((a, r) => a + r[k], 0);
+  return `<section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Labour</h2><div class="spacer"></div><span class="small muted">Processed timesheets at their locked rates${waiting.length ? ` · ${fmtH(waiting.reduce((a, t) => a + Number(t.hours), 0))} approved, not yet processed` : ""}</span></div>
+    ${rows.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Cost code</th><th class="right">Hours</th><th class="right">Cost</th><th class="right">Chargeout</th></tr></thead><tbody>${rows.map((r) => `<tr><td class="mono">${esc(r.code || "No code")}</td><td class="num">${fmtH(r.h)}</td><td class="num">${money(r.cost)}</td><td class="num">${money(r.charge)}</td></tr>`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td class="num">${fmtH(tot("h"))}</td><td class="num">${money(tot("cost"))}</td><td class="num">${money(tot("charge"))}</td></tr></tfoot></table></div>`
+      : `<p class="small muted" style="padding:0 20px 18px">No processed timesheets yet. <a class="link" href="#/app/projects/${p.id}/workforce/timesheets">Go to timesheets</a></p>`}</section>`;
+}
+
+/** Worker's own hours in the site app. */
+function siteHours(u, p, w) {
+  const week = weekStart(), mine = DB.timesheets.filter((t) => t.workerId === w.id && t.date >= addDays(week, -7)).sort((a, b) => b.date.localeCompare(a.date));
+  return `<div class="label">My hours</div>
+    <div class="list-card">${mine.map((t) => `<div class="li" style="justify-content:space-between;gap:10px"><span><b style="display:block;font-size:15px">${D(t.date).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })} · ${fmtH(t.hours)}</b><span class="muted small">${t.startTime ? `${hm(t.startTime)}–${hm(t.endTime)} · ` : ""}${esc(projName(t.projectId))}${t.status === "rejected" ? ` · <span class="red-text">${esc(t.rejectReason ?? "")}</span>` : ""}</span></span>${badge(t.status)}</div>`).join("") || '<div class="li muted">No hours entered in the last two weeks.</div>'}</div>
+    ${mine.some((t) => t.status === "rejected") ? '<p class="small muted">Rejected hours: enter them again with the fix. The rejected entry stays for the record.</p>' : ""}
+    <details class="card card-pad"><summary class="link" style="cursor:pointer;font-size:15px">+ Log hours</summary><div style="margin-top:12px">${form("createTimesheet", `${hidden("project", p.id)}${tsFields(u, p, null, { worker: w.id, mobile: true })}<button class="btn btn-primary btn-lg btn-block" style="margin-top:12px">Send for approval</button>`)}</div></details>`;
+}
+
 function pageWorkforce(u, p) {
   const base = `#/app/projects/${p.id}`, here = onSiteNow(p.id), hereIds = new Set(here.map((e) => e.workerId)), office = can(u, "attendance.manage");
   const workers = DB.workers.filter((w) => w.inductedProjectIds.includes(p.id) || hereIds.has(w.id) || DB.tasks.some((t) => t.projectId === p.id && t.contractorId === w.contractorId));
@@ -905,7 +1069,7 @@ function pageWorkforce(u, p) {
   const comps = uniq(workers.map((w) => w.contractorId)).map(contractorOf).filter(Boolean), missing = office ? missingSignOuts(p.id) : [], vis = office ? visitorsOnSite(p.id) : [];
   const action = ({ w, r, inAt }) => !office ? "" : inAt ? form("manualOut", `${hidden("project", p.id)}${hidden("worker", w.id)}<button class="btn btn-sm">Sign out</button>`)
     : r.eligible ? form("manualIn", `${hidden("project", p.id)}${hidden("worker", w.id)}<div class="inline-form"><input name="reason" class="input" placeholder="Reason, e.g. no phone" aria-label="Reason for manual sign-in"><button class="btn btn-sm">Sign in</button></div>`) : "";
-  return `${pageHeader({ crumbs: crumbsFor(p), title: "Workforce &amp; site access", actions: office ? `<a class="btn btn-dark" href="${base}/workforce/muster">${icon("users", 15)} Muster list</a><a class="btn" href="${base}/safety/access">Gate QR &amp; visitors</a>` : "" })}
+  return `${pageHeader({ crumbs: crumbsFor(p), title: "Workforce &amp; time", actions: office ? `<a class="btn" href="${base}/safety/access">Gate QR &amp; visitors</a>` : "" })}${workforceTabs(u, p, "")}
   <div class="metrics">${metric("On site now", here.length, `${companiesOnSite(p.id)} companies`)}${office ? metric("Visitors on site", vis.length) : ""}${metric("Can't sign in", rows.filter((x) => !x.r.eligible).length, "Exact requirement shown below", "amber")}${metric("Companies engaged", comps.length)}</div>
   ${missing.length ? `<div class="notice notice-warn" style="align-items:center">${icon("clock")}<span style="flex:1"><b>${missing.length} missing sign-out${missing.length > 1 ? "s" : ""}:</b> ${missing.map((e) => esc(DB.workers.find((w) => w.id === e.workerId)?.name ?? "")).join(", ")} — still signed in from an earlier day.</span>${form("fixMissing", `${hidden("project", p.id)}<button class="btn btn-sm">Record sign-out at 3:30 pm</button>`)}</div>` : ""}
   <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Site register &amp; eligibility</h2><div class="spacer"></div><span class="small muted">${office ? "Signing someone in by hand needs a reason, and requirements still apply · " : ""}A check-in is attendance, not an approved timesheet</span></div>
@@ -916,7 +1080,7 @@ function pageWorkforce(u, p) {
   <section class="card"><div class="card-head"><h2>Contractor compliance</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Company</th><th>Trade</th><th>Public liability</th><th>Workers comp</th></tr></thead><tbody>
   ${comps.map((c) => `<tr><td style="font-weight:600">${esc(c.tradingName)}${c.abn ? `<div class="muted small">ABN ${esc(c.abn)}</div>` : ""}</td><td class="small">${esc(c.trade ?? "")}</td>${["Public liability", "Workers comp"].map((t) => { const ins = c.insurances.find((i) => i.type === t); return `<td>${ins ? insBadge(ins) : '<span class="muted small">Not on file</span>'}</td>`; }).join("")}</tr>`).join("")}
   </tbody></table></div></section>
-  <p class="small muted">Timesheets (separate payroll and charge-out rates, supervisor approval) are next on the roadmap.</p>`;
+`;
 }
 function insBadge(ins, withType = false) {
   const d = daysBetween(new Date(), D(ins.expires)), t = withType ? `${ins.type} · ` : "";
@@ -1193,6 +1357,7 @@ function pageSiteSignIn(u, route) {
     ${onSite ? `<div class="notice notice-ok">${icon("checkcircle")}You're signed in to site.</div>${form("siteOut", hidden("projectId", p.id) + '<button class="btn btn-lg btn-block">Sign out of site</button>')}`
       : form("siteIn", hidden("projectId", p.id) + `<button class="btn ${r.eligible ? "btn-primary" : ""} btn-lg btn-block"${r.eligible ? "" : " disabled"}>Sign in to site</button>`)}
     <div class="li" style="justify-content:space-between;border:1px solid var(--border);border-radius:12px;padding:12px 14px"><span class="small">Your gate code <span class="muted">(for the QR poster)</span></span><b class="mono" style="font-size:20px;letter-spacing:3px">${esc(w.workerCode ?? "")}</b></div>
+    ${siteHours(u, p, w)}
     <a class="btn btn-lg btn-block" href="#/app/projects/${p.id}/safety/incidents#report">${icon("alert", 16)} Report a hazard or incident</a>
     <p class="small muted" style="text-align:center">Linked to ${esc(contractorOf(w.contractorId)?.tradingName)}</p>
   </div>${siteTabs(route)}`);

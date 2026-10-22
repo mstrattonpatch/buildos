@@ -64,14 +64,15 @@ async function loadCompany(orgId) {
   const T = [
     "memberships", "contractors", "insurances", "workers", "inductions", "credentials", "projects", "locations", "tasks",
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
-    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees",
+    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs",
   ];
-  const [orgRes, profRes, attendance, audit, invitations, visitors, ...rows] = await Promise.all([
+  const [orgRes, profRes, attendance, audit, invitations, timesheets, visitors, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
     sb.from("profiles").select("*"),
     selectAll("attendance", (q) => q.gte("at", twoDaysAgo)),
     selectAll("audit_events", (q) => q.order("at", { ascending: false }).limit(300)),
     selectAll("invitations", (q) => q.is("accepted_at", null)),
+    selectAll("timesheets", (q) => q.gte("date", ymd(new Date(Date.now() - 120 * 86400000)))),
     selectAll("visitors", (q) => q.gte("signed_in_at", new Date(Date.now() - 14 * 86400000).toISOString()).order("signed_in_at", { ascending: false })),
     ...T.map((t) => selectAll(t)),
   ]);
@@ -110,6 +111,10 @@ async function loadCompany(orgId) {
     incidents: r.incidents.sort((a, b) => b.reportedAt.localeCompare(a.reportedAt)),
     toolbox: r.toolbox_talks.map((t) => ({ ...t, attendees: r.toolbox_attendees.filter((a) => a.talkId === t.id).map((a) => a.workerId) })).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)),
     visitors,
+    timesheets: timesheets.sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || "").localeCompare(b.startTime || "")),
+    timesheetCosts: r.timesheet_costs,
+    rateCards: r.rate_cards.sort((a, b) => a.name.localeCompare(b.name)),
+    rateRules: r.rate_rules,
     attendance,
     budgetLines: r.budget_lines.sort((a, b) => a.costCode.localeCompare(b.costCode)),
     variations: r.variations.sort((a, b) => a.ref.localeCompare(b.ref)),
