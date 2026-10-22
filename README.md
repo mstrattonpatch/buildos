@@ -124,6 +124,13 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **Project reports** (*Reports*): weekly site report, client progress report, cost report (internal only), quality report and site diary pack, for any date range. The client view leaves out internal detail. Each section notes how its figures are worked out. Print or save as PDF.
 - **Handover** (*Handover*): readiness checks for open defects, unreleased inspection points, open NCRs, and current certificates, warranties, O&M manuals and as-built drawings (upload these under those document categories). The pack lists outstanding defects, ITP status and the drawing register, and prints as a cover document. Issuing it records the recipient and what was outstanding, and moves the project into its defects liability period.
 
+## Worker wallets & contractor profiles
+
+- **Credential wallet** (*People → a worker*): each card or licence keeps its evidence, issuer, expiry and status — uploaded, awaiting verification, verified, expired, rejected or unable to verify. Verifying records the method (original sighted, online register checked…), who and when. Nobody verifies their own.
+- **Site requirements** (*Workforce*): besides the White Card and induction, a project can require other credentials (e.g. working at heights). They block sign-in — in the app, at the QR gate and for manual sign-in — until verified and in date.
+- **Self-service links** (no account needed): give a worker their link to see their cards and upload new ones; give a contractor theirs to update contacts and upload insurance certificates and company documents. Uploads wait for the office to check them. Links can be replaced at any time, and uploads through a link can only go into that link's own folder.
+- **Contractor profile** (*People → a company*): contacts and emergency contact, approved trades, prequalification (approval needs an expiry), insurances with cover limits and certificates, company documents, workers and their compliance, projects, and performance — defects assigned, average close-out, NCRs, agreed backcharges.
+
 ## Roles
 
 | Role | Can |

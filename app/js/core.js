@@ -414,9 +414,16 @@ function commercialPosition(p, vars, lines) {
   };
 }
 
+const CREDENTIAL_TYPES = ["White Card", "Working at heights", "Confined space", "First aid", "EWP licence (high risk)", "Forklift licence (high risk)", "Dogging licence (high risk)", "Rigging licence (high risk)", "Scaffolding licence (high risk)", "Crane licence (high risk)", "Electrical licence", "Plumbing licence", "Asbestos awareness", "Traffic control", "Other"];
+const CRED_STATUS = { uploaded: ["pending", "Uploaded"], awaiting_verification: ["in_review", "Awaiting verification"], verified: ["verified", "Verified"], expired: ["expired", "Expired"], rejected: ["rejected", "Rejected"], unable_to_verify: ["expiring", "Unable to verify"] };
+const credStatus = (c, today = new Date()) => (c.status === "verified" && c.expires && D(c.expires) < startOfDay(today) ? "expired" : c.status);
+/** The record that counts for a type: verified and in date first, then the most recent upload. */
+const bestCredential = (list, type) => { const of = list.filter((c) => c.type.toLowerCase() === type.toLowerCase() && c.status !== "rejected"); return of.find((c) => credStatus(c) === "verified") || of.sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""))[0] || list.find((c) => c.type.toLowerCase() === type.toLowerCase()); };
 function credentialReq(type, c, today, mandatory) {
   if (!c) return { label: type, detail: "Not uploaded", severity: mandatory ? "blocking" : "warning" };
-  if (c.expires && D(c.expires) < startOfDay(today)) return { label: type, detail: `Expired ${dayMonth(c.expires)}`, severity: "blocking" };
+  if (c.expires && D(c.expires) < startOfDay(today)) return { label: type, detail: `Expired ${dayMonth(c.expires)}`, severity: mandatory || c.status === "verified" ? "blocking" : "warning" };
+  if (c.status === "rejected") return { label: type, detail: `Rejected — ${c.rejectReason ?? "upload it again"}`, severity: mandatory ? "blocking" : "warning" };
+  if (c.status === "unable_to_verify") return { label: type, detail: "Couldn't be verified — see the site office", severity: mandatory ? "blocking" : "warning" };
   if (c.status !== "verified") return { label: type, detail: "Awaiting verification", severity: mandatory ? "blocking" : "warning" };
   const days = c.expires ? daysBetween(today, D(c.expires)) : Infinity;
   if (days <= 30) return { label: type, detail: `Expires ${dayMonth(c.expires)}`, severity: "warning" };
@@ -425,10 +432,13 @@ function credentialReq(type, c, today, mandatory) {
 /** Exact requirements for a worker to sign in — never a generic "not compliant". */
 function siteRequirements(w, projectId, today = new Date()) {
   const mine = DB.credentials.filter((c) => c.workerId === w.id);
-  const reqs = [credentialReq("White Card", mine.find((c) => c.type === "White Card"), today, true)];
+  const reqs = [credentialReq("White Card", bestCredential(mine, "White Card"), today, true)];
   const inducted = w.inductedProjectIds.includes(projectId);
   reqs.push({ label: "Site induction", detail: inducted ? "Complete" : "Not yet inducted to this site", severity: inducted ? "ok" : "blocking" });
-  for (const c of mine.filter((c) => c.type !== "White Card")) reqs.push(credentialReq(c.type, c, today, false));
+  // Mirrors site_blockers(): each project's required credentials block sign-in too.
+  const required = DB.projectRequirements.filter((r) => r.projectId === projectId).map((r) => r.type);
+  for (const t of required) reqs.push(credentialReq(t, bestCredential(mine, t), today, true));
+  for (const t of uniq(mine.map((c) => c.type)).filter((t) => t !== "White Card" && !required.some((r) => r.toLowerCase() === t.toLowerCase()))) reqs.push(credentialReq(t, bestCredential(mine, t), today, false));
   for (const s of DB.swms.filter((s) => s.projectId === projectId && s.contractorId === w.contractorId && s.status === "approved")) {
     const ack = s.acknowledgedBy.includes(w.id);
     reqs.push({ label: `SWMS · ${s.title} v${s.version}`, detail: ack ? "Acknowledged" : "Needs signing", severity: ack ? "ok" : "blocking" });
@@ -844,6 +854,14 @@ function myTasks(u) {
     out.push({ title: `Review ${d.number} rev ${d.revision} · ${d.title}`, sub: `${projName(d.projectId)} · uploaded ${dayMonth(d.uploadedAt)}`, href: `#/app/projects/${d.projectId}/documents/${d.id}`, tone: "blue" });
   if (can(u, "swms.submit")) for (const s of DB.swms.filter((x) => x.status === "changes_requested" && (u.role !== "subcontractor_admin" || x.contractorId === u.contractorId)))
     out.push({ title: `Revise SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · changes requested`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: "amber" });
+  if (can(u, "people.manage")) {
+    const creds = DB.credentials.filter((c) => c.status === "awaiting_verification" && c.workerId !== u.workerId);
+    for (const w of uniq(creds.map((c) => c.workerId))) { const n = creds.filter((c) => c.workerId === w); out.push({ title: `Verify ${n.length} credential${n.length > 1 ? "s" : ""} · ${DB.workers.find((x) => x.id === w)?.name ?? ""}`, sub: n.map((c) => c.type).join(", "), href: `#/app/people/workers/${w}`, tone: "blue" }); }
+    for (const c of DB.contractors) {
+      const n = c.insurances.filter((i) => i.status === "awaiting_verification").length + DB.contractorDocs.filter((d) => d.contractorId === c.id && d.status === "awaiting_verification").length;
+      if (n) out.push({ title: `Check ${n} upload${n > 1 ? "s" : ""} from ${c.tradingName}`, sub: "Insurance certificates and company documents", href: `#/app/people/contractors/${c.id}`, tone: "blue" });
+    }
+  }
   if (can(u, "permit.approve")) for (const x of DB.permits.filter((x) => x.status === "requested" && x.requestedBy !== u.id))
     out.push({ title: `Approve permit ${x.ref} · ${x.type}`, sub: `${projName(x.projectId)} · ${x.location} · from ${dayMonth(x.validFrom)}`, href: `#/app/projects/${x.projectId}/safety/permits/${x.id}`, tone: "red" });
   if (can(u, "safety.manage")) for (const x of DB.incidents.filter((x) => x.status !== "closed" && x.type !== "observation"))

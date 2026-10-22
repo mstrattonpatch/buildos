@@ -28,6 +28,8 @@ the extras are added.
 | Costs & claims | Budget (PS/PC), purchase orders, bills with separation of duties, receipts from the site app, internal charges, backcharges, running-cost ledger with warnings, lump-sum and cost-plus progress claims with retention and a claim document |
 | Estimates | Items with quantity formulas, assemblies, trade package quotes, markup, versions, client quote, convert to a job |
 | Reports & handover | Weekly site, client progress, cost, quality and diary pack reports with internal/client views; handover readiness, printable pack, defects liability period |
+| Worker wallets & contractor profiles | Credential verification workflow, project site requirements, no-account self-service links for workers and contractors, contractor profiles with insurances, documents and performance |
+| Insights & dashboards | Charts in overviews and reports; interactive Insights page with slicers, cross-filtering, what-if and live refresh |
 | Variations (basic), claims register, budget view, site diary, sign-in | |
 
 ## Next, in order

@@ -64,7 +64,7 @@ async function loadCompany(orgId) {
   const T = [
     "memberships", "contractors", "insurances", "workers", "inductions", "credentials", "projects", "locations", "tasks",
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
-    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads", "contract_items", "purchase_orders", "bills", "receipts", "internal_charges", "backcharges", "estimates", "estimate_items", "estimate_quotes", "assemblies", "handovers",
+    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads", "contract_items", "purchase_orders", "bills", "receipts", "internal_charges", "backcharges", "estimates", "estimate_items", "estimate_quotes", "assemblies", "handovers", "contractor_docs", "project_requirements", "portal_links",
   ];
   const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
@@ -95,6 +95,9 @@ async function loadCompany(orgId) {
     contractors: r.contractors.map((c) => ({ ...c, insurances: r.insurances.filter((i) => i.contractorId === c.id) })).sort((a, b) => a.tradingName.localeCompare(b.tradingName)),
     workers: r.workers.map((w) => ({ ...w, inductedProjectIds: r.inductions.filter((i) => i.workerId === w.id).map((i) => i.projectId) })).sort((a, b) => a.name.localeCompare(b.name)),
     credentials: r.credentials,
+    contractorDocs: r.contractor_docs.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)),
+    projectRequirements: r.project_requirements,
+    portalLinks: r.portal_links,
     tasks: r.tasks.map((t) => ({ ...t, predecessorIds: t.predecessorIds || [] })),
     defects: r.defects.map((d) => ({ ...d, photos: d.photos || [], evidencePhotos: d.evidencePhotos || [] })).sort((a, b) => b.ref.localeCompare(a.ref)),
     itps: r.itps.map((i) => ({ ...i, points: r.itp_points.filter((p) => p.itpId === i.id).sort((a, b) => a.seq - b.seq).map((p) => ({
@@ -156,7 +159,8 @@ async function signPhotos(db) {
 }
 
 async function signFiles(db) {
-  const paths = uniq([...db.swms.map((s) => s.filePath), ...db.documents.map((d) => d.filePath), ...db.bills.map((b) => b.filePath)].filter((p) => p && p.startsWith(db.org.id + "/")));
+  const paths = uniq([...db.swms.map((s) => s.filePath), ...db.documents.map((d) => d.filePath), ...db.bills.map((b) => b.filePath), ...db.credentials.map((c) => c.filePath),
+    ...db.contractors.flatMap((c) => c.insurances.map((i) => i.filePath)), ...db.contractorDocs.map((d) => d.filePath)].filter((p) => p && p.startsWith(db.org.id + "/")));
   if (!paths.length) return;
   const { data } = await sb.storage.from("documents").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.fileUrls[x.path] = x.signedUrl;
@@ -168,13 +172,14 @@ async function uploadDocument(input) {
 }
 
 /** Same as uploadDocument, but also returns the file's name, size and type. */
-async function uploadDocumentWithInfo(input) {
+/** prefix: storage folder (defaults to the company's); self-service links upload under "<org>/portal/<token>". */
+async function uploadDocumentWithInfo(input, prefix = DB?.org.id) {
   const file = input?.files?.[0];
   if (!file) return null;
   if (file.size > 20 * 1024 * 1024) throw new RuleError("That file is over 20 MB. Please upload a smaller copy.");
   const ext = (file.name.match(/\.([a-z0-9]{1,5})$/i)?.[1] || "bin").toLowerCase();
   if (!["pdf", "jpg", "jpeg", "png", "heic", "doc", "docx"].includes(ext)) throw new RuleError("Upload a PDF, Word document or photo.");
-  const path = `${DB.org.id}/${crypto.randomUUID()}.${ext}`;
+  const path = `${prefix}/${crypto.randomUUID()}.${ext}`;
   const { error } = await sb.storage.from("documents").upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
   if (error) throw new RuleError(`Upload failed: ${friendlyError(error)}`);
   return { path, name: file.name, size: file.size, type: file.type };

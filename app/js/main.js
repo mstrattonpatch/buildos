@@ -55,6 +55,8 @@ async function gateStatus(workerCode) {
 function resolve(path, query) {
   const gm = path.match(/^\/gate\/([^/]+)$/);
   if (gm) return { html: pageGate(gm[1]), title: "Site sign-in" };
+  const pm_ = path.match(/^\/(wallet|supplier)\/([^/]+)$/);
+  if (pm_) return { html: pagePortal(pm_[1], pm_[2]), title: pm_[1] === "wallet" ? "My cards & licences" : "Company compliance" };
   if ((path === "/login" || path === "/signup") && SESSION && DB && currentUser()) { go(homeFor(currentUser())); return null; }
   if (path === "/login") return { html: pageSignIn(), title: "Sign in" };
   if (path === "/signup") return { html: pageSignUp(), title: "Create account" };
@@ -83,6 +85,8 @@ function resolve(path, query) {
   if (company[path]) return { html: appShell(u, path, company[path][0](u)), title: company[path][1] };
   if (path === "/app/timesheets") return { html: appShell(u, path, pageCompanyTimesheets(u, query)), title: "Timesheets" };
   if (path === "/app/timesheets/sheet") return { html: appShell(u, path, pageWeeklySheet(u, query)), title: "Weekly timesheet" };
+  const pp = path.match(/^\/app\/people\/(workers|contractors)\/([^/]+)$/);
+  if (pp) return { html: appShell(u, path, pp[1] === "workers" ? pageWorker(u, pp[2]) : pageContractor(u, pp[2])), title: pp[1] === "workers" ? "Worker" : "Contractor" };
   if (path === "/app/insights") return { html: appShell(u, path, pageInsights(u, query)), title: "Insights" };
   if (path === "/app/estimates") return { html: appShell(u, path, pageEstimates(u)), title: "Estimates" };
   const em = path.match(/^\/app\/estimates\/([^/]+)(\/quote)?$/);
@@ -422,6 +426,52 @@ const ACTIONS = {
     const s = DB.swms.find((x) => x.id === f(fd, "swmsId"));
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
+  // ---- wallets & contractor profiles
+  async addCred(fd, u, el) {
+    const file = el.querySelector("[name=file]")?.files?.length ? await uploadDocumentWithInfo(el.querySelector("[name=file]")) : null;
+    return (await rpc("add_credential", { p_worker: f(fd, "worker"), p: { type: f(fd, "type"), number: f(fd, "number"), issuer: f(fd, "issuer"), expires: f(fd, "expires"), file_path: file?.path ?? "", sighted: fd.get("sighted") === "on", method: f(fd, "method") } })).message;
+  },
+  async reviewCred(fd) { return (await rpc("review_credential", { p_cred: f(fd, "id"), p_decision: f(fd, "decision"), p: { method: f(fd, "method"), note: f(fd, "note"), expires: f(fd, "expires") } })).message; },
+  async portalLink(fd) { return (await rpc("portal_link", { p_kind: f(fd, "kind"), p_id: f(fd, "id"), p_reset: f(fd, "reset") === "1" })).message; },
+  async siteRequirements(fd) { return (await rpc("set_project_requirements", { p_project: f(fd, "project"), p_types: fd.getAll("types") })).message; },
+  async saveContractor(fd) {
+    const p = Object.fromEntries(["trading_name", "legal_name", "abn", "trade", "email", "phone", "address", "contact_name", "contact_phone", "emergency_name", "emergency_phone", "prequal_status", "prequal_expires", "prequal_notes"].map((k) => [k, f(fd, k)]));
+    p.trades = f(fd, "trades").split(",").map((x) => x.trim()).filter(Boolean);
+    return (await rpc("save_contractor", { p_contractor: f(fd, "id"), p })).message;
+  },
+  async addInsurance(fd, u, el) {
+    const file = el.querySelector("[name=file]")?.files?.length ? await uploadDocumentWithInfo(el.querySelector("[name=file]")) : null;
+    return (await rpc("add_insurance", { p_contractor: f(fd, "contractor"), p: { type: f(fd, "type"), insurer: f(fd, "insurer"), policy_number: f(fd, "policy_number"), cover_limit: f(fd, "cover_limit") ? parseMoney(f(fd, "cover_limit")) : null, expires: f(fd, "expires"), file_path: file?.path ?? "", sighted: fd.get("sighted") === "on" } })).message;
+  },
+  async reviewItem(fd) { return (await rpc("review_compliance_item", { p_kind: f(fd, "kind"), p_id: f(fd, "id"), p_decision: f(fd, "decision"), p_note: f(fd, "note") })).message; },
+  async addCompanyDoc(fd, u, el) {
+    if (!el.querySelector("[name=file]")?.files?.length) throw new RuleError("Choose the file to upload.");
+    const file = await uploadDocumentWithInfo(el.querySelector("[name=file]"));
+    return (await rpc("add_contractor_doc", { p_contractor: f(fd, "contractor"), p: { kind: f(fd, "kind"), title: f(fd, "title"), expires: f(fd, "expires"), file_path: file.path } })).message;
+  },
+  // ---- self-service links (no account)
+  async walletAdd(fd, u, el) {
+    if (!f(fd, "type")) throw new RuleError("Choose what you're uploading.");
+    if (!el.querySelector("[name=file]")?.files?.length) throw new RuleError("Take a photo of the card or certificate.");
+    const file = await uploadDocumentWithInfo(el.querySelector("[name=file]"), `${PORTAL.info.org_id}/portal/${PORTAL.token}`);
+    const r = await rpc("wallet_add", { p_token: PORTAL.token, p: { type: f(fd, "type"), number: f(fd, "number"), expires: f(fd, "expires"), file_path: file.path } });
+    PORTAL.info = await rpc("wallet_info", { p_token: PORTAL.token });
+    return { msg: r.message, noReload: true };
+  },
+  async supplierAdd(fd, u, el) {
+    if (!el.querySelector("[name=file]")?.files?.length) throw new RuleError("Choose the file to upload.");
+    const file = await uploadDocumentWithInfo(el.querySelector("[name=file]"), `${PORTAL.info.org_id}/portal/${PORTAL.token}`);
+    const p = Object.fromEntries(["type", "insurer", "policy_number", "expires", "kind", "title"].map((k) => [k, f(fd, k)]));
+    p.cover_limit = f(fd, "cover_limit") ? parseMoney(f(fd, "cover_limit")) : null; p.file_path = file.path;
+    const r = await rpc("supplier_add", { p_token: PORTAL.token, p_what: f(fd, "what"), p });
+    PORTAL.info = await rpc("supplier_info", { p_token: PORTAL.token });
+    return { msg: r.message, noReload: true };
+  },
+  async supplierUpdate(fd) {
+    const r = await rpc("supplier_update", { p_token: PORTAL.token, p: Object.fromEntries(["email", "phone", "address", "contact_name", "contact_phone", "emergency_name", "emergency_phone"].map((k) => [k, f(fd, k)])) });
+    PORTAL.info = await rpc("supplier_info", { p_token: PORTAL.token });
+    return { msg: r.message, noReload: true };
+  },
   // ---- estimates & handover
   async createEstimate(fd) {
     const r = await rpc("create_estimate", { p_org: DB.org.id, p: Object.fromEntries(["name", "client", "address", "markup_pct", "valid_until"].map((k) => [k, f(fd, k)])) });
@@ -705,6 +755,8 @@ document.addEventListener("click", async (e) => {
     render(); window.scrollTo(0, 0); return;
   }
   if (e.target.closest("[data-print]")) { window.print(); return; }
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { navigator.clipboard?.writeText(cp.dataset.copy).then(() => toast("Link copied."), () => toast("Couldn't copy — select the link and copy it.", "error")); return; }
   const pay = e.target.closest("[data-payroll]");
   if (pay) { exportPayroll(pay.dataset.payroll); return; }
   const tick = e.target.closest("[data-tick-onsite]");
