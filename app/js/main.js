@@ -73,6 +73,7 @@ function resolve(path, query) {
   if (path === "/site/tasks") return { html: pageSiteTasks(u, path), title: "Tasks" };
   if (path === "/site/chat") { if (listProjects(u)[0]) markReadLocal(listProjects(u)[0].id); return { html: pageSiteChat(u, path), title: "Team chat" }; }
   if (path === "/site/contacts") return { html: pageSiteContacts(u, path), title: "Contacts" };
+  if (path === "/site/receipt") return { html: pageSiteReceipt(u, path), title: "Receipt" };
   if (path === "/site/note") return { html: pageSiteNote(u, path), title: "Diary note" };
   const company = {
     "/app": [pageControlCentre, "Company overview"], "/app/projects": [pageProjects, "Projects"], "/app/projects/new": [pageNewProject, "New project"],
@@ -102,6 +103,12 @@ function resolve(path, query) {
     else if (sub === "programme") { html = pageProgramme(u, p, query); title = "Programme"; }
     else if ((mm = sub.match(/^programme\/(.+)$/))) { html = pageTask(u, p, mm[1]); title = "Task"; }
     else if (sub === "commercial") { html = pageCommercial(u, p); title = "Commercial"; }
+    else if (sub === "commercial/ledger") { html = pageLedger(u, p); title = "Cost ledger"; }
+    else if (sub === "commercial/pos") { html = pagePOs(u, p); title = "Purchase orders"; }
+    else if (sub === "commercial/bills") { html = pageBills(u, p); title = "Bills"; }
+    else if (sub === "commercial/costs") { html = pageCostsOther(u, p); title = "Receipts & charges"; }
+    else if (sub === "commercial/claims") { html = pageClaims(u, p); title = "Claims"; }
+    else if ((mm = sub.match(/^commercial\/claims\/(.+)$/))) { html = pageClaim(u, p, mm[1]); title = "Payment claim"; }
     else if (sub === "safety") { html = pageSafety(u, p); title = "Safety"; }
     else if ((mm = sub.match(/^safety\/swms\/(.+)$/))) { html = pageSwms(u, p, mm[1]); title = "SWMS"; }
     else if (sub === "safety/incidents") { html = pageIncidents(u, p); title = "Incidents"; }
@@ -408,6 +415,64 @@ const ACTIONS = {
     const r = await rpc("revise_swms", { p_swms: f(fd, "swmsId"), p: { ...swmsPayload(fd, el), file_path, requires_reack: fd.get("requires_reack") === "on" } });
     const s = DB.swms.find((x) => x.id === f(fd, "swmsId"));
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
+  },
+  // ---- costs & claims
+  async budgetLine(fd) {
+    const b = f(fd, "budget") ? parseMoney(f(fd, "budget")) : 0, fo = f(fd, "forecast_override") ? parseMoney(f(fd, "forecast_override")) : null;
+    if (b === null) throw new RuleError("Enter the budget as a number.");
+    return (await rpc("save_budget_line", { p_project: f(fd, "project"), p_id: f(fd, "id") || null, p: { cost_code: f(fd, "cost_code"), description: f(fd, "description"), kind: f(fd, "kind"), budget: b, forecast_override: fo } })).message;
+  },
+  async createPo(fd) {
+    const amount = parseMoney(f(fd, "amount"));
+    return (await rpc("create_po", { p_project: f(fd, "project"), p: { contractor_id: f(fd, "contractor_id"), cost_code: f(fd, "cost_code"), description: f(fd, "description"), amount } })).message;
+  },
+  async poAction(fd) { return (await rpc("po_action", { p_po: f(fd, "id"), p_action: f(fd, "action") })).message; },
+  async enterBill(fd, u, el) {
+    const amount = parseMoney(f(fd, "amount")), gst = f(fd, "gst") ? parseMoney(f(fd, "gst")) : null;
+    if (amount === null) throw new RuleError("Enter the amount (excl. GST).");
+    const file = el.querySelector("[name=file]")?.files?.length ? await uploadDocument(el.querySelector("[name=file]")) : "";
+    return (await rpc("enter_bill", { p_project: f(fd, "project"), p: { contractor_id: f(fd, "contractor_id"), invoice_number: f(fd, "invoice_number"), invoice_date: f(fd, "invoice_date"), due_date: f(fd, "due_date"), amount, gst, po_id: f(fd, "po_id"), cost_code: f(fd, "cost_code"), description: f(fd, "description"), file_path: file } })).message;
+  },
+  async billAction(fd) { return (await rpc("bill_action", { p_bill: f(fd, "id"), p_action: f(fd, "action"), p_note: f(fd, "note"), p_paid: null })).message; },
+  async submitReceipt(fd, u, el) {
+    const amount = parseMoney(f(fd, "amount"));
+    if (!el.querySelector("[name=photo]")?.files?.length) throw new RuleError("Take a photo of the receipt.");
+    if (!amount) throw new RuleError("Enter the total on the receipt.");
+    const [photo] = await uploadPhotos(el.querySelector("[name=photo]"), 1);
+    return (await rpc("submit_receipt", { p_project: f(fd, "project"), p: { supplier: f(fd, "supplier"), amount, paid_with: f(fd, "paid_with"), date: f(fd, "date"), note: f(fd, "note"), photo_path: photo } })).message;
+  },
+  async receiptAction(fd) { return (await rpc("receipt_action", { p_receipt: f(fd, "id"), p_action: f(fd, "action"), p: { cost_code: f(fd, "cost_code"), reason: f(fd, "reason") } })).message; },
+  async internalCharge(fd) {
+    return (await rpc("add_internal_charge", { p_project: f(fd, "project"), p: { description: f(fd, "description"), cost_code: f(fd, "cost_code"), amount: parseMoney(f(fd, "amount")), date: f(fd, "date") } })).message;
+  },
+  async backcharge(fd) {
+    return (await rpc("raise_backcharge", { p_project: f(fd, "project"), p: { contractor_id: f(fd, "contractor_id"), amount: parseMoney(f(fd, "amount")), reason: f(fd, "reason"), cost_code: f(fd, "cost_code") } })).message;
+  },
+  async backchargeAction(fd) { return (await rpc("backcharge_action", { p_bc: f(fd, "id"), p_action: f(fd, "action") })).message; },
+  async contractSetup(fd) {
+    const p = { contract_type: f(fd, "contract_type"), retention_pct: f(fd, "retention_pct"), retention_cap_pct: f(fd, "retention_cap_pct"), fee_pct: f(fd, "fee_pct") };
+    const descs = fd.getAll("ci_desc"), vals = fd.getAll("ci_value");
+    const items = descs.map((d, i) => ({ description: String(d).trim(), value: parseMoney(vals[i]) })).filter((x) => x.description);
+    const cur = DB.contractItems.filter((x) => x.projectId === f(fd, "project")).map((x) => ({ description: x.description, value: x.value }));
+    // The schedule locks after the first claim, so only send it when it has actually changed.
+    if (p.contract_type === "lump_sum" && JSON.stringify(items) !== JSON.stringify(cur)) p.items = items;
+    return (await rpc("save_contract_setup", { p_project: f(fd, "project"), p })).message;
+  },
+  async createClaim(fd) {
+    const items = [], variations = [];
+    for (const [k, v] of fd) {
+      if (!String(v).trim()) continue;
+      const amt = parseMoney(v);
+      if (amt === null) throw new RuleError("Enter amounts as numbers.");
+      if (k.startsWith("item:")) items.push({ id: k.slice(5), to_date: amt });
+      if (k.startsWith("var:")) variations.push({ id: k.slice(4), to_date: amt });
+    }
+    const r = await rpc("create_claim", { p_project: f(fd, "project"), p: { period_end: f(fd, "period_end"), due_date: f(fd, "due_date"), items, variations } });
+    return { msg: r.message, go: `/app/projects/${f(fd, "project")}/commercial/claims/${r.id}` };
+  },
+  async claimAction(fd) {
+    const c = DB.claims.find((x) => x.id === f(fd, "id")), r = await rpc("claim_action", { p_claim: c.id, p_action: f(fd, "action"), p: { amount: f(fd, "amount") ? parseMoney(f(fd, "amount")) : null, note: f(fd, "note"), date: f(fd, "date"), due_date: f(fd, "due_date") } });
+    return f(fd, "action") === "delete" ? { msg: r.message, go: `/app/projects/${c.projectId}/commercial/claims` } : r.message;
   },
   // ---- team chat, phone tasks, site notes
   async postMessage(fd, u, el) {

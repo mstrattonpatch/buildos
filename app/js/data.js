@@ -64,7 +64,7 @@ async function loadCompany(orgId) {
   const T = [
     "memberships", "contractors", "insurances", "workers", "inductions", "credentials", "projects", "locations", "tasks",
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
-    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads",
+    "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads", "contract_items", "purchase_orders", "bills", "receipts", "internal_charges", "backcharges",
   ];
   const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
@@ -123,6 +123,12 @@ async function loadCompany(orgId) {
     siteNotes: siteNotes.map((n) => ({ ...n, photos: n.photos || [] })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     attendance,
     budgetLines: r.budget_lines.sort((a, b) => a.costCode.localeCompare(b.costCode)),
+    contractItems: r.contract_items.sort((a, b) => a.seq - b.seq),
+    purchaseOrders: r.purchase_orders.sort((a, b) => b.ref.localeCompare(a.ref)),
+    bills: r.bills.sort((a, b) => b.enteredAt.localeCompare(a.enteredAt)),
+    receipts: r.receipts.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
+    internalCharges: r.internal_charges.sort((a, b) => b.date.localeCompare(a.date)),
+    backcharges: r.backcharges.sort((a, b) => b.ref.localeCompare(a.ref)),
     variations: r.variations.sort((a, b) => a.ref.localeCompare(b.ref)),
     claims: r.claims.sort((a, b) => a.ref.localeCompare(b.ref)),
     diary: r.diary.sort((a, b) => b.date.localeCompare(a.date)),
@@ -138,14 +144,14 @@ async function loadCompany(orgId) {
 // Private photos are shown through short-lived signed links.
 async function signPhotos(db) {
   const paths = uniq([...db.defects.flatMap((d) => [...d.photos, ...d.evidencePhotos]), ...db.itps.flatMap((i) => i.points.flatMap((p) => p.photos)),
-    ...db.messages.flatMap((m) => m.photos), ...db.siteTasks.flatMap((t) => t.evidence), ...db.siteNotes.flatMap((n) => n.photos)].filter((p) => p && p.startsWith(db.org.id + "/") && !db.photoUrls[p]));
+    ...db.messages.flatMap((m) => m.photos), ...db.receipts.map((x) => x.photoPath), ...db.siteTasks.flatMap((t) => t.evidence), ...db.siteNotes.flatMap((n) => n.photos)].filter((p) => p && p.startsWith(db.org.id + "/") && !db.photoUrls[p]));
   if (!paths.length) return;
   const { data } = await sb.storage.from("photos").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.photoUrls[x.path] = x.signedUrl;
 }
 
 async function signFiles(db) {
-  const paths = uniq([...db.swms.map((s) => s.filePath), ...db.documents.map((d) => d.filePath)].filter((p) => p && p.startsWith(db.org.id + "/")));
+  const paths = uniq([...db.swms.map((s) => s.filePath), ...db.documents.map((d) => d.filePath), ...db.bills.map((b) => b.filePath)].filter((p) => p && p.startsWith(db.org.id + "/")));
   if (!paths.length) return;
   const { data } = await sb.storage.from("documents").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.fileUrls[x.path] = x.signedUrl;

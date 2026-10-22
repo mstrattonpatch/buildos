@@ -30,6 +30,7 @@ function money(cents, o = {}) {
 }
 const moneyLimit = (c) => (c === undefined ? "none" : Number.isFinite(c) ? money(c) : "unlimited");
 const pct = (n, d = 1) => `${n.toFixed(d)}%`;
+const fullDate = (s) => D(s).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
 const shortDate = (s) => D(s).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
 const dayMonth = (s) => D(s).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 const longToday = () => new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" });
@@ -338,12 +339,12 @@ function createSeed(now = new Date()) {
 const SAFETY = ["ncr.manage", "permit.request", "permit.approve", "safety.report", "safety.manage", "attendance.manage"];
 const TIME = ["timesheet.submit", "timesheet.approve", "timesheet.process", "rates.manage"];
 const GRANTS = {
-  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign"],
-  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign"],
-  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY, "timesheet.submit", "timesheet.approve", "task.assign"],
-  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve", "ncr.manage", "safety.report", "task.assign"],
+  director: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign", "cost.manage", "receipt.submit"],
+  project_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "swms.submit", "variation.create", "variation.approve", "swms.review", "commercial.view", "diary.submit", "people.manage", "project.manage", "documents.upload", "documents.approve", ...SAFETY, ...TIME, "task.assign", "cost.manage", "receipt.submit"],
+  site_supervisor: ["defect.create", "defect.assign", "defect.verify", "itp.submit", "swms.submit", "swms.review", "diary.submit", "people.manage", "documents.upload", ...SAFETY, "timesheet.submit", "timesheet.approve", "task.assign", "receipt.submit"],
+  quality_manager: ["defect.create", "defect.assign", "defect.verify", "itp.release_hold", "itp.manage", "itp.submit", "documents.upload", "documents.approve", "ncr.manage", "safety.report", "task.assign", "receipt.submit"],
   subcontractor_admin: ["defect.rectify", "variation.create", "itp.submit", "swms.submit", "documents.upload", "permit.request", "safety.report", "timesheet.submit"],
-  worker: ["defect.create", "permit.request", "safety.report", "timesheet.submit"],
+  worker: ["defect.create", "permit.request", "safety.report", "timesheet.submit", "receipt.submit"],
 };
 const VARIATION_LIMIT = { project_manager: 5000000, director: Infinity };
 const ROLE_LABEL = { director: "Director", project_manager: "Project manager", site_supervisor: "Site supervisor", quality_manager: "Quality manager", subcontractor_admin: "Subcontractor admin", worker: "Worker" };
@@ -403,6 +404,7 @@ function commercialPosition(p, vars, lines) {
   const approvedVariations = sum(vars.filter((v) => v.status === "approved" || v.status === "included_in_claim"), (v) => v.approvedAmount ?? v.amount);
   const variationExposure = sum(vars.filter((v) => ["draft", "submitted", "under_review"].includes(v.status)), (v) => v.amount);
   const revisedContract = p.contractSum + approvedVariations;
+  if (DB?.bills) lines = costLedger(p.id).rows.map((r) => ({ originalBudget: r.budget, committed: r.committed, actual: r.actual, forecastFinal: r.forecast }));
   const forecastFinalCost = sum(lines, (l) => l.forecastFinal);
   const forecastMargin = revisedContract - forecastFinalCost;
   return {
@@ -736,6 +738,43 @@ const canCheckTask = (u, t) => t.status === "submitted" && t.assigneeId !== u.id
 const taskLink = (t) => { const d = t.defectId && DB.defects.find((x) => x.id === t.defectId); if (d) return [`#/app/projects/${t.projectId}/quality/defects/${d.id}`, d.ref];
   const i = t.itpPointId && DB.itps.find((x) => x.points.some((p) => p.id === t.itpPointId)); return i ? [`#/app/projects/${t.projectId}/quality/itp/${i.id}`, `${i.ref} · ${i.points.find((p) => p.id === t.itpPointId).name}`] : null; };
 
+// ---- costs & claims
+const BUDGET_KIND = { standard: "", ps: "Provisional sum", pc: "Prime cost" };
+const PAID_WITH = { company_card: "Company card", personal: "Paid personally", cash: "Petty cash", account: "On account" };
+const poBilled = (po) => sum(DB.bills.filter((b) => b.poId === po.id && (b.status === "approved" || b.status === "paid")), (b) => b.amount);
+const labourCost = (t) => { const c = tsCostOf(t); return c ? Math.round(Number(t.hours) * c.costRate) : 0; };
+/**
+ * Running-cost ledger by cost code. Actual = opening figures on the budget line + approved bills,
+ * approved receipts, internal charges and processed labour − agreed backcharges. Committed = actual
+ * not under a purchase order + open PO values. Forecast = override, else the larger of budget and committed.
+ */
+function costLedger(pid) {
+  const lc = (c) => (c || "").toUpperCase() || "NO CODE";
+  const lines = DB.budgetLines.filter((l) => l.projectId === pid), codes = new Map();
+  const row = (code) => { const k = lc(code); if (!codes.has(k)) codes.set(k, { code: k, line: null, budget: 0, opening: 0, openingCommitted: 0, legacyForecast: 0, bills: 0, receipts: 0, charges: 0, labour: 0, backcharges: 0, poOpen: 0, poActual: 0 }); return codes.get(k); };
+  for (const l of lines) Object.assign(row(l.costCode), { line: l, budget: l.originalBudget || 0, opening: l.actual || 0, openingCommitted: l.committed || 0, legacyForecast: l.forecastFinal || 0 });
+  for (const b of DB.bills.filter((b) => b.projectId === pid && (b.status === "approved" || b.status === "paid"))) { const r = row(b.costCode); r.bills += b.amount; if (b.poId) r.poActual += b.amount; }
+  for (const x of DB.receipts.filter((x) => x.projectId === pid && x.status === "approved")) row(x.costCode).receipts += x.amount;
+  for (const x of DB.internalCharges.filter((x) => x.projectId === pid)) row(x.costCode).charges += x.amount;
+  for (const t of DB.timesheets.filter((t) => t.projectId === pid && t.status === "processed")) { const c = labourCost(t); if (c) row(t.costCode).labour += c; }
+  for (const x of DB.backcharges.filter((x) => x.projectId === pid && x.status === "agreed")) row(x.costCode).backcharges += x.amount;
+  for (const po of DB.purchaseOrders.filter((x) => x.projectId === pid && x.status === "issued")) row(po.costCode).poOpen += Math.max(0, po.amount - poBilled(po));
+  const rows = [...codes.values()].map((r) => {
+    const fresh = r.bills + r.receipts + r.charges + r.labour - r.backcharges, actual = r.opening + fresh;
+    const committed = Math.max(r.openingCommitted, r.opening) + fresh + r.poOpen;
+    const forecast = r.line?.forecastOverride ?? Math.max(r.budget, committed, r.legacyForecast);
+    const warnings = [];
+    if (!r.line && actual) warnings.push(["amber", "No budget line"]);
+    if (r.line && r.budget && forecast > r.budget) warnings.push([r.line.kind !== "standard" ? "blue" : "red", r.line.kind !== "standard" ? `${BUDGET_KIND[r.line.kind]} over allowance by ${money(forecast - r.budget)} — adjust with the client` : `Forecast over budget by ${money(forecast - r.budget)}`]);
+    else if (r.budget && actual >= 0.9 * r.budget) warnings.push(["amber", `${Math.round((actual / r.budget) * 100)}% of budget spent`]);
+    return { ...r, actual, committed, forecast, variance: r.budget - forecast, kind: r.line?.kind ?? "standard", description: r.line?.description ?? "", warnings };
+  }).sort((a, b) => a.code.localeCompare(b.code));
+  const claims = DB.claims.filter((c) => c.projectId === pid);
+  const claimWarnings = [...claims.filter((c) => c.status === "submitted" && c.dueDate && c.dueDate < todayYmd()).map((c) => ["red", `${c.ref} claimed ${money(c.claimed)} — not certified, due ${dayMonth(c.dueDate)}`]),
+    ...claims.filter((c) => (c.status === "certified" || c.status === "paid") && c.certified < c.claimed).map((c) => ["amber", `${c.ref} certified ${money(c.claimed - c.certified)} less than claimed`])];
+  return { rows, claimWarnings };
+}
+
 function myTasks(u) {
   const out = [];
   if (can(u, "variation.approve")) for (const v of listVariations(u).filter((v) => v.status === "submitted" || v.status === "under_review"))
@@ -751,8 +790,19 @@ function myTasks(u) {
     out.push({ title: `Verify ${d.ref} · ${d.title}`, sub: `${projName(d.projectId)} · ${contractorOf(d.contractorId)?.tradingName ?? ""}`, href: `#/app/projects/${d.projectId}/quality/defects/${d.id}`, tone: "blue" });
   if (can(u, "swms.review")) for (const s of DB.swms.filter((s) => s.status === "submitted" || s.status === "in_review"))
     out.push({ title: `Review SWMS · ${s.title} v${s.version}`, sub: `${projName(s.projectId)} · ${contractorOf(s.contractorId)?.tradingName}`, href: `#/app/projects/${s.projectId}/safety/swms/${s.id}`, tone: "blue" });
+  if (can(u, "cost.manage")) {
+    const onlyMe = DB.users.filter((x) => can(x, "cost.manage")).length === 1;
+    for (const b of DB.bills.filter((b) => b.status === "received" && (b.enteredBy !== u.id || onlyMe)))
+      out.push({ title: `Approve bill · ${contractorOf(b.contractorId)?.tradingName ?? ""} ${b.invoiceNumber}`, sub: `${projName(b.projectId)} · ${money(b.amount)}${b.dueDate ? ` · due ${dayMonth(b.dueDate)}` : ""}`, href: `#/app/projects/${b.projectId}/commercial/bills`, tone: b.dueDate && b.dueDate <= addDays(todayYmd(), 3) ? "red" : "blue" });
+    for (const x of DB.receipts.filter((x) => x.status === "submitted"))
+      out.push({ title: `Check receipt · ${x.supplier} ${money(x.amount + x.gst)}`, sub: `${projName(x.projectId)} · from ${userById(x.submittedBy)?.name ?? ""}`, href: `#/app/projects/${x.projectId}/commercial/costs`, tone: "blue" });
+    for (const x of DB.receipts.filter((x) => x.status === "approved" && x.paidWith === "personal" && !x.reimbursedAt))
+      out.push({ title: `Reimburse ${userById(x.submittedBy)?.name ?? ""} ${money(x.amount + x.gst)}`, sub: `${projName(x.projectId)} · ${x.supplier}`, href: `#/app/projects/${x.projectId}/commercial/costs`, tone: "amber" });
+    for (const c of DB.claims.filter((c) => c.status === "draft"))
+      out.push({ title: `Submit draft claim ${c.ref}`, sub: `${projName(c.projectId)} · ${money(c.claimed)}`, href: `#/app/projects/${c.projectId}/commercial/claims/${c.id}`, tone: "amber" });
+  }
   if (can(u, "commercial.view")) for (const c of DB.claims.filter((c) => c.status === "submitted"))
-    out.push({ title: `Assess progress claim ${c.ref}`, sub: `${projName(c.projectId)} · response due ${dayMonth(c.dueDate)}`, href: `#/app/projects/${c.projectId}/commercial`, tone: "amber" });
+    out.push({ title: `Record certificate for ${c.ref}`, sub: `${projName(c.projectId)} · ${money(c.claimed)} claimed${c.dueDate ? ` · due ${dayMonth(c.dueDate)}` : ""}`, href: `#/app/projects/${c.projectId}/commercial/claims/${c.id}`, tone: c.dueDate && c.dueDate < todayYmd() ? "red" : "amber" });
   if (can(u, "documents.approve")) for (const d of DB.documents.filter((x) => x.status === "in_review"))
     out.push({ title: `Review ${d.number} rev ${d.revision} · ${d.title}`, sub: `${projName(d.projectId)} · uploaded ${dayMonth(d.uploadedAt)}`, href: `#/app/projects/${d.projectId}/documents/${d.id}`, tone: "blue" });
   if (can(u, "swms.submit")) for (const s of DB.swms.filter((x) => x.status === "changes_requested" && (u.role !== "subcontractor_admin" || x.contractorId === u.contractorId)))
@@ -825,6 +875,7 @@ function notifications(u) {
   }
   for (const x of DB.incidents.filter((x) => x.notifiable && x.status !== "closed")) out.push({ title: `Notifiable incident ${x.ref} open`, sub: `${projName(x.projectId)} · ${x.title}`, href: `#/app/projects/${x.projectId}/safety/incidents/${x.id}`, tone: "red" });
   for (const x of DB.permits.filter((x) => permitLive(x) && x.validTo === todayYmd())) out.push({ title: `Permit ${x.ref} ends today`, sub: `${projName(x.projectId)} · ${x.type} · ${x.location} — close it out when work stops`, href: `#/app/projects/${x.projectId}/safety/permits/${x.id}`, tone: "amber" });
+  if (can(u, "commercial.view")) for (const p of listProjects(u)) { const w = costLedger(p.id).rows.filter((r) => r.warnings.some(([t]) => t === "red")); if (w.length) out.push({ title: `${w.length} cost code${w.length > 1 ? "s" : ""} forecast over budget`, sub: `${p.name} · ${w.map((r) => r.code).join(", ")}`, href: `#/app/projects/${p.id}/commercial/ledger`, tone: "red" }); }
   for (const p of listProjects(u)) { const n = unreadCount(u, p.id); if (n) out.push({ title: `${n} new message${n > 1 ? "s" : ""} in team chat`, sub: p.name, href: `#/app/projects/${p.id}/chat`, tone: "blue" }); }
   for (const p of DB.projects) { const nm = nextMilestoneOf(p), d = daysBetween(new Date(), D(nm.date)); if (d >= 0 && d <= 7) out.push({ title: `${nm.name} in ${d} days`, sub: p.name, href: `#/app/projects/${p.id}/programme`, tone: "blue" }); }
   return out;

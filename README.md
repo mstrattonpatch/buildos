@@ -77,12 +77,24 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **From site** (office) — finished tasks to check, site notes waiting, and hours sent in from phones, in one place.
 - **Contacts** (site app) — the team with call and email buttons, and crew with a phone number.
 
+## Costs & claims
+
+*Commercial* (PMs and directors) has tabs for the overview, cost ledger, purchase orders, bills, receipts & charges, and claims.
+
+- **Budget** by cost code, each line standard, a provisional sum (PS) or a prime cost item (PC), with an optional hand-set forecast.
+- **Purchase orders** commit cost. PMs issue up to $50,000; above that a director does. Closing a PO stops its unbilled balance counting as committed.
+- **Bills** are entered against a PO or a cost code and approved by someone other than the person who entered them (when there's someone else). A bill that takes a PO over its value needs a reason. Duplicate invoice numbers are refused.
+- **Receipts** come from the site app (*Receipt*): photo, supplier, total incl. GST, and how it was paid. The office approves them with a cost code, and receipts paid personally are tracked until reimbursed.
+- **Internal charges** (company plant, yard materials) and **backcharges** to subcontractors (which reduce cost once agreed).
+- **Cost ledger**: actual = approved bills + approved receipts + internal charges + processed labour − agreed backcharges; committed adds open PO balances; forecast final is the larger of budget and committed unless set by hand. Warnings: forecast over budget, 90%+ spent, PS/PC over allowance, costs with no budget line, claims past due or certified short.
+- **Progress claims**: lump sum (a schedule of contract items that adds up to the contract sum, plus approved variations, retention to a cap) or cost-plus (every approved, unclaimed cost to the period end, the fee on costs, labour at chargeout). Draft → submitted → certified (a short certificate needs the payment-schedule reason) → paid. Each claim prints as a payment claim document with the security-of-payment statement.
+
 ## Roles
 
 | Role | Can |
 | --- | --- |
 | Director | Everything, including approving variations of any size |
-| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety, approving and processing timesheets, rates, giving and checking tasks |
+| Project manager | Projects, people, defects, ITP hold points, SWMS, variations up to $50,000, commercial, everything in safety, approving and processing timesheets, rates, giving and checking tasks, budgets, POs, bills, receipts and claims (PMs up to $50,000 per PO or bill) |
 | Site supervisor | People, defects, completing ITP points, accepting inspections, SWMS review, site diary, programme progress, NCRs, approving permits, investigating incidents, the site register and visitors, entering and approving timesheets, giving and checking tasks, accepting site notes |
 | Quality manager | Defects, ITP templates and hold-point sign-off, NCRs, giving and checking tasks |
 | Subcontractor admin | Their own company's defects (rectify), SWMS submissions, completing ITP points and raising variations, answering their NCRs, requesting permits, reporting incidents, entering their workers' hours |

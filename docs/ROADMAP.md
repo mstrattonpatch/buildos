@@ -25,14 +25,14 @@ the extras are added.
 | Safety extras | Incidents & observations, permits to work, toolbox talks, NCRs, QR gate (workers and visitors, no account), manual sign-in, missing sign-outs, muster list |
 | Timesheets & rates | Hours entry (office, subbie, site app, from sign-ins), approve/reject, process with locked rates, rate cards and job/cost-code rates, payroll CSV with overtime, weekly timesheet print, labour cost on Commercial |
 | Team chat & phone tasks | Project chat with photos and unread counts, tasks to someone's phone (from chat, defects, ITP points) with done → check → accept/send back, site notes into the diary, From site review, Contacts |
+| Costs & claims | Budget (PS/PC), purchase orders, bills with separation of duties, receipts from the site app, internal charges, backcharges, running-cost ledger with warnings, lump-sum and cost-plus progress claims with retention and a claim document |
 | Variations (basic), claims register, budget view, site diary, sign-in | |
 
 ## Next, in order
 
-1. **Costs & claims** — receipts from the site app, budget by cost code, purchase orders and bills, receipts (paid by card / personally / cash / on account), internal charges, running-cost ledger with warnings (lines over contract, 90 %+ claimed, PS/PC overruns, claimed-not-certified), full progress claims (retention, cost-plus, claim document), variation extras (backcharge trade, charge client).
-2. **Estimates** — costings by category with formulas, assemblies, take-offs, trade packages and quotes, inclusions/exclusions, versions, client quote, convert to job.
-3. **AI features** (needs an Anthropic API key in Supabase secrets, called from an Edge Function — never from the browser) — invoice/receipt reading, estimate document review, subcontractor ITP conversion, diary drafting, report writing, Ask Claude.
-4. **Reports & handover** — report builder with presets (weekly site, client progress, cost, quality, diary pack), internal vs client view, handover pack.
+1. **Estimates** — costings by category with formulas, assemblies, take-offs, trade packages and quotes, inclusions/exclusions, versions, client quote, convert to job.
+2. **AI features** (needs an Anthropic API key in Supabase secrets, called from an Edge Function — never from the browser) — invoice/receipt reading, estimate document review, subcontractor ITP conversion, diary drafting, report writing, Ask Claude.
+3. **Reports & handover** — report builder with presets (weekly site, client progress, cost, quality, diary pack), internal vs client view, handover pack.
 
 Also from the earlier build, folded into the steps above: programme phases with
 drag-to-edit bars, short-term (look-ahead) programme, delays and EOT notices,

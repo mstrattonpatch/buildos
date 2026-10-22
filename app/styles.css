@@ -474,3 +474,8 @@ table.kv th { text-align: left; font-weight: 600; color: var(--muted); font-size
 .task-card.late { border-color: #f0c98f; }
 .site-note { border-left: 3px solid var(--blue); padding: 4px 10px; background: #f6f9fc; border-radius: 0 6px 6px 0; }
 .tab-n { font-style: normal; background: var(--red); color: #fff; border-radius: 9px; font-size: 10px; padding: 0 5px; margin-left: 2px; }
+/* costs & claims */
+.claim-sum { margin: 16px 0 0 auto; min-width: 340px; border-collapse: collapse; font-size: 14px; }
+.claim-sum td { padding: 5px 0 5px 24px; border-top: 1px solid var(--border); }
+.claim-sum td:first-child { padding-left: 0; }
+@media print { .claim-doc { border: 0; box-shadow: none; padding: 0; } .subnav { display: none; } }
