@@ -1,0 +1,35 @@
+# Runs every database and browser test on each pull request and push to main (tests/run.sh, see tests/README.md).
+name: Tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install test packages and create the local database
+        run: bash tests/run.sh setup   # the runner image ships PostgreSQL 16
+      - name: Install Chromium for the browser tests
+        working-directory: tests
+        run: npx -y playwright@$(node -p "require('./node_modules/playwright-core/package.json').version") install --with-deps chromium
+      - name: Check the demo's migration list is current
+        run: |
+          node demo/build-manifest.mjs
+          git diff --exit-code demo/migrations.json || (echo "Run: node demo/build-manifest.mjs and commit demo/migrations.json" && exit 1)
+      - name: Run all tests
+        run: bash tests/run.sh all
+      - name: Keep the logs if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: tests/.pg/*.log

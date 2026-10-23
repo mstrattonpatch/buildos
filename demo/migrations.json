@@ -1,5 +1,5 @@
 {
-  "version": "d27bdbc80964",
+  "version": "58791fd22931",
   "migrations": [
     "20261022000000_initial_schema.sql",
     "20261022010000_programme.sql",
@@ -13,6 +13,7 @@
     "20261022090000_estimates_handover.sql",
     "20261022100000_wallet_contractors.sql",
     "20261022110000_sydney_dates.sql",
-    "20261022120000_ai.sql"
+    "20261022120000_ai.sql",
+    "20261023000000_project_access.sql"
   ]
 }

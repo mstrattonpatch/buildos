@@ -1789,8 +1789,27 @@ function pageSettings(u) {
       <div class="full"><button class="btn btn-primary">Save invitation</button></div></div>`)}</section>` : ""}
   <section class="card"><div class="card-head" style="flex-wrap:wrap"><h2>Members</h2><div class="spacer"></div><span class="small muted">The database checks roles on every action</span></div><div class="table-wrap"><table class="register"><thead><tr><th>Person</th><th>Role</th><th>Variation approval limit</th></tr></thead><tbody>${members}</tbody></table></div></section>
   ${admin && DB.invitations.length ? `<section class="card"><div class="card-head"><h2>Pending invitations</h2></div><div class="table-wrap"><table class="register"><thead><tr><th>Email</th><th>Role</th><th>Sent</th><th></th></tr></thead><tbody>${invites}</tbody></table></div></section>` : ""}
+  ${projectAccessCard(u)}
   ${aiSettingsCard(u)}
   ${admin ? "" : '<p class="small muted">Only company admins can invite people or change roles.</p>'}`;
+}
+
+// Who sees which project. Directors and company admins always see every project, so they're shown ticked and locked.
+function projectAccessCard(u) {
+  const mode = DB.org.projectAccess || "all", admin = u.isAdmin, seesAll = (m) => m.role === "director" || m.isAdmin;
+  const head = `<div class="row" style="gap:10px;flex-wrap:wrap"><h2>Project access</h2>${badge(mode === "all" ? "current" : "pending", mode === "all" ? "Everyone sees every project" : "Only their projects")}</div>`;
+  const choose = admin ? form("setProjectAccess", `<div class="stack" style="gap:8px;margin-top:10px">
+      <label class="row small" style="gap:8px;align-items:flex-start"><input type="radio" name="mode" value="all"${mode === "all" ? " checked" : ""}><span><b>Everyone in the company sees every project</b><br><span class="muted">Simplest for small teams.</span></span></label>
+      <label class="row small" style="gap:8px;align-items:flex-start"><input type="radio" name="mode" value="assigned"${mode === "assigned" ? " checked" : ""}><span><b>People see only the projects they're added to</b><br><span class="muted">Directors and admins still see everything. Subcontractors and workers also see the projects their company or crew is on.</span></span></label>
+      <div><button class="btn">Save</button></div></div>`) : `<p class="small muted" style="margin-top:6px">${mode === "all" ? "Everyone in the company sees every project." : "People see only the projects they're added to."} Only company admins can change this.</p>`;
+  if (mode !== "assigned" || !can(u, "project.manage")) return `<section class="card card-pad">${head}${choose}</section>`;
+  const staff = DB.users.filter((m) => !["subcontractor_admin", "worker"].includes(m.role));
+  const teams = listProjects(u).map((p) => {
+    const on = new Set(DB.projectMembers.filter((x) => x.projectId === p.id).map((x) => x.userId));
+    return `<details class="li" style="display:block"><summary style="cursor:pointer"><b>${esc(p.name)}</b> <span class="muted small">· ${staff.filter((m) => seesAll(m) || on.has(m.id)).length} of ${staff.length} people</span></summary>
+      ${form("setProjectMembers", `${hidden("project", p.id)}<div class="row wrap" style="gap:6px 16px;margin:10px 0">${staff.map((m) => `<label class="row small" style="gap:6px"><input type="checkbox" name="users" value="${m.id}"${seesAll(m) || on.has(m.id) ? " checked" : ""}${seesAll(m) ? " disabled" : ""}> ${esc(m.name)} <span class="muted">(${ROLE_LABEL[m.role]}${m.isAdmin && m.role !== "director" ? ", admin" : ""})</span></label>`).join("")}</div><button class="btn btn-sm">Save team</button>`)}</details>`;
+  }).join("");
+  return `<section class="card card-pad">${head}${choose}<h3 style="margin:16px 0 6px;font-size:15px">Project teams</h3><p class="small muted" style="margin:0 0 8px">Tick who works on each project. Subcontractor admins and workers are added automatically through their company and inductions.</p><div class="list-card">${teams || '<div class="li muted">No projects yet.</div>'}</div></section>`;
 }
 
 function aiSettingsCard(u) {
@@ -1826,7 +1845,7 @@ function pageGettingStarted(u) {
     ["users", "Add contractors and workers", "The companies on site, their insurances, and workers with White Cards and inductions.", can(u, "people.manage") ? '<a class="btn" href="#/app/people">People &amp; contractors</a>' : ""],
     ["user", "Invite your team", "Project managers, supervisors, subbies and workers each see what their role needs.", u.isAdmin ? '<a class="btn" href="#/app/settings">Team &amp; roles</a>' : ""],
   ];
-  return `${pageHeader({ title: `Welcome to Setout, ${esc(u.name.split(" ")[0])}`, meta: `<span>${esc(DB.org.name)} has no projects yet.</span>` })}
+  return `${pageHeader({ title: `Welcome to Setout, ${esc(u.name.split(" ")[0])}`, meta: `<span>${DB.org.projectAccess === "assigned" && !(u.role === "director" || u.isAdmin) ? "You haven't been added to a project yet. Ask a director or project manager to add you in Team &amp; roles." : `${esc(DB.org.name)} has no projects yet.`}</span>` })}
   <div class="pillars" style="margin-top:0">${steps.map(([ic, t, b, a]) => `<section class="card card-pad stack"><span class="li-icon" style="background:var(--green-tint);color:var(--green-text)">${icon(ic, 20)}</span><h3>${t}</h3><p class="muted small">${b}</p><div>${a}</div></section>`).join("")}</div>
   ${u.isAdmin ? `<section class="card card-pad stack"><h2>Just exploring?</h2><p class="muted small">Load the sample project set (Riverside Apartments and three others) into this company to try every screen with realistic data. You can only do this while the company has no projects.</p><div>${form("loadSample", '<button class="btn">Load sample projects</button>', 'data-confirm="Load four sample projects with made-up contractors, workers and figures into this company?"')}</div></section>` : ""}`;
 }

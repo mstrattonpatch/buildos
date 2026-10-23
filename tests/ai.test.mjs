@@ -135,9 +135,18 @@ test("edge function: if the API won't take the fallback option, it retries once 
   const s = await session("wk@ai.test");
   await setMode("nofallback");
   const before = (await setMode("nofallback")).requests.length;
-  const r = await call(s, { action: "chat", org_id: org, messages: [{ role: "user", content: "hello" }], context: { page: "/site" } });
+  const r = await call(s, { action: "read", org_id: org, expect: "bill", media_type: "application/pdf", data: tinyPdf, file_name: "coastal-invoice.pdf", today: "2026-10-22" });
   const reqs = (await setMode("ok")).requests;
-  assert.match(r.reply, /You're on \/site/);
+  assert.equal(r.doc_type, "bill");
   assert.equal(reqs.length - before, 2);
   assert.equal(reqs.at(-2).fallbacks, "default"); assert.equal("fallbacks" in reqs.at(-1), false);
+});
+
+test("edge function: documents are read with Opus 5.5, the help chat answers with Haiku 5.5 (no fallback)", async () => {
+  const s = await session("wk@ai.test");
+  await call(s, { action: "chat", org_id: org, messages: [{ role: "user", content: "hello" }], context: { page: "/site" } });
+  const req = (await setMode("ok")).requests.at(-1);
+  assert.equal(req.model, "claude-haiku-5-5");
+  assert.equal("fallbacks" in req, false);
+  assert.equal(req.output_config.effort, "low");
 });

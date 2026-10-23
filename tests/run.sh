@@ -36,8 +36,8 @@ fresh() { mock_stop; db_reset; mock_start; }
 
 case "${1:-all}" in
   setup) (cd "$T" && npm install --no-fund --no-audit); db_start; echo "Ready. Run: tests/run.sh all" ;;
-  unit) fresh; (cd "$T" && node --test --test-concurrency=1 ./*.test.mjs) ;;
-  e2e) fresh; (cd "$T" && node "e2e-$2.mjs" "${3:-}") ;;
+  unit) fresh; rc=0; (cd "$T" && node --test --test-concurrency=1 ./*.test.mjs) || rc=$?; mock_stop; exit $rc ;;
+  e2e) fresh; rc=0; (cd "$T" && node "e2e-$2.mjs" "${3:-}") || rc=$?; mock_stop; exit $rc ;;
   mock) fresh; echo "Mock Supabase + app on http://localhost:54321/buildos/app/ (demo: /buildos/demo/). Stop with tests/run.sh stop" ;;
   stop) mock_stop; [ -d "$PG_DIR/data" ] && as_pg "$PG_BIN/pg_ctl -D '$PG_DIR/data' stop -m fast >/dev/null" || true ;;
   all)

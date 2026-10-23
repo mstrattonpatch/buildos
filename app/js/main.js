@@ -432,6 +432,8 @@ const ACTIONS = {
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
   // ---- wallets & contractor profiles
+  async setProjectAccess(fd) { return (await rpc("set_project_access", { p_org: DB.org.id, p_mode: f(fd, "mode") })).message; },
+  async setProjectMembers(fd) { return (await rpc("set_project_members", { p_project: f(fd, "project"), p_users: fd.getAll("users") })).message; },
   async setAi(fd) { return (await rpc("set_ai_enabled", { p_org: DB.org.id, p_enabled: f(fd, "enabled") === "1" })).message; },
   async addCred(fd, u, el) {
     const file = el.querySelector("[name=file]")?.files?.length ? await uploadDocumentWithInfo(el.querySelector("[name=file]")) : null;

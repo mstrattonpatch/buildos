@@ -13,8 +13,11 @@ const CANNED = {
 };
 function check(p) {
   const errs = [];
-  if (p.model !== "claude-opus-5-5") errs.push("model");
-  if (AI.mode === "nofallback" ? "fallbacks" in p : p.fallbacks !== "default" || !p.betas?.includes("server-side-fallback-2026-07-01")) errs.push("fallbacks");
+  const reading = !!p.output_config?.format;
+  // Documents are read with Opus 5.5 (with the server-side fallback); the help chat uses Haiku 5.5, which has no fallback.
+  if (p.model !== (reading ? "claude-opus-5-5" : "claude-haiku-5-5")) errs.push("model");
+  if (!reading) { if ("fallbacks" in p) errs.push("fallbacks not supported on Haiku"); }
+  else if (AI.mode === "nofallback" ? "fallbacks" in p : p.fallbacks !== "default" || !p.betas?.includes("server-side-fallback-2026-07-01")) errs.push("fallbacks");
   if ("temperature" in p || "top_p" in p || "thinking" in p && p.thinking?.type !== "adaptive") errs.push("sampling/thinking");
   if (!p.max_tokens) errs.push("max_tokens");
   if (p.tool_choice && ["any", "tool"].includes(p.tool_choice.type)) errs.push("tool_choice");

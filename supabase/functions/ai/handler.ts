@@ -11,13 +11,17 @@ export interface Deps {
   supabaseFor: (authHeader: string) => SupabaseClient; // a client that acts as the signed-in person
 }
 
-const MODEL = "claude-opus-5-5";
+// Reading documents needs the most accurate model; the help chat answers short how-to questions, so it uses the
+// fast, low-cost one.
+const DOC_MODEL = "claude-opus-5-5";
+const CHAT_MODEL = "claude-haiku-5-5";
 const MAX_FILE_BYTES = 12 * 1024 * 1024; // decoded; the browser shrinks photos first
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-/** Ask for the server-side fallback (another model takes over if a request is declined). If the API rejects the
- *  request, try once more without it, so an account without that option still works. */
+/** Ask for the server-side fallback (another model takes over if a request is declined) where the model offers one.
+ *  If the API rejects the request, try once more without it, so an account without that option still works. */
 async function create(d: Deps, params: Anthropic.Beta.MessageCreateParamsNonStreaming) {
+  if (params.model === CHAT_MODEL) return await d.anthropic!.beta.messages.create(params); // no server-side fallback for this model
   try {
     return await d.anthropic!.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
   } catch (e) {
@@ -105,7 +109,7 @@ async function read(d: Deps, b: ReadBody) {
   else throw new UserError("AI can read PDFs and photos (JPG or PNG). For a Word file, save it as a PDF first.");
 
   const res = await create(d, {
-    model: MODEL,
+    model: DOC_MODEL,
     max_tokens: 16000,
     system: READ_SYSTEM,
     output_config: { effort: "medium", format: { type: "json_schema", schema: READ_SCHEMA } },
@@ -146,7 +150,7 @@ async function chat(d: Deps, b: ChatBody) {
   for (const m of msgs) { const last = turns.at(-1); if (last && last.role === m.role) last.content += `\n\n${m.content}`; else turns.push({ ...m }); }
 
   const res = await create(d, {
-    model: MODEL,
+    model: CHAT_MODEL,
     max_tokens: 4000,
     output_config: { effort: "low" },
     system: [
