@@ -614,3 +614,4 @@ body:has(.help-root.on-site) .site-body { padding-bottom: 72px; }
   .help-panel { height: min(560px, calc(100vh - 160px)); }
 }
 @media print { .help-root { display: none; } }
+.help-faq { padding: 10px 12px; border-top: 1px solid var(--border); max-height: 42%; overflow-y: auto; }

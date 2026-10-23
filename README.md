@@ -5,7 +5,8 @@ One connected construction platform: quality, programme, workforce & safety, and
 | | Link | What it is |
 | --- | --- | --- |
 | **App** | https://mstrattonpatch.github.io/buildos/app/ | The real program: accounts, your company's data in Supabase |
-| **Demo** | https://mstrattonpatch.github.io/buildos/ | Public website + clickable demo with sample data in the browser |
+| **Website** | https://mstrattonpatch.github.io/buildos/ | Public website (home, pricing, security, book a demo) |
+| **Demo** | https://mstrattonpatch.github.io/buildos/demo/ | The real app on a sample company, running entirely in the visitor's browser |
 
 ## How it fits together
 
@@ -25,7 +26,8 @@ GitHub Pages (static files)          Supabase (Sydney)
 ## Files
 
 ```
-index.html                         public website + demo (sample data, no account needed)
+index.html                         public website ("Explore the platform" opens the demo)
+demo/                              the demo: the real app + every migration, run in the browser (see below)
 app/index.html                     the real app
 app/js/config.js                   Supabase URL + publishable key (public by design)
 app/js/core.js                     helpers, display rules, sample dataset
@@ -143,6 +145,14 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - If the server refuses something when it's sent (for example, the diary was already submitted), it stays in the Outbox with the reason — nothing is silently lost. Defects can't be duplicated by a retry.
 - **Approvals never work offline** — releasing a hold point, approving a permit, timesheet, bill or claim needs a live permission check, so the app says so instead of pretending it's saved.
 - **Signing out deletes everything** this account stored on the device (with a warning if anything hasn't been sent yet).
+
+## The demo
+
+- `demo/index.html` loads the **real app's code** (`app/js/…`) and runs **every migration** in a Postgres database inside the browser (PGlite), behind a stand-in for the Supabase API (`demo/backend.js`). So every feature, including new ones, appears in the demo with no extra work, and the demo follows the same permission rules as the real app.
+- `demo/seed.js` builds the sample company on the first visit — the four sample projects plus timesheets, chat, purchase orders, bills, a receipt, permits, an incident, a toolbox talk, an NCR and an estimate — using the app's own database functions. All names and figures are fictional.
+- Visitors pick a role (director, site supervisor, quality manager, subcontractor admin or worker). The bar at the top has **Back to website**, **Switch role** and **Reset demo**. Changes stay in that browser only; nothing is sent anywhere.
+- **No AI in the demo:** Read with AI and Scan a document are hidden, and Help offers a fixed list of common questions with written answers, so the demo never costs anything.
+- **After adding a migration**, run `node demo/build-manifest.mjs` and commit `demo/migrations.json` — the demo loads the migrations listed there, and a changed list gives visitors a fresh demo database.
 
 ## AI help
 

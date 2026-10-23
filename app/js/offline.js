@@ -13,7 +13,7 @@ let SYNCING = false, SNAPSHOT_AT = null;
 const idb = (() => {
   let dbp = null;
   const open = () => (dbp ||= new Promise((res, rej) => {
-    const r = indexedDB.open("buildos-offline", 1);
+    const r = indexedDB.open(DEMO ? "buildos-demo-offline" : "buildos-offline", 1);
     r.onupgradeneeded = () => { const d = r.result; d.createObjectStore("outbox", { keyPath: "id" }); d.createObjectStore("kv"); };
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   }));

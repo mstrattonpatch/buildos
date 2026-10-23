@@ -2,14 +2,17 @@
 // Reads a company's records (Row Level Security limits them to what the
 // signed-in person may see) and sends every change to a database function.
 
+// The demo (demo/index.html) runs this same code against a database inside the browser: BUILDOS_DEMO.fetch answers every request.
+const DEMO = window.BUILDOS_DEMO || null;
 const sb = window.supabase.createClient(BUILDOS_CONFIG.supabaseUrl, BUILDOS_CONFIG.supabaseKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  ...(DEMO ? { global: { fetch: DEMO.fetch } } : {}),
 });
 
 let DB = null;              // the current company's records, in the shape the pages use
 let SESSION = null;         // Supabase auth session
 let MY_ORGS = [];           // [{ id, name, role, isAdmin }]
-const ORG_KEY = "buildos_org";
+const ORG_KEY = DEMO ? "buildos_demo_org" : "buildos_org";
 const prefs = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } },
@@ -158,6 +161,7 @@ async function signPhotos(db) {
   const paths = uniq([...db.defects.flatMap((d) => [...d.photos, ...d.evidencePhotos]), ...db.itps.flatMap((i) => i.points.flatMap((p) => p.photos)),
     ...db.messages.flatMap((m) => m.photos), ...db.receipts.map((x) => x.photoPath), ...db.siteTasks.flatMap((t) => t.evidence), ...db.siteNotes.flatMap((n) => n.photos)].filter((p) => p && p.startsWith(db.org.id + "/") && !db.photoUrls[p]));
   if (!paths.length) return;
+  if (DEMO) { for (const p of paths) db.photoUrls[p] = await DEMO.fileUrl("photos", p); return; }
   const { data } = await sb.storage.from("photos").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.photoUrls[x.path] = x.signedUrl;
 }
@@ -166,6 +170,7 @@ async function signFiles(db) {
   const paths = uniq([...db.swms.map((s) => s.filePath), ...db.documents.map((d) => d.filePath), ...db.bills.map((b) => b.filePath), ...db.credentials.map((c) => c.filePath),
     ...db.contractors.flatMap((c) => c.insurances.map((i) => i.filePath)), ...db.contractorDocs.map((d) => d.filePath)].filter((p) => p && p.startsWith(db.org.id + "/")));
   if (!paths.length) return;
+  if (DEMO) { for (const p of paths) db.fileUrls[p] = await DEMO.fileUrl("documents", p); return; }
   const { data } = await sb.storage.from("documents").createSignedUrls(paths, 3600);
   for (const x of data || []) if (x.signedUrl) db.fileUrls[x.path] = x.signedUrl;
 }

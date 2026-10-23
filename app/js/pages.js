@@ -77,7 +77,7 @@ function appShell(u, route, inner) {
        <div class="proj-card"><div class="label">Project</div><div style="color:#fff;font-weight:600;font-size:13.5px">${esc(project.name)}</div><div class="mono" style="font-size:11.5px;color:#8fa59b">${project.code}</div></div>
        ${projectNav(project.id, can(u, "commercial.view")).filter((n) => !n[0].endsWith("/from-site") || can(u, "task.assign") || can(u, "diary.submit")).map((n) => navLink(n, route, counts)).join("")}
        <div class="bottom"><a class="nav" href="#/app/settings" title="Settings">${icon("settings", 17)}<span class="nav-text">Project settings</span></a></div>`
-    : `<div class="nav-label">Company</div>${companyNav.filter((n) => !n[5] || can(u, n[5])).map((n) => navLink(n, route, counts)).join("")}
+    : `<div class="nav-label">Company</div>${companyNav.filter((n) => (!n[5] || can(u, n[5])) && (n[0] !== "#/app/scan" || aiOn())).map((n) => navLink(n, route, counts)).join("")}
        <div class="nav-label">Recent projects</div>${projects.map((p) => `<a class="nav" href="#/app/projects/${p.id}" title="${esc(p.name)}"><span class="recent-dot"></span><span class="nav-text">${esc(p.name)}</span></a>`).join("")}
        <div class="bottom"><a class="nav" href="#/app/settings" title="Company settings">${icon("settings", 17)}<span class="nav-text">Company settings</span></a></div>`;
   const qBase = project || projects[0] ? `#/app/projects/${project?.id ?? projects[0].id}` : "#/app/projects/new";
@@ -1794,6 +1794,7 @@ function pageSettings(u) {
 }
 
 function aiSettingsCard(u) {
+  if (DEMO) return "";
   const on = DB.org.aiEnabled !== false, rows = DB.aiUsage || [], manage = can(u, "project.manage");
   const done = rows.filter((r) => r.status === "done"), reads = done.filter((r) => r.kind === "read").length, chats = done.filter((r) => r.kind === "chat").length;
   return `<section class="card card-pad"><div class="row" style="gap:10px;flex-wrap:wrap"><h2>${icon("sparkle", 17)} AI help</h2>${badge(on ? "current" : "draft", on ? "On" : "Off")}</div>

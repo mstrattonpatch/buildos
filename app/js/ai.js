@@ -5,7 +5,9 @@
 // 3. Help chat: a question box on every page that knows BuildOS's pages and the person's role.
 // The AI key lives in Supabase (Edge Function secret), never in this code.
 
-const aiOn = () => !!(SESSION && DB && DB.org.aiEnabled !== false);
+// In the demo nothing calls the AI: document reading is hidden and Help answers from a fixed list (DEMO_FAQ).
+const aiOn = () => !DEMO && !!(SESSION && DB && DB.org.aiEnabled !== false);
+const helpOn = () => (DEMO ? !!(SESSION && DB) : aiOn());
 const AI_KINDS = {
   receipt: { label: "receipt", docType: "receipt" },
   bill: { label: "supplier invoice", docType: "bill" },
@@ -181,7 +183,7 @@ function scanDestination(u, r) {
 function pageScan(u) {
   const r = SCAN.result;
   return `${pageHeader({ title: "Scan a document", meta: "<span>Upload a receipt, supplier invoice, licence or ticket, certificate of currency or drawing — AI reads it and fills in the right form.</span>" })}
-  ${!aiOn() ? `<section class="card card-pad"><p>AI help is switched off for ${esc(DB.org.name)}. ${can(u, "project.manage") ? 'Turn it on in <a href="#/app/settings">Team &amp; roles</a>.' : "A director or project manager can turn it on in Team &amp; roles."}</p></section>` : `
+  ${DEMO ? '<section class="card card-pad"><p>Scan a document uses AI, so it\'s switched off in this demo. In the full app it reads receipts, invoices, licences, insurance certificates and drawings into the right form.</p></section>' : !aiOn() ? `<section class="card card-pad"><p>AI help is switched off for ${esc(DB.org.name)}. ${can(u, "project.manage") ? 'Turn it on in <a href="#/app/settings">Team &amp; roles</a>.' : "A director or project manager can turn it on in Team &amp; roles."}</p></section>` : `
   <div class="two-col">
     <section class="card card-pad"><h2 style="margin-bottom:12px">1. Choose the file</h2>
       <div class="stack">${field("Document <span class=\"muted\">(PDF or photo)</span>", '<input type="file" name="scan" accept=".pdf,image/*" class="input" style="padding:8px" data-scan-file>')}
@@ -218,8 +220,9 @@ function afterAiRender() {
 
 // ---- help chat
 let HELP = { open: false, busy: false, messages: [] };
-try { HELP.messages = JSON.parse(sessionStorage.getItem("buildos-help") || "[]").slice(-20); } catch { /* private mode */ }
-const saveHelp = () => { try { sessionStorage.setItem("buildos-help", JSON.stringify(HELP.messages.slice(-20))); } catch { /* full */ } };
+const HELP_KEY = DEMO ? "buildos-demo-help" : "buildos-help";
+try { HELP.messages = JSON.parse(sessionStorage.getItem(HELP_KEY) || "[]").slice(-20); } catch { /* private mode */ }
+const saveHelp = () => { try { sessionStorage.setItem(HELP_KEY, JSON.stringify(HELP.messages.slice(-20))); } catch { /* full */ } };
 
 /** Safe, tiny markdown: escape everything, then allow **bold**, `code`, in-app links and simple lists. */
 function helpMarkdown(s) {
@@ -238,9 +241,24 @@ function helpMarkdown(s) {
   return out.join("");
 }
 
+/** Demo answers. {p} becomes the first project's id. */
+const DEMO_FAQ = [
+  ["How do I raise a defect?", "1. Open a project's [Quality](#/app/projects/{p}/quality) page and press **New defect** — or on a phone use the **+** button in the [site app](#/site).\n2. Choose the location, describe what's wrong and add photos.\n3. Assign it to the contractor with a due date. They rectify it, submit evidence, and you verify and close it."],
+  ["Where do I release a hold point?", "ITPs live on the project's [Quality](#/app/projects/{p}/quality) page. Open the ITP, check the photos and measurements on the hold point, then press **Release**. Only a quality manager, project manager or director can release one, and work after it stays blocked until they do."],
+  ["How do I enter a supplier invoice?", "Open the project's [Bills](#/app/projects/{p}/commercial/bills) page, choose the supplier, link the purchase order if there is one, enter the amount and cost code, and attach the invoice. Someone other than the person who entered it approves it. In the full app, **Read with AI** fills the form from the invoice for you."],
+  ["How do workers upload their white card?", "Open the worker under [People & contractors](#/app/people) and press **Create link**. Send them the link — they can upload photos of their tickets from their phone without an account. Uploads wait for the office to check them before they count."],
+  ["How does site sign-in work?", "Print the QR poster from the project's [Site access](#/app/projects/{p}/safety/access) page and put it at the gate. Workers scan it with their phone camera and sign in with their worker code; visitors fill in a short form. Anyone missing a white card, induction or required ticket is stopped. The [muster list](#/app/projects/{p}/workforce/muster) shows who's on site."],
+  ["How do I approve timesheets?", "Open [Timesheets](#/app/timesheets), check the week's hours, select them and press **Approve**. Approved hours can be processed and exported as a payroll CSV split into ordinary and overtime."],
+  ["How do I make a progress claim?", "On the project's [Claims](#/app/projects/{p}/commercial/claims) page press **New claim**, enter the value to date for each contract item and approved variation, and BuildOS works out this period's amount and retention. Print the claim document to send it."],
+  ["Can subcontractors see my margin?", "No. Subcontractor admins only see their own company's defects, ITPs, SWMS, timesheets and documents. Budgets, costs, variations' commercial detail and claims are only visible to directors and project managers."],
+  ["Does it work without signal?", "Yes. The [site app](#/site) keeps working: defects, inspections, diary entries, notes, hours, receipts and finished tasks are saved on the phone and sent when it's back online — see the [Outbox](#/site/outbox). Approvals always need a connection."],
+  ["What can the AI do in the full app?", "In the full app, **Read with AI** fills in forms from photos and PDFs of receipts, supplier invoices, licences, insurance certificates and drawings, and **Help** answers any question about BuildOS. Both are switched off in this demo."],
+];
+
 const HELP_STARTERS = ["How do I enter a supplier invoice?", "Where do I release a hold point?", "How do workers upload their white card?", "Something isn't saving — what do I check?"];
 
 function helpPanelHtml() {
+  if (DEMO) return demoHelpHtml();
   const msgs = HELP.messages.map((m) => `<div class="help-msg ${m.role}">${m.role === "user" ? esc(m.content) : helpMarkdown(m.content)}</div>`).join("");
   return `<div class="help-head"><b>${icon("sparkle", 15)} Ask BuildOS</b><span class="spacer"></span>${HELP.messages.length ? '<button type="button" class="link small" data-help-clear>New chat</button>' : ""}<button type="button" class="icon-btn" data-help-toggle aria-label="Close help">${icon("x", 16)}</button></div>
     <div class="help-list" id="help-list" aria-live="polite">${msgs || `<p class="small muted">Ask how to do something in BuildOS, or where to find it. I know the pages and what your role can do.</p><div class="help-starters">${HELP_STARTERS.map((q) => `<button type="button" class="chip" data-help-ask="${esc(q)}">${esc(q)}</button>`).join("")}</div>`}
@@ -249,9 +267,17 @@ function helpPanelHtml() {
     <p class="help-foot">AI answers can be wrong — check before acting on anything important.</p>`;
 }
 
+function demoHelpHtml() {
+  const msgs = HELP.messages.map((m) => `<div class="help-msg ${m.role}">${m.role === "user" ? esc(m.content) : helpMarkdown(m.content)}</div>`).join("");
+  return `<div class="help-head"><b>${icon("sparkle", 15)} Common questions</b><span class="spacer"></span>${HELP.messages.length ? '<button type="button" class="link small" data-help-clear>Clear</button>' : ""}<button type="button" class="icon-btn" data-help-toggle aria-label="Close help">${icon("x", 16)}</button></div>
+    <div class="help-list" id="help-list" aria-live="polite">${msgs || '<p class="small muted">Pick a question to see how it works in BuildOS.</p>'}</div>
+    <div class="help-starters help-faq">${DEMO_FAQ.map(([q], i) => `<button type="button" class="chip" data-help-faq="${i}">${esc(q)}</button>`).join("")}</div>
+    <p class="help-foot">Demo: answers are written in advance. In the full app you can ask anything.</p>`;
+}
+
 function renderHelp() {
   let root = document.getElementById("help-root");
-  const show = aiOn() && !!currentUser();
+  const show = helpOn() && !!currentUser();
   if (!show) { root?.remove(); return; }
   if (!root) { root = document.createElement("div"); root.id = "help-root"; document.body.appendChild(root); }
   const onSite = location.hash.startsWith("#/site");
@@ -287,7 +313,7 @@ async function askHelp(q) {
 
 // ---- events
 document.addEventListener("click", async (e) => {
-  const t = e.target.closest?.("[data-ai-read],[data-scan-read],[data-scan-go],[data-help-toggle],[data-help-ask],[data-help-clear],[data-help-link]");
+  const t = e.target.closest?.("[data-ai-read],[data-scan-read],[data-scan-go],[data-help-toggle],[data-help-ask],[data-help-faq],[data-help-clear],[data-help-link]");
   if (!t) return;
   if (t.matches("[data-ai-read]")) { e.preventDefault(); await runAiRead(t); return; }
   if (t.matches("[data-scan-read]")) {
@@ -307,6 +333,11 @@ document.addEventListener("click", async (e) => {
   }
   if (t.matches("[data-help-toggle]")) { HELP.open = !HELP.open; renderHelp(); if (HELP.open) document.getElementById("help-q")?.focus(); return; }
   if (t.matches("[data-help-ask]")) { await askHelp(t.dataset.helpAsk); return; }
+  if (t.matches("[data-help-faq]")) {
+    const [q, a] = DEMO_FAQ[+t.dataset.helpFaq], pid = listProjects(currentUser())[0]?.id;
+    HELP.messages.push({ role: "user", content: q }, { role: "assistant", content: pid ? a.replaceAll("{p}", pid) : a.replace(/\[([^\]]+)\]\(#\/app\/projects\/\{p\}[^)]*\)/g, "$1") });
+    saveHelp(); renderHelp(); return;
+  }
   if (t.matches("[data-help-clear]")) { HELP.messages = []; saveHelp(); renderHelp(); return; }
   if (t.matches("[data-help-link]") && matchMedia("(max-width: 700px)").matches) { HELP.open = false; setTimeout(renderHelp, 0); }
 });

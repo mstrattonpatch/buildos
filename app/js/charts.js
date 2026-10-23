@@ -121,7 +121,7 @@ const tally = (list, key, val = () => 1) => { const m = new Map(); for (const x 
 (function vizTooltip() {
   const tip = document.createElement("div");
   tip.className = "viz-tip"; tip.setAttribute("role", "tooltip"); tip.hidden = true;
-  document.addEventListener("DOMContentLoaded", () => document.body.appendChild(tip));
+  if (document.body) document.body.appendChild(tip); else document.addEventListener("DOMContentLoaded", () => document.body.appendChild(tip));
   let cur = null;
   const show = (el, x, y) => {
     let d; try { d = JSON.parse(el.dataset.tip); } catch { return; }

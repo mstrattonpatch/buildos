@@ -1,0 +1,31 @@
+/* Demo bar and start screens. The app's own styles come from ../app/styles.css. */
+:root { --demo-bar: 40px; }
+.demo-bar { position: sticky; top: 0; z-index: 80; height: var(--demo-bar); display: flex; align-items: center; gap: 14px; padding: 0 16px; background: #0f1e19; color: #d7e1dc; font-size: 13px; }
+.demo-bar a, .demo-bar button { color: #fff; font: 600 13px var(--font); background: none; border: 0; cursor: pointer; padding: 6px 4px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.demo-bar a:hover, .demo-bar button:hover { text-decoration: underline; }
+.demo-bar .demo-tag { background: #eda100; color: #1b1300; font-weight: 700; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
+.demo-bar .demo-who { color: #9fb5ab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.demo-bar .spacer { flex: 1; }
+.demo-bar .demo-cta { background: var(--green); border-radius: 6px; padding: 6px 12px; }
+@media (max-width: 700px) { .demo-bar .demo-who, .demo-bar .demo-reset-label, .demo-bar .demo-cta { display: none; } .demo-bar { gap: 8px; } }
+
+/* keep the app's sticky parts below the bar */
+.sidebar { top: var(--demo-bar) !important; height: calc(100vh - var(--demo-bar)) !important; }
+.topbar, .site-top { top: var(--demo-bar) !important; }
+.shell, .site-wrap, .site, .auth-wrap { min-height: calc(100vh - var(--demo-bar)) !important; }
+
+.demo-loading { min-height: calc(100vh - var(--demo-bar)); display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center; padding: 24px; color: var(--muted); }
+.demo-loading b { color: var(--ink); font-size: 18px; }
+.demo-spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--green); animation: demo-spin 0.9s linear infinite; }
+@keyframes demo-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .demo-spinner { animation: none; } }
+
+.demo-pick { max-width: 980px; margin: 0 auto; padding: 48px 16px; }
+.demo-pick h1 { font-size: 30px; margin: 0 0 8px; }
+.demo-pick > p { color: var(--muted); max-width: 640px; margin: 0 0 24px; font-size: 15px; }
+.demo-roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.demo-role { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); cursor: pointer; font: inherit; color: inherit; }
+.demo-role:hover, .demo-role:focus-visible { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-tint); outline: none; }
+.demo-role b { font-size: 16px; }
+.demo-name { color: var(--green-text); font-weight: 600; font-size: 13px; }
+.demo-blurb { color: var(--muted); font-size: 13px; margin-top: 4px; }

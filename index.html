@@ -372,6 +372,11 @@ dl.kv dd { margin: 0; font-family: var(--mono); font-size: 13px; text-align: rig
 .problem { background: var(--forest); color: #fff; }
 .problem .card-dark { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 16px 18px; display: flex; gap: 14px; font-size: 14.5px; }
 .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px; }
+.pub section[id] { scroll-margin-top: 80px; }
+.trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 18px; }
+.ind-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 7px; font-size: 13.5px; }
+.ind-list li { display: flex; gap: 8px; align-items: flex-start; }
+.ind-list svg { color: var(--green-text); flex: none; margin-top: 3px; }
 .flow { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-top: 24px; overflow: hidden; }
 .flow > div { padding: 18px; border-right: 1px solid var(--border); }
 .flow > div:last-child { border-right: none; background: var(--green-tint); }
@@ -380,6 +385,9 @@ dl.kv dd { margin: 0; font-family: var(--mono); font-size: 13px; text-align: rig
 .pub-foot .inner { height: 72px; display: flex; align-items: center; gap: 24px; font-size: 13px; }
 @media (max-width: 900px) {
   .hero-grid, .pillars, .flow { grid-template-columns: 1fr; }
+  .trust-grid { grid-template-columns: 1fr 1fr; }
+  .hero-grid > * { min-width: 0; }
+  .pub main { overflow-x: clip; }
   .flow > div { border-right: none; border-bottom: 1px solid var(--border); }
   .pub h1.display { font-size: 40px; }
   .pub-nav nav { display: none; }
@@ -1148,6 +1156,22 @@ function pageHome() {
     ["align", "var(--blue-tint)", "var(--blue)", "Projects & commercial", "Programmes, drawings with revision control, site diaries, budgets, purchase orders, variations and progress claims.", ["Programme", "Documents", "Variations", "Claims"]],
     ["shield", "var(--amber-tint)", "var(--amber-text)", "Workforce & safety", "Worker credential wallets, inductions, SWMS review and acknowledgement, QR site sign-in and live muster lists.", ["Credentials", "SWMS", "Site access", "Permits"]],
   ];
+  const industries = [
+    ["home", "Residential & multi-residential", "Builders delivering homes, townhouses and apartment buildings.", ["Defects by unit and room, with photos", "Client progress reports and handover packs", "Variations with approval limits", "Defects liability period tracking"]],
+    ["folder", "Commercial head contractors", "Offices, schools, health and mixed-use projects with many trades.", ["ITPs with hold and witness points", "Subcontractor SWMS review and compliance", "Progress claims with retention", "Cost ledger, POs and bill approval"]],
+    ["package", "Industrial & warehouse", "Large-span builds with heavy plant and high-risk work.", ["Permits to work (heights, hot works, lifts)", "Plant tickets checked at sign-in", "Programme with critical path", "QR site sign-in and muster list"]],
+    ["grid", "Fit-out & refurbishment", "Fast jobs on live sites, often after hours.", ["Visitor sign-in on occupied sites", "Drawings with revision control", "Lump-sum or cost-plus claims", "Programme with delays and re-baselining"]],
+    ["mappin", "Civil & infrastructure", "Roads, drainage, earthworks and subdivisions.", ["Inspection and test plans with evidence", "NCRs and corrective actions", "Toolbox talks and incident reporting", "Daily site diary with weather and labour"]],
+    ["hardhat", "Subcontractors & trades", "Trades working for builders, or running their own jobs.", ["See and close out your own defects", "Submit SWMS, ITPs and timesheets", "Workers keep tickets current from a link", "You only ever see your own company's records"]],
+  ];
+  const integrations = [
+    ["phone", "Any phone, tablet or computer", "Runs in the browser. Add it to the home screen and the site app keeps working without a signal, then syncs when you're back in range.", ["iPhone", "Android", "Windows", "Mac"]],
+    ["qr", "QR site sign-in", "Print the gate poster; workers and visitors sign in with their phone camera, no account or app needed.", ["Gate poster", "Visitors", "Muster list"]],
+    ["camera", "Reads your paperwork", "Photograph a receipt, invoice, licence, insurance certificate or drawing and AI fills in the form for you to check.", ["Receipts", "Invoices", "Tickets", "Certificates"]],
+    ["download", "Payroll and spreadsheet exports", "Approved hours export as a payroll CSV split into ordinary and overtime. Defect registers and dashboards export to CSV for Excel.", ["Payroll CSV", "Excel / CSV"]],
+    ["file", "PDF reports and documents", "Weekly site reports, client progress reports, payment claims, timesheets and handover packs print or save straight to PDF.", ["PDF", "Print"]],
+    ["users", "Links for people without an account", "Send workers and subcontractors a private link to upload tickets, insurances and company documents for you to check.", ["Workers", "Subcontractors"]],
+  ];
   const flow = [["Programme", "Pour is scheduled", "The task carries its ITP, SWMS and crew."], ["Workforce", "Crew signs in", "Credentials and inductions checked at the gate."], ["Quality", "Hold point released", "Photos and sign-off recorded against the task."], ["Site diary", "Day is logged", "Attendance and inspections pre-fill the diary."], ["Commercial", "Claim backed by evidence", "The assessor sees the site record beside the claim."]];
   return pub(`
   <section><div class="inner hero-grid">
@@ -1155,7 +1179,7 @@ function pageHome() {
       <span class="pill-eyebrow">Quality · Projects · Workforce · Commercial</span>
       <h1 class="display">Everything on site.<br>Everything under control.</h1>
       <p class="lede">One connected platform for construction quality, project delivery, workforce compliance and commercial management. Enter it once, on site or in the office, and every team sees the same truth.</p>
-      <div class="row wrap" style="margin-top:28px;gap:12px"><a href="#/demo" class="btn btn-primary btn-lg">Book a demo ${icon("arrowright")}</a><a href="#/login" class="btn btn-lg">Explore the platform</a></div>
+      <div class="row wrap" style="margin-top:28px;gap:12px"><a href="#/demo" class="btn btn-primary btn-lg">Book a demo ${icon("arrowright")}</a><a href="demo/" class="btn btn-lg">Explore the platform</a></div>
       <p class="small muted" style="margin-top:20px">Built in Australia for builders, head contractors and subcontractors.</p>
     </div>
     <div class="mock" aria-label="Product preview: Level 4 slab pour readiness">
@@ -1176,22 +1200,29 @@ function pageHome() {
     <div class="stack" style="gap:10px">${["A subbie's crew, their SWMS, their defects and their progress claim live in four different places.", "The office approves a claim without seeing the failed inspection on site.", "BuildOS keeps one project record, so every module reads from and writes to the same thing."].map((t, i) => `<div class="card-dark"><span class="mono" style="color:#8fd1b3">0${i + 1}</span><span>${esc(t)}</span></div>`).join("")}</div>
   </div></section>
   <section id="platform"><div class="inner">
-    <div class="row" style="align-items:flex-end"><h2 class="section" style="max-width:520px">Three pillars, one connected platform</h2><span class="spacer"></span><a href="#/login" class="link">See every feature →</a></div>
+    <div class="row" style="align-items:flex-end"><h2 class="section" style="max-width:520px">Three pillars, one connected platform</h2><span class="spacer"></span><a href="demo/" class="link">See every feature →</a></div>
     <div class="pillars">${pillars.map(([ic, tint, col, t, b, tags]) => `<div class="card stack" style="padding:24px"><span class="li-icon" style="background:${tint};color:${col}">${icon(ic, 20)}</span><h3 style="font-size:18px">${t}</h3><p class="muted">${b}</p><div class="row wrap" style="gap:6px">${tags.map((x) => `<span class="tag">${x}</span>`).join("")}</div></div>`).join("")}</div>
   </div></section>
   <section style="padding-top:0"><div class="inner">
     <span class="eyebrow">How it connects</span><h2 class="section" style="margin-top:8px">From the pour to the progress claim</h2>
     <div class="flow">${flow.map(([k, t, b], i) => `<div><div class="mono" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${i === 4 ? "var(--green-text)" : "var(--muted)"}">Step ${i + 1} · ${k}</div><h3 style="margin:8px 0 6px">${t}</h3><p class="small muted">${b}</p></div>`).join("")}</div>
   </div></section>
-  <section id="integrations" style="padding-top:0"><div class="inner two-col">
-    <div class="card" style="padding:28px"><h2 style="font-size:24px">Built to stand up in a dispute</h2>
-      <div class="two-col" style="margin-top:18px;gap:18px"><div><b>Full audit history</b><p class="small muted">Who changed what, and when.</p></div><div><b>Separated companies</b><p class="small muted">Subbies see their records, never your margin.</p></div><div><b>Private files</b><p class="small muted">Short-lived links, never public URLs.</p></div><div><b>Data location</b><p class="small muted">[Hosting region to confirm]</p></div></div>
-      <a class="link small" href="#/security" style="display:inline-block;margin-top:16px">Read about security →</a></div>
-    <div class="card" style="padding:28px"><h2 style="font-size:24px">Works with what you already run</h2>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px">${["[Accounting]", "[Microsoft 365]", "[Google Workspace]", "[Payroll]", "Calendars", "CSV / XLSX"].map((x) => `<div class="mono" style="border:1px solid var(--border);border-radius:8px;height:52px;display:grid;place-items:center;font-size:12px;text-align:center">${x}</div>`).join("")}</div>
-      <p class="small muted" style="margin-top:14px">Starting with reliable CSV/XLSX import and one accounting integration.</p></div>
+  <section id="industries" style="padding-top:0"><div class="inner">
+    <span class="eyebrow">Industries</span><h2 class="section" style="margin-top:8px;max-width:640px">Built for the way each part of the industry works</h2>
+    <p class="muted" style="max-width:640px;margin-top:10px">One platform, set up around the work you actually do: the same project record, with the modules each kind of job leans on most.</p>
+    <div class="pillars">${industries.map(([ic, t, who, feats]) => `<div class="card stack" style="padding:24px;gap:10px"><span class="li-icon" style="background:var(--green-tint);color:var(--green-text)">${icon(ic, 20)}</span><h3 style="font-size:18px">${t}</h3><p class="small muted">${who}</p><ul class="ind-list">${feats.map((f) => `<li>${icon("check", 14)}<span>${f}</span></li>`).join("")}</ul></div>`).join("")}</div>
   </div></section>
-  <section id="industries" style="padding-top:0"><div class="inner"><div class="cta-band">
+  <section id="integrations" style="padding-top:0"><div class="inner">
+    <span class="eyebrow">Integrations</span><h2 class="section" style="margin-top:8px;max-width:640px">Works with what you already run</h2>
+    <p class="muted" style="max-width:640px;margin-top:10px">No new hardware and no app store downloads. Your team uses the phones and computers they already have, and data goes out in formats your other systems accept.</p>
+    <div class="pillars">${integrations.map(([ic, t, b, tags]) => `<div class="card stack" style="padding:24px;gap:10px"><span class="li-icon" style="background:var(--blue-tint);color:var(--blue)">${icon(ic, 20)}</span><h3 style="font-size:17px">${t}</h3><p class="small muted">${b}</p><div class="row wrap" style="gap:6px">${tags.map((x) => `<span class="tag">${x}</span>`).join("")}</div></div>`).join("")}</div>
+    <div class="card row wrap" style="padding:18px 24px;margin-top:16px;gap:12px"><span class="badge badge-blue">${icon("clock", 12)}Planned</span><span class="small">Direct sync with accounting and payroll software, and spreadsheet import for moving existing projects in. <a class="link" href="#/demo">Tell us what you use →</a></span></div>
+  </div></section>
+  <section style="padding-top:0"><div class="inner"><div class="card" style="padding:28px">
+    <div class="row wrap" style="align-items:flex-end;gap:12px"><h2 style="font-size:24px">Built to stand up in a dispute</h2><span class="spacer"></span><a class="link small" href="#/security">Read about security →</a></div>
+    <div class="trust-grid"><div><b>Full audit history</b><p class="small muted">Who changed what, and when, on every record.</p></div><div><b>Separated companies</b><p class="small muted">Subbies see their own records, never your margin.</p></div><div><b>Private files</b><p class="small muted">Photos and documents open through short-lived links, never public URLs.</p></div><div><b>Data in Australia</b><p class="small muted">Hosted in Sydney.</p></div></div>
+  </div></div></section>
+  <section style="padding-top:0"><div class="inner"><div class="cta-band">
     <div style="flex:1;min-width:260px"><h2 style="font-size:30px;color:#fff">See your next project in BuildOS</h2><p style="margin-top:8px;color:#d8efe4">30-minute walkthrough with your own project structure. Plans from [PRICE] per month.</p></div>
     <a href="#/demo" class="btn btn-lg" style="color:var(--ink)">Book a demo</a><a href="#/pricing" class="btn btn-lg" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">View pricing</a>
   </div></div></section>`);
@@ -1209,7 +1240,7 @@ function pageSecurity() {
 }
 function pageDemo() {
   return pub(`<section><div class="inner hero-grid" style="align-items:start">
-    <div><span class="eyebrow">Book a demo</span><h1 class="display" style="font-size:44px">30 minutes, your own project structure.</h1><p class="lede">We'll walk through a concrete pour from programme to progress claim using your buildings, trades and cost codes.</p><p class="small muted" style="margin-top:16px">Want to look around first? <a href="#/login" class="link">Explore the prototype</a>.</p></div>
+    <div><span class="eyebrow">Book a demo</span><h1 class="display" style="font-size:44px">30 minutes, your own project structure.</h1><p class="lede">We'll walk through a concrete pour from programme to progress claim using your buildings, trades and cost codes.</p><p class="small muted" style="margin-top:16px">Want to look around first? <a href="demo/" class="link">Explore the prototype</a>.</p></div>
     <div class="card card-pad">${form("demo", `<div class="stack"><label class="field"><span>Name <span class="req">*</span></span><input class="input" name="name" autocomplete="name"></label><label class="field"><span>Work email <span class="req">*</span></span><input class="input" type="email" name="email" autocomplete="email"></label><label class="field"><span>Company</span><input class="input" name="company" autocomplete="organization"></label><label class="field"><span>What do you build?</span><select class="input" name="type"><option>Commercial</option><option>Residential</option><option>Civil</option><option>Fit-out</option><option>Subcontractor</option></select></label><button class="btn btn-primary btn-lg" type="submit">Book a demo</button></div>`)}</div>
   </div></section>`);
 }
@@ -1696,7 +1727,9 @@ function parseRoute() {
 
 function resolve(path, query) {
   const pub = { "/": [pageHome, "Everything on site. Everything under control."], "/pricing": [pagePricing, "Pricing"], "/security": [pageSecurity, "Security & privacy"], "/demo": [pageDemo, "Book a demo"], "/login": [pageLogin, "Log in"] };
-  if (pub[path]) return { html: pub[path][0](), title: pub[path][1] };
+  if (pub[path] && path !== "/login") return { html: pub[path][0](), title: pub[path][1] };
+  // The product demo is the real app running on sample data: demo/index.html.
+  location.replace("demo/"); return null;
   const u = currentUser();
   if (!u) { go("/login"); return null; }
   if (path === "/site") return { html: pageSiteToday(u, path), title: "Site app" };

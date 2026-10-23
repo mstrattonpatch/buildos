@@ -31,6 +31,7 @@ the extras are added.
 | Worker wallets & contractor profiles | Credential verification workflow, project site requirements, no-account self-service links for workers and contractors, contractor profiles with insurances, documents and performance |
 | Insights & dashboards | Charts in overviews and reports; interactive Insights page with slicers, cross-filtering, what-if and live refresh |
 | AI help | Read with AI on receipts, bills, credentials, insurances, company documents and drawings; Scan a document; help chat that knows the pages and the person's role; per-person limits, usage log, company on/off switch |
+| Live demo | The real app and database running in the browser on a sample company, role picker, back-to-website bar, reset, FAQ-only help (no AI cost) |
 | Offline site work | Service worker, encrypted offline snapshot and outbox for site records, sync status and Outbox, approvals blocked offline, wipe on sign-out |
 | Variations (basic), claims register, budget view, site diary, sign-in | |
 

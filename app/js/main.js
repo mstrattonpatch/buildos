@@ -871,7 +871,7 @@ function exportDefects(pid) {
 }
 
 // ------------------------------------------------------------- boot
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { /* offline start not available */ });
+if ("serviceWorker" in navigator && !DEMO) navigator.serviceWorker.register("sw.js").catch(() => { /* offline start not available */ });
 
 (async function boot() {
   showLoading();
