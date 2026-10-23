@@ -33,3 +33,4 @@ jobs:
         with:
           name: test-logs
           path: tests/.pg/*.log
+          include-hidden-files: true

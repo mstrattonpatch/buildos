@@ -45,7 +45,7 @@ case "${1:-all}" in
     fresh; (cd "$T" && node --test --test-concurrency=1 ./*.test.mjs) || fails=$((fails + 1))
     for f in "$T"/e2e-*.mjs; do
       n="$(basename "$f" .mjs)"; fresh
-      if (cd "$T" && node "$n.mjs" > "$PG_DIR/$n.log" 2>&1); then echo "PASS $n"; else echo "FAIL $n (see $PG_DIR/$n.log)"; fails=$((fails + 1)); fi
+      if (cd "$T" && node "$n.mjs" > "$PG_DIR/$n.log" 2>&1); then echo "PASS $n"; else echo "FAIL $n (see $PG_DIR/$n.log)"; tail -n 40 "$PG_DIR/$n.log"; fails=$((fails + 1)); fi
     done
     mock_stop
     [ "$fails" = 0 ] && echo "ALL PASSED" || { echo "$fails suite(s) failed"; exit 1; } ;;

@@ -82,8 +82,8 @@ check(await sue.locator("img.doc-preview-img").count() === 1, "Image preview sho
 
 // PM approves rev 4 → rev 3 superseded
 await pm.waitForTimeout(15500);
-await pm.goto(APP + `#/app/projects/${pid}/documents`); await pm.waitForTimeout(1500);
-await pm.getByRole("link", { name: "Rev 4 in review" }).click();
+await pm.goto(APP + `#/app/projects/${pid}/documents`); await pm.reload(); await pm.waitForSelector("main.content");
+await pm.getByRole("link", { name: "Rev 4 in review" }).click({ timeout: 15000 });
 await pm.locator("form[data-act=reviewDoc]").getByRole("button", { name: /Approve/ }).click();
 check(await hasToast(pm, /rev 4 is now current; rev 3 superseded/), "Approving rev 4 supersedes rev 3");
 await pm.getByRole("link", { name: "3", exact: true }).click();
