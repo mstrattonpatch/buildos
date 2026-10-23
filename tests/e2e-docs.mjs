@@ -67,7 +67,8 @@ check(await hasToast(pm, /A-102 rev 3 is now current/), "PM issues rev 3 for con
 // New revision from the document page; old stays current until approved
 await sue.goto(APP + `#/app/projects/${pid}/documents`); await sue.reload(); await sue.waitForSelector("table.register");
 await sue.locator("table.register").getByRole("link", { name: "General arrangement — L2 to L4" }).click();
-await sue.waitForSelector("form[data-act=uploadDoc]");
+// The register has its own (empty) upload form, so wait for the document page, not just a form.
+await sue.waitForSelector("h1:has-text('A-102')"); await sue.waitForSelector("form[data-act=uploadDoc]");
 check(await sue.locator("form[data-act=uploadDoc] [name=title]").inputValue() === "General arrangement — L2 to L4", "New-revision form is pre-filled");
 await upload(sue, { file: PDF, revision: "4", note: "Grid C stair moved" });
 check(await hasToast(sue, /Rev 3 stays current until it's approved/), "Rev 4 uploaded; rev 3 stays current");
