@@ -39,6 +39,7 @@ app/styles.css                     design system
 app/js/ai.js                       Read with AI, Scan a document, help chat
 supabase/migrations/               database schema, security rules, workflow functions
 supabase/functions/ai/             Edge Function that calls the AI (the key never reaches the browser)
+tests/                             local database + browser tests: `tests/run.sh setup`, then `tests/run.sh all`
 ```
 
 ## First-time setup checklist (Supabase dashboard)
