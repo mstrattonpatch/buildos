@@ -69,7 +69,7 @@ async function loadCompany(orgId) {
     "defects", "itps", "itp_points", "swms", "swms_acks", "documents", "budget_lines", "variations", "claims", "diary",
     "itp_templates", "itp_template_points", "itp_signoffs", "ncrs", "permits", "incidents", "toolbox_talks", "toolbox_attendees", "rate_cards", "rate_rules", "timesheet_costs", "site_tasks", "chat_reads", "contract_items", "purchase_orders", "bills", "receipts", "internal_charges", "backcharges", "estimates", "estimate_items", "estimate_quotes", "assemblies", "handovers", "contractor_docs", "project_requirements", "portal_links",
   ];
-  const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, aiUsage, projectMembers, ...rows] = await Promise.all([
+  const [orgRes, profRes, attendance, audit, invitations, timesheets, messages, siteNotes, visitors, aiUsage, projectMembers, alerts, automationSettings, automationRuns, jobs, ...rows] = await Promise.all([
     sb.from("organisations").select("*").eq("id", orgId).single(),
     sb.from("profiles").select("*"),
     selectAll("attendance", (q) => q.gte("at", twoDaysAgo)),
@@ -81,6 +81,11 @@ async function loadCompany(orgId) {
     selectAll("visitors", (q) => q.gte("signed_in_at", new Date(Date.now() - 14 * 86400000).toISOString()).order("signed_in_at", { ascending: false })),
     selectAll("ai_usage", (q) => q.gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())).catch(() => []), // until the AI migration has run
     selectAll("project_members").catch(() => []), // until the project access migration has run
+    // Alerts from the automations, and (for admins) their settings, runs and the job queue — empty until that migration has run.
+    sb.from("notifications").select("*").order("created_at", { ascending: false }).limit(50).then((r) => (r.error ? [] : r.data.map(camel))),
+    selectAll("automation_settings").catch(() => []),
+    selectAll("automation_runs", (q) => q.order("created_at", { ascending: false }).limit(100)).catch(() => []),
+    selectAll("jobs", (q) => q.order("created_at", { ascending: false }).limit(100)).catch(() => []),
     ...T.map((t) => selectAll(t)),
   ]);
   if (orgRes.error) throw new Error(friendlyError(orgRes.error));
@@ -123,6 +128,7 @@ async function loadCompany(orgId) {
     visitors,
     aiUsage,
     projectMembers,
+    alerts, automationSettings, automationRuns, jobs,
     timesheets: timesheets.sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || "").localeCompare(b.startTime || "")),
     timesheetCosts: r.timesheet_costs,
     rateCards: r.rate_cards.sort((a, b) => a.name.localeCompare(b.name)),

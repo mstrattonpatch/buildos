@@ -88,6 +88,7 @@ function resolve(path, query) {
   if (path === "/app/timesheets/sheet") return { html: appShell(u, path, pageWeeklySheet(u, query)), title: "Weekly timesheet" };
   const pp = path.match(/^\/app\/people\/(workers|contractors)\/([^/]+)$/);
   if (pp) return { html: appShell(u, path, pp[1] === "workers" ? pageWorker(u, pp[2]) : pageContractor(u, pp[2])), title: pp[1] === "workers" ? "Worker" : "Contractor" };
+  if (path === "/app/automations") return { html: appShell(u, path, pageAutomations(u)), title: "Automations" };
   if (path === "/app/scan") return { html: appShell(u, path, pageScan(u)), title: "Scan a document" };
   if (path === "/app/insights") return { html: appShell(u, path, pageInsights(u, query)), title: "Insights" };
   if (path === "/app/estimates") return { html: appShell(u, path, pageEstimates(u)), title: "Estimates" };
@@ -432,6 +433,9 @@ const ACTIONS = {
     return { msg: r.message, go: `/app/projects/${s.projectId}/safety/swms/${r.id}` };
   },
   // ---- wallets & contractor profiles
+  async setAutomation(fd) { return (await rpc("set_automation", { p_org: DB.org.id, p_rule: f(fd, "rule"), p_enabled: fd.get("enabled") === "on", p_days: f(fd, "days") ? parseInt(f(fd, "days"), 10) : null })).message; },
+  async runAutomations() { return (await rpc("run_my_automations", { p_org: DB.org.id })).message; },
+  async retryJob(fd) { return (await rpc("retry_job", { p_id: f(fd, "id") })).message; },
   async setProjectAccess(fd) { return (await rpc("set_project_access", { p_org: DB.org.id, p_mode: f(fd, "mode") })).message; },
   async setProjectMembers(fd) { return (await rpc("set_project_members", { p_project: f(fd, "project"), p_users: fd.getAll("users") })).message; },
   async setAi(fd) { return (await rpc("set_ai_enabled", { p_org: DB.org.id, p_enabled: f(fd, "enabled") === "1" })).message; },
@@ -871,6 +875,13 @@ function exportDefects(pid) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// Opening the bell marks the alerts as seen (quietly; the dot clears on the next refresh).
+document.addEventListener("toggle", (e) => {
+  if (!e.target.matches?.("details[data-alerts]") || !e.target.open || !DB?.alerts?.some((a) => !a.readAt)) return;
+  const now = new Date().toISOString();
+  rpc("mark_notifications_read", { p_ids: null }).then(() => DB.alerts.forEach((a) => { a.readAt ||= now; })).catch(() => { /* try again next time */ });
+}, true);
 
 // ------------------------------------------------------------- boot
 if ("serviceWorker" in navigator && !DEMO) navigator.serviceWorker.register("sw.js").catch(() => { /* offline start not available */ });

@@ -157,6 +157,25 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **No AI in the demo:** Read with AI and Scan a document are hidden, and Help offers a fixed list of common questions with written answers, so the demo never costs anything.
 - **After adding a migration**, run `node demo/build-manifest.mjs` and commit `demo/migrations.json` — the demo loads the migrations listed there, and a changed list gives visitors a fresh demo database.
 
+## Project access
+
+- *Team & roles → Project access*: **Everyone sees every project** (the default) or **People see only their projects**. With the second, open a project in that card and tick who's on its team. Directors and company admins always see everything; subcontractor admins and workers also see projects their company or crew is working on.
+- The database enforces it: records on other projects can't be read, and every change to a project's records is refused if the person can't see that project.
+
+## Automations & alerts
+
+- Setout checks the records every 15 minutes and alerts people by itself: **a ticket or licence expiring** (30 days' warning by default), **a defect overdue**, and **a hold or witness point waiting** for sign-off. Each alert goes to each person once.
+- Alerts appear on the **bell** at the top of every page (opening it marks them read) and, once email is set up, by email.
+- *Company → Automations* (company admins): switch each rule on or off, change the ticket warning period, **Check now**, see recent runs, and retry any email that failed.
+- Every change made in Setout is also recorded as an event, ready for later features (webhooks, more rules).
+
+**Setting up emails (once, optional — the bell works without it):**
+
+1. Create a free account at https://resend.com, verify your sending domain and create an API key.
+2. In Supabase **Edge Functions → Secrets**, add `RESEND_API_KEY` (that key), `EMAIL_FROM` (e.g. `Setout <alerts@yourdomain.com>`), `APP_URL` (`https://mstrattonpatch.github.io/buildos/app/`) and `WORKER_SECRET` (any long random text).
+3. Deploy the function: `supabase functions deploy worker --no-verify-jwt` (or via the editor: name it `worker`, paste in `supabase/functions/worker/index.ts`, `handler.ts` and `deno.json`, and turn off *Verify JWT*).
+4. In Supabase **Integrations → Cron → Create job**: every minute (`* * * * *`), type *HTTP request*, POST to `https://<your ref>.supabase.co/functions/v1/worker` with a header `x-worker-secret` = the same secret.
+
 ## AI help
 
 - **Read with AI** on receipts, bills, credentials, insurance certificates, company documents and drawings: choose the file, press the button, and the details it can read are filled in and highlighted. Nothing is saved until the person checks the values and presses save. It also warns about expired tickets, a document that's the wrong kind, a supplier that isn't set up yet, and anything it wasn't sure of.

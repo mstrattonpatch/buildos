@@ -60,7 +60,7 @@ function gantt(tasks, fromOffset = -2, days = 14, opts = {}) {
 const ganttKey = (crit = false) => `<div class="row wrap small muted" style="gap:14px;margin-top:12px">${crit ? '<span class="row" style="gap:5px"><i class="key crit-key"></i>Critical path</span>' : ""}<span class="row" style="gap:5px"><i class="key" style="background:var(--green)"></i>In progress</span><span class="row" style="gap:5px"><i class="key" style="background:var(--amber)"></i>At risk (forecast past baseline)</span><span class="row" style="gap:5px"><i class="key" style="background:var(--blue)"></i>Starting</span><span class="row" style="gap:5px"><i class="key" style="background:var(--red);width:9px;height:9px;transform:rotate(45deg)"></i>Milestone blocked</span><span class="row" style="gap:5px"><i class="key" style="background:#c9cfc8;height:3px"></i>Baseline</span></div>`;
 
 // ===================================================== internal app shell
-const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/insights", "Insights", "chart"], ["#/app/people", "People & contractors", "users"], ["#/app/timesheets", "Timesheets", "clock", false, null, "timesheet.approve"], ["#/app/rates", "Rates", "dollar", false, null, "rates.manage"], ["#/app/estimates", "Estimates", "file", false, null, "estimate.manage"], ["#/app/templates", "ITP templates", "clipboard"], ["#/app/reports", "Reports", "chart"], ["#/app/scan", "Scan a document", "sparkle"]];
+const companyNav = [["#/app", "Overview", "grid", true], ["#/app/projects", "Projects", "folder", true], ["#/app/tasks", "My tasks", "listchecks", false, "tasks"], ["#/app/insights", "Insights", "chart"], ["#/app/people", "People & contractors", "users"], ["#/app/timesheets", "Timesheets", "clock", false, null, "timesheet.approve"], ["#/app/rates", "Rates", "dollar", false, null, "rates.manage"], ["#/app/estimates", "Estimates", "file", false, null, "estimate.manage"], ["#/app/templates", "ITP templates", "clipboard"], ["#/app/reports", "Reports", "chart"], ["#/app/scan", "Scan a document", "sparkle"], ["#/app/automations", "Automations", "bell"]];
 const projectNav = (id, money) => { const b = `#/app/projects/${id}`; return [[b, "Overview", "home", true], [`${b}/programme`, "Programme", "calendar"], [`${b}/quality`, "Quality", "clipboard", false, "defects"], [`${b}/safety`, "Safety", "shield"], [`${b}/workforce`, "Workforce & time", "hardhat"], [`${b}/chat`, "Team chat", "users", false, "chat"], [`${b}/from-site`, "From site", "phone", false, "fromSite"], [`${b}/documents`, "Documents", "file"], ...(money ? [[`${b}/commercial`, "Commercial", "dollar"]] : []), [`${b}/diary`, "Site diary", "notebook"], [`${b}/reports`, "Reports", "chart"], [`${b}/handover`, "Handover", "package"]]; };
 const isActive = (cur, href, exact) => { const h = href.slice(1); return exact ? cur === h : cur === h || cur.startsWith(h + "/"); };
 function navLink([href, label, ic, exact, countKey], cur, counts) {
@@ -77,11 +77,11 @@ function appShell(u, route, inner) {
        <div class="proj-card"><div class="label">Project</div><div style="color:#fff;font-weight:600;font-size:13.5px">${esc(project.name)}</div><div class="mono" style="font-size:11.5px;color:#8fa59b">${project.code}</div></div>
        ${projectNav(project.id, can(u, "commercial.view")).filter((n) => !n[0].endsWith("/from-site") || can(u, "task.assign") || can(u, "diary.submit")).map((n) => navLink(n, route, counts)).join("")}
        <div class="bottom"><a class="nav" href="#/app/settings" title="Settings">${icon("settings", 17)}<span class="nav-text">Project settings</span></a></div>`
-    : `<div class="nav-label">Company</div>${companyNav.filter((n) => (!n[5] || can(u, n[5])) && (n[0] !== "#/app/scan" || aiOn())).map((n) => navLink(n, route, counts)).join("")}
+    : `<div class="nav-label">Company</div>${companyNav.filter((n) => (!n[5] || can(u, n[5])) && (n[0] !== "#/app/scan" || aiOn()) && (n[0] !== "#/app/automations" || u.isAdmin)).map((n) => navLink(n, route, counts)).join("")}
        <div class="nav-label">Recent projects</div>${projects.map((p) => `<a class="nav" href="#/app/projects/${p.id}" title="${esc(p.name)}"><span class="recent-dot"></span><span class="nav-text">${esc(p.name)}</span></a>`).join("")}
        <div class="bottom"><a class="nav" href="#/app/settings" title="Company settings">${icon("settings", 17)}<span class="nav-text">Company settings</span></a></div>`;
   const qBase = project || projects[0] ? `#/app/projects/${project?.id ?? projects[0].id}` : "#/app/projects/new";
-  const notes = notifications(u);
+  const notes = notifications(u), alerts = DB.alerts || [], unread = alerts.filter((a) => !a.readAt).length;
   const tabs = [["#/app", "Overview", "grid", true], [project ? `#/app/projects/${project.id}` : "#/app/projects", "Project", "home", !!project], [`${qBase}/quality`, "Quality", "clipboard"], ["#/app/tasks", "My tasks", "listchecks"], ["#/site", "Site app", "phone"]];
   return `<div class="shell">
     <div class="sidebar-col"><aside class="sidebar" aria-label="Main navigation"><a href="#/app" class="brand">${logo(true)}</a><div class="org-name" title="${esc(DB.org.name)}">${esc(DB.org.name)}</div>${side}</aside></div>
@@ -95,8 +95,9 @@ function appShell(u, route, inner) {
           ${projects.length ? `<a href="${qBase}/quality/new">${icon("clipboard")} Defect</a><a href="${qBase}/diary">${icon("notebook")} Site diary entry</a>${can(u, "variation.create") ? `<a href="${qBase}/commercial#new-variation">${icon("dollar")} Variation</a>` : ""}` : ""}
           ${can(u, "project.manage") ? `<a href="#/app/projects/new">${icon("folder")} Project</a>` : ""}${can(u, "people.manage") ? `<a href="#/app/people">${icon("users")} Contractor or worker</a>` : ""}${aiOn() ? `<a href="#/app/scan">${icon("sparkle")} Scan a document</a>` : ""}
         </div></details>
-        <details class="menu"><summary class="icon-btn" aria-label="Notifications (${notes.length})">${icon("bell", 17)}${notes.length ? '<span class="pip"></span>' : ""}</summary><div class="menu-panel" style="width:340px;max-width:90vw">
-          <div class="menu-label label">Notifications</div>${notes.map((n) => `<a href="${n.href}" style="align-items:flex-start"><span style="width:8px;height:8px;border-radius:4px;margin-top:6px;flex:none;background:var(--${n.tone})"></span><span><b style="font-weight:600">${esc(n.title)}</b><br><span class="muted small">${esc(n.sub)}</span></span></a>`).join("") || '<p class="muted small" style="padding:8px 10px">All clear.</p>'}
+        <details class="menu" data-alerts><summary class="icon-btn" aria-label="Notifications (${notes.length + unread})">${icon("bell", 17)}${notes.length || unread ? '<span class="pip"></span>' : ""}</summary><div class="menu-panel" style="width:340px;max-width:90vw;max-height:70vh;overflow-y:auto">
+          ${alerts.length ? `<div class="menu-label label">Alerts</div>${alerts.slice(0, 8).map((a) => `<a href="${esc(a.link || "#/app")}" style="align-items:flex-start"><span style="width:8px;height:8px;border-radius:4px;margin-top:6px;flex:none;background:${a.readAt ? "var(--border)" : "var(--blue)"}"></span><span><b style="font-weight:600">${esc(a.title)}</b><br><span class="muted small">${esc(a.body || "")} · ${timeAgo(a.createdAt)}</span></span></a>`).join("")}` : ""}
+          <div class="menu-label label">Needs attention</div>${notes.map((n) => `<a href="${n.href}" style="align-items:flex-start"><span style="width:8px;height:8px;border-radius:4px;margin-top:6px;flex:none;background:var(--${n.tone})"></span><span><b style="font-weight:600">${esc(n.title)}</b><br><span class="muted small">${esc(n.sub)}</span></span></a>`).join("") || '<p class="muted small" style="padding:8px 10px">All clear.</p>'}
         </div></details>
         <details class="menu"><summary class="avatar" aria-label="Account">${u.initials}</summary><div class="menu-panel" style="width:290px;max-width:90vw">
           <div style="padding:8px 10px"><b>${esc(u.name)}</b><div class="muted small">${esc(u.title)} · ${esc(DB.org.name)}</div></div>
@@ -1792,6 +1793,38 @@ function pageSettings(u) {
   ${projectAccessCard(u)}
   ${aiSettingsCard(u)}
   ${admin ? "" : '<p class="small muted">Only company admins can invite people or change roles.</p>'}`;
+}
+
+// Built-in automations: what each rule does, whether it's on, its recent runs, and the background job queue.
+const AUTOMATIONS = [
+  ["credential_expiring", "Ticket or licence expiring", "Tells the worker, their company's admins and whoever manages people, once per ticket, when a verified card or licence is within the warning period.", 30],
+  ["defect_overdue", "Defect overdue", "Tells the responsible company's admins and the people who assign defects when a defect passes its due date.", null],
+  ["hold_point_submitted", "Hold point waiting", "Tells everyone who can release hold and witness points (never the person who submitted it) when one is waiting.", null],
+];
+const JOB_LABEL = { "notification.email": "Email an alert" };
+
+function pageAutomations(u) {
+  if (!u.isAdmin) return notFound("Only company admins can manage automations.");
+  const set = Object.fromEntries((DB.automationSettings || []).map((s) => [s.rule, s]));
+  const runs = DB.automationRuns || [], jobs = DB.jobs || [];
+  const stuck = jobs.filter((j) => j.status === "failed" || j.status === "dead");
+  const emailed = jobs.filter((j) => j.type === "notification.email" && j.status === "done");
+  const notSetUp = emailed.length && emailed.every((j) => /email not set up/.test(j.result || ""));
+  return `${pageHeader({ title: "Automations", meta: "<span>Alerts Setout sends by itself, checked every 15 minutes against the current records. Each one is sent once per person.</span>",
+    actions: form("runAutomations", '<button class="btn">Check now</button>') })}
+  ${notSetUp ? '<div class="notice notice-warn" style="margin-bottom:16px">Alerts show on the bell, but emails aren\'t being sent yet: the email service hasn\'t been set up (see the README, "Automations").</div>' : ""}
+  <section class="card"><div class="card-head"><h2>Rules</h2></div><div class="list-card" style="border:0">
+    ${AUTOMATIONS.map(([key, name, what, days]) => { const s = set[key], on = s ? s.enabled : true, n = runs.filter((r) => r.rule === key).length;
+      return `<div class="li" style="flex-wrap:wrap;gap:12px;align-items:flex-start"><span style="flex:1;min-width:240px"><b style="display:block">${name}</b><span class="small muted">${what}</span><span class="small muted" style="display:block;margin-top:4px">${n} in the last 100 runs</span></span>
+        ${form("setAutomation", `${hidden("rule", key)}<div class="row wrap" style="gap:8px;align-items:center">${days !== null ? `<label class="row small" style="gap:6px">Warn <input name="days" type="number" min="1" max="180" class="input" style="width:72px;height:32px" value="${s?.days ?? days}"> days before</label>` : ""}
+          <label class="row small" style="gap:6px"><input type="checkbox" name="enabled"${on ? " checked" : ""}> On</label><button class="btn btn-sm">Save</button></div>`)}</div>`; }).join("")}
+  </div></section>
+  <section class="card"><div class="card-head"><h2>Recent runs</h2></div>${runs.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>When</th><th>Rule</th><th>About</th><th>People told</th></tr></thead><tbody>
+    ${runs.slice(0, 25).map((r) => `<tr><td class="small">${dateTime(r.createdAt)}</td><td>${esc(AUTOMATIONS.find((a) => a[0] === r.rule)?.[1] || r.rule)}</td><td>${esc(r.detail || "")}</td><td>${r.notified}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted small" style="padding:0 20px 18px">Nothing has triggered yet.</p>'}</section>
+  <section class="card"><div class="card-head"><h2>Background jobs</h2><span class="spacer"></span><span class="small muted">${jobs.filter((j) => j.status === "queued").length} waiting · ${stuck.length} failed</span></div>
+    ${stuck.length ? `<div class="table-wrap"><table class="register"><thead><tr><th>Job</th><th>Status</th><th>Tries</th><th>Problem</th><th></th></tr></thead><tbody>
+    ${stuck.map((j) => `<tr><td>${esc(JOB_LABEL[j.type] || j.type)}<div class="muted small">${dateTime(j.createdAt)}</div></td><td>${badge(j.status === "dead" ? "rejected" : "expiring", j.status === "dead" ? "Gave up" : "Will retry")}</td><td>${j.attempts}</td><td class="small">${esc(j.error || "")}</td><td>${form("retryJob", `${hidden("id", j.id)}<button class="btn btn-sm">Retry</button>`)}</td></tr>`).join("")}</tbody></table></div>`
+    : '<p class="muted small" style="padding:0 20px 18px">No failed jobs.</p>'}</section>`;
 }
 
 // Who sees which project. Directors and company admins always see every project, so they're shown ticked and locked.

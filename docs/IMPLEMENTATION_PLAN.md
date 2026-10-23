@@ -1,6 +1,6 @@
 # Setout 2.0: review and implementation plan
 
-*Status: Phase 1 in progress — per-project access, CI and the AI model split are done.*
+*Status: Phase 1 done — per-project access, the event log and job queue, the three built-in automations with bell and email alerts, the Automations page, CI and the AI model split. Next: Phase 2.*
 
 *Reviews two documents: "Technical Product Strategy and AI Roadmap" and "BuildOS 2.0 Technical Design Specification" (v1.0, both 23 Oct 2026). The plan is written against the code as it stands (commit `658831c`).*
 

@@ -11,11 +11,17 @@ import { createClient } from "@supabase/supabase-js";
 import { fakeAnthropic, AI } from "./fake-anthropic.mjs";
 // The real Edge Function code, run here with a fake Claude API.
 fs.mkdirSync(new URL("./ai-fn/", import.meta.url), { recursive: true });
-let aiHandle = null;
+let aiHandle = null, workerHandle = null;
+const MAIL = [];
 if (fs.existsSync(`${ROOT}/supabase/functions/ai/handler.ts`)) {
   for (const f of ["handler.ts", "guide.ts"]) fs.copyFileSync(`${ROOT}/supabase/functions/ai/${f}`, new URL(`./ai-fn/${f}`, import.meta.url));
   aiHandle = (await import("./ai-fn/handler.ts")).handle;
 }
+if (fs.existsSync(`${ROOT}/supabase/functions/worker/handler.ts`)) {
+  fs.copyFileSync(`${ROOT}/supabase/functions/worker/handler.ts`, new URL("./ai-fn/worker-handler.ts", import.meta.url));
+  workerHandle = (await import("./ai-fn/worker-handler.ts")).handleWorker;
+}
+
 
 const PORT = 54321;
 const APP_DIR = ROOT;
@@ -27,10 +33,12 @@ const pool = new pg.Pool(PG);
 const files = new Map(); // storage path -> Buffer
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+// A service-role token, like the worker's secret key (testing only).
+const SERVICE_JWT = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "service_role" })}.sig`;
 const makeJwt = (u) => `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: u.id, email: u.email, role: "authenticated", aud: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
 const userFromJwt = (h) => {
   const t = (h || "").replace(/^Bearer /, "");
-  try { const p = JSON.parse(Buffer.from(t.split(".")[1], "base64url")); return p.sub ? { id: p.sub, email: p.email } : null; } catch { return null; }
+  try { const p = JSON.parse(Buffer.from(t.split(".")[1], "base64url")); return p.role === "service_role" ? { service: true } : p.sub ? { id: p.sub, email: p.email } : null; } catch { return null; }
 };
 const userJson = (r) => ({ id: r.id, aud: "authenticated", role: "authenticated", email: r.email, user_metadata: r.raw_user_meta_data || {}, app_metadata: { provider: "email" }, created_at: r.created_at, email_confirmed_at: r.created_at });
 const sessionJson = (r) => ({ access_token: makeJwt(r), token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: "r-" + r.id, user: userJson(r) });
@@ -39,8 +47,9 @@ async function asUser(user, sql, params) {
   const c = await pool.connect();
   try {
     await c.query("begin");
-    await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(user ? { sub: user.id, email: user.email, role: "authenticated" } : { role: "anon" })]);
-    await c.query(`set local role ${user ? "authenticated" : "anon"}`);
+    const role = user?.service ? "service_role" : user ? "authenticated" : "anon";
+    await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(user?.service ? { role } : user ? { sub: user.id, email: user.email, role } : { role })]);
+    await c.query(`set local role ${role}`);
     const r = await c.query(sql, params);
     await c.query("commit");
     return r.rows;
@@ -138,6 +147,15 @@ http.createServer(async (req, res) => {
       });
       return send(res, r.status, await r.text(), Object.fromEntries(r.headers));
     }
+    if (p === "/functions/v1/worker" && workerHandle) {
+      const r = await workerHandle(new Request(`http://localhost:${PORT}${p}`, { method: req.method, headers: Object.fromEntries(Object.entries(req.headers).filter(([, v]) => typeof v === "string")), body: req.method === "POST" ? body : undefined }), {
+        db: createClient(`http://localhost:${PORT}`, SERVICE_JWT, { global: { headers: { Authorization: `Bearer ${SERVICE_JWT}` } }, auth: { persistSession: false } }),
+        secret: "test-worker-secret", appUrl: `http://localhost:${PORT}/buildos/app/`,
+        sendEmail: AI.mode === "noemail" ? null : async (e) => { if (e.to.includes("bounce")) throw new Error("Email provider said 422: invalid address"); MAIL.push(e); },
+      });
+      return send(res, r.status, await r.text(), Object.fromEntries(r.headers));
+    }
+    if (p === "/__mail") { if (req.method === "POST") MAIL.length = 0; return send(res, 200, MAIL); }
     if (p === "/__ai") { if (req.method === "POST") AI.mode = json().mode || "ok"; return send(res, 200, { mode: AI.mode, requests: AI.requests }); }
 
     // ---------- RPC
@@ -148,7 +166,14 @@ http.createServer(async (req, res) => {
       const types = Object.fromEntries((await pool.query("select unnest(proargnames) n, unnest(proargtypes::regtype[]::text[]) t from pg_proc where proname = $1 and pronamespace = 'public'::regnamespace", [m[1]])).rows.map((r) => [r.n, r.t]));
       const vals = keys.map((k) => (args[k] !== null && typeof args[k] === "object" && !(Array.isArray(args[k]) && /\[\]$/.test(types[k] || "")) ? JSON.stringify(args[k]) : args[k]));
       try {
-        const rows = await asUser(user, `select public.${m[1]}(${keys.map((k, i) => `${k} => $${i + 1}`).join(", ")}) as r`, vals);
+        // Like PostgREST: a function returning rows gives an array (setof) or one object (a single row type).
+        const [shape] = (await pool.query("select p.proretset set, t.typtype = 'c' row from pg_proc p join pg_type t on t.oid = p.prorettype where p.proname = $1 and p.pronamespace = 'public'::regnamespace limit 1", [m[1]])).rows;
+        const call = `public.${m[1]}(${keys.map((k, i) => `${k} => $${i + 1}`).join(", ")})`;
+        if (shape?.set || shape?.row) {
+          const rows = (await asUser(user, `select * from ${call}`, vals)).map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v instanceof Date ? v.toISOString() : v])));
+          return send(res, 200, shape.set ? rows : rows[0] ?? null);
+        }
+        const rows = await asUser(user, `select ${call} as r`, vals);
         return send(res, 200, rows[0].r);
       } catch (e) { return send(res, 400, pgErr(e)); }
     }
