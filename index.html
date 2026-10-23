@@ -4,17 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#182E27">
-<title>BuildOS</title>
+<title>Setout</title>
 <meta name="description" content="One connected platform for construction quality, project delivery, workforce compliance and commercial management.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='6' fill='%23182E27'/%3E%3Crect x='6' y='7' width='10' height='2.6' rx='1.3' fill='%23fff'/%3E%3Crect x='6' y='11.7' width='14' height='2.6' rx='1.3' fill='%23fff'/%3E%3Crect x='6' y='16.4' width='7' height='2.6' rx='1.3' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='6.5' fill='%23182E27'/%3E%3Cpath d='M13 13V5.5A7.5 7.5 0 0 1 20.5 13Z' fill='%237FC4A5'/%3E%3Ccircle cx='13' cy='13' r='7.5' fill='none' stroke='%23fff' stroke-width='2.6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* BuildOS design tokens — from "Interface & visual identity v0.1".
+/* Setout design tokens — from "Interface & visual identity v0.1".
    Borders, not shadows, separate cards; shadow is reserved for floating UI. */
 :root {
   --forest: #182e27;
+  --mint: #7fc4a5;      /* Peg mint: the set-out point in the mark */
   --forest-2: #21403a;
   --green: #27815f;
   --green-text: #1f6b4d;
@@ -358,7 +359,7 @@ dl.kv dd { margin: 0; font-family: var(--mono); font-size: 13px; text-align: rig
 .pub section { padding: 72px 0; }
 .pub .eyebrow { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--green-text); }
 .pub .pill-eyebrow { display: inline-flex; height: 26px; align-items: center; padding: 0 10px; border-radius: 999px; background: var(--green-tint); color: var(--green-text); font-size: 12px; font-weight: 600; }
-.pub h1.display { font-size: 56px; line-height: 1.04; letter-spacing: -0.035em; margin: 18px 0 20px; }
+.pub h1.display { font-size: 50px; line-height: 1.04; letter-spacing: -0.035em; margin: 18px 0 20px; }
 .pub h2.section { font-size: 34px; line-height: 1.12; letter-spacing: -0.025em; }
 .pub .lede { font-size: 17px; line-height: 1.6; color: #3c4843; max-width: 520px; }
 .hero-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
@@ -410,11 +411,11 @@ noscript { display: block; padding: 40px; text-align: center; }
 </head>
 <body>
 <div id="root"></div>
-<noscript>BuildOS needs JavaScript to run.</noscript>
+<noscript>Setout needs JavaScript to run.</noscript>
 <script>
 "use strict";
 /* =====================================================================
-   BuildOS — single-file prototype
+   Setout — single-file prototype
    One connected construction platform: quality, programme, workforce &
    safety and commercial sharing one project record. All data is sample
    data, saved in this browser (localStorage). Money is stored in cents.
@@ -1102,7 +1103,7 @@ const STATUS = {
 };
 const badge = (status, label) => { const [t, i, l] = STATUS[status] || ["grey", "circle", status]; return `<span class="badge badge-${t}">${icon(i, 13, "stroke-width:2.6")}${esc(label ?? l)}</span>`; };
 const sampleTag = () => `<span class="sample-tag" title="Illustrative figures">Sample data</span>`;
-const logo = (light = false, size = 26) => `<span class="row" style="gap:9px;font-weight:700;font-size:17px;color:${light ? "#fff" : "var(--ink)"}"><svg width="${size}" height="${size}" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" fill="${light ? "#27815F" : "#182E27"}"/><rect x="6" y="7" width="10" height="2.6" rx="1.3" fill="#fff"/><rect x="6" y="11.7" width="14" height="2.6" rx="1.3" fill="#fff" opacity=".85"/><rect x="6" y="16.4" width="7" height="2.6" rx="1.3" fill="#fff" opacity=".7"/></svg><span class="brand-text">BuildOS</span></span>`;
+const logo = (light = false, size = 26) => `<span class="row" style="gap:9px;font-weight:700;font-size:18px;letter-spacing:-0.02em;color:${light ? "#fff" : "var(--ink)"}"><svg width="${size}" height="${size}" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6.5" fill="${light ? "#27815F" : "#182E27"}"/>${light ? "" : '<path d="M13 13V6.6A6.4 6.4 0 0 1 19.4 13Z" fill="#7FC4A5"/>'}<circle cx="13" cy="13" r="6.4" fill="none" stroke="#fff" stroke-width="2"/><path d="M13 3.6v18.8M3.6 13h18.8" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg><span class="brand-text">Setout</span></span>`;
 function metric(label, value, note, tone, href) {
   const n = note ? `<div class="m-note ${tone === "amber" ? "amber-text" : tone === "red" ? "red-text" : ""}">${tone === "amber" ? icon("alert", 12) : tone === "red" ? icon("lock", 12) : ""}${esc(note)}</div>` : "";
   const body = `<div class="m-label">${esc(label)}</div><div class="m-value">${esc(value)}</div>${n}`;
@@ -1177,8 +1178,8 @@ function pageHome() {
   <section><div class="inner hero-grid">
     <div>
       <span class="pill-eyebrow">Quality · Projects · Workforce · Commercial</span>
-      <h1 class="display">Everything on site.<br>Everything under control.</h1>
-      <p class="lede">One connected platform for construction quality, project delivery, workforce compliance and commercial management. Enter it once, on site or in the office, and every team sees the same truth.</p>
+      <h1 class="display">Set out the whole job<br>in one place.</h1>
+      <p class="lede">Quality, programme, workforce and commercial on one project record. Enter it once, on site or in the office, and every team works from the same marks.</p>
       <div class="row wrap" style="margin-top:28px;gap:12px"><a href="#/demo" class="btn btn-primary btn-lg">Book a demo ${icon("arrowright")}</a><a href="demo/" class="btn btn-lg">Explore the platform</a></div>
       <p class="small muted" style="margin-top:20px">Built in Australia for builders, head contractors and subcontractors.</p>
     </div>
@@ -1196,8 +1197,8 @@ function pageHome() {
     </div>
   </div></section>
   <section class="problem"><div class="inner hero-grid" style="gap:40px">
-    <div><span class="eyebrow" style="color:#8fd1b3">The problem</span><h2 class="section" style="margin-top:10px;color:#fff">Three systems. The same data typed in three times. Nobody sees the whole job.</h2></div>
-    <div class="stack" style="gap:10px">${["A subbie's crew, their SWMS, their defects and their progress claim live in four different places.", "The office approves a claim without seeing the failed inspection on site.", "BuildOS keeps one project record, so every module reads from and writes to the same thing."].map((t, i) => `<div class="card-dark"><span class="mono" style="color:#8fd1b3">0${i + 1}</span><span>${esc(t)}</span></div>`).join("")}</div>
+    <div><span class="eyebrow" style="color:#7FC4A5">The problem</span><h2 class="section" style="margin-top:10px;color:#fff">Three systems. The same data typed in three times. Nobody sees the whole job.</h2></div>
+    <div class="stack" style="gap:10px">${["A subbie's crew, their SWMS, their defects and their progress claim live in four different places.", "The office approves a claim without seeing the failed inspection on site.", "Setout keeps one project record, so every module reads from and writes to the same thing."].map((t, i) => `<div class="card-dark"><span class="mono" style="color:#7FC4A5">0${i + 1}</span><span>${esc(t)}</span></div>`).join("")}</div>
   </div></section>
   <section id="platform"><div class="inner">
     <div class="row" style="align-items:flex-end"><h2 class="section" style="max-width:520px">Three pillars, one connected platform</h2><span class="spacer"></span><a href="demo/" class="link">See every feature →</a></div>
@@ -1223,7 +1224,7 @@ function pageHome() {
     <div class="trust-grid"><div><b>Full audit history</b><p class="small muted">Who changed what, and when, on every record.</p></div><div><b>Separated companies</b><p class="small muted">Subbies see their own records, never your margin.</p></div><div><b>Private files</b><p class="small muted">Photos and documents open through short-lived links, never public URLs.</p></div><div><b>Data in Australia</b><p class="small muted">Hosted in Sydney.</p></div></div>
   </div></div></section>
   <section style="padding-top:0"><div class="inner"><div class="cta-band">
-    <div style="flex:1;min-width:260px"><h2 style="font-size:30px;color:#fff">See your next project in BuildOS</h2><p style="margin-top:8px;color:#d8efe4">30-minute walkthrough with your own project structure. Plans from [PRICE] per month.</p></div>
+    <div style="flex:1;min-width:260px"><h2 style="font-size:30px;color:#fff">Every job starts here.</h2><p style="margin-top:8px;color:#fff;font-weight:600">See your next project in Setout.</p><p style="margin-top:8px;color:#d8efe4">30-minute walkthrough with your own project structure. Plans from [PRICE] per month.</p></div>
     <a href="#/demo" class="btn btn-lg" style="color:var(--ink)">Book a demo</a><a href="#/pricing" class="btn btn-lg" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">View pricing</a>
   </div></div></section>`);
 }
@@ -1526,7 +1527,7 @@ function pageItp(u, p, id) {
   const base = `#/app/projects/${p.id}`, task = DB.tasks.find((t) => t.id === itp.taskId), mayRelease = can(u, "itp.release_hold");
   const TYPE = { hold: "Hold point", witness: "Witness point", inspection: "Inspection", test: "Test" };
   return `${pageHeader({ crumbs: [[base, p.name], [`${base}/quality`, "Quality"]], title: `<span class="mono" style="font-size:20px;color:var(--muted);margin-right:10px">${itp.ref}</span>${esc(itp.title)}`, meta: `<span>Template v${itp.templateVersion} — template changes don't silently alter this active ITP</span>${task ? `<span>Task: <a class="link" href="${base}/programme">${esc(task.name)}</a></span>` : ""}` })}
-  ${itp.points.some((x) => x.type === "hold" && x.status !== "released") ? `<div class="notice notice-error">${icon("lock")}<span><b>Hold point open.</b> Work covered by this hold must not proceed until a designated person releases it. BuildOS flags the hold and records who released it — it doesn't replace contractual requirements.</span></div>` : ""}
+  ${itp.points.some((x) => x.type === "hold" && x.status !== "released") ? `<div class="notice notice-error">${icon("lock")}<span><b>Hold point open.</b> Work covered by this hold must not proceed until a designated person releases it. Setout flags the hold and records who released it — it doesn't replace contractual requirements.</span></div>` : ""}
   <section class="card"><div class="table-wrap"><table class="register"><thead><tr><th>Point</th><th>Type</th><th>Acceptance check</th><th>Evidence</th><th>Status</th><th style="min-width:250px">Sign-off</th></tr></thead><tbody>
   ${itp.points.map((pt) => `<tr><td style="font-weight:600">${esc(pt.name)}</td><td>${pt.type === "hold" ? badge("hold", "Hold") : `<span class="tag">${TYPE[pt.type]}</span>`}</td><td class="small">${esc(pt.check)}</td><td class="small">${pt.evidence ? `${pt.evidence} photo${pt.evidence > 1 ? "s" : ""}` : '<span class="muted">None</span>'}</td><td>${badge(pt.status)}</td><td>
     ${pt.status === "released" ? `<span class="small muted">Released by ${esc(userById(pt.releasedBy)?.name)} · ${pt.releasedAt ? dateTime(pt.releasedAt) : ""}</span>` : ""}
@@ -1726,7 +1727,7 @@ function parseRoute() {
 }
 
 function resolve(path, query) {
-  const pub = { "/": [pageHome, "Everything on site. Everything under control."], "/pricing": [pagePricing, "Pricing"], "/security": [pageSecurity, "Security & privacy"], "/demo": [pageDemo, "Book a demo"], "/login": [pageLogin, "Log in"] };
+  const pub = { "/": [pageHome, "Set out the whole job in one place."], "/pricing": [pagePricing, "Pricing"], "/security": [pageSecurity, "Security & privacy"], "/demo": [pageDemo, "Book a demo"], "/login": [pageLogin, "Log in"] };
   if (pub[path] && path !== "/login") return { html: pub[path][0](), title: pub[path][1] };
   // The product demo is the real app running on sample data: demo/index.html.
   location.replace("demo/"); return null;
@@ -1774,7 +1775,7 @@ function render() {
   }
   if (!out) return;
   document.getElementById("root").innerHTML = out.html;
-  document.title = `${out.title} · BuildOS`;
+  document.title = `${out.title} · Setout`;
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
   else window.scrollTo(0, 0);
 }

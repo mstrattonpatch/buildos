@@ -158,7 +158,7 @@ function render() {
   window.hideVizTip?.();
   document.getElementById("root").innerHTML = out.html;
   updateSyncUI();
-  document.title = `${out.title} · BuildOS`;
+  document.title = `${out.title} · Setout`;
   if (pendingScroll) { document.getElementById(pendingScroll)?.scrollIntoView(); pendingScroll = null; }
   afterChatRender();
   afterInsightsRender();
@@ -293,7 +293,7 @@ const ACTIONS = {
     if (!data.session) return { msg: "Account created — confirm your email to continue.", go: `/check-email?email=${encodeURIComponent(email)}`, noReload: true };
     SESSION = data.session;
     await enterApp();
-    return { msg: "Welcome to BuildOS.", go: DB ? homeFor(currentUser()) : "/welcome", noReload: true };
+    return { msg: "Welcome to Setout.", go: DB ? homeFor(currentUser()) : "/welcome", noReload: true };
   },
   async forgot(fd) {
     const { error } = await sb.auth.resetPasswordForEmail(f(fd, "email"), { redirectTo: appUrl() });

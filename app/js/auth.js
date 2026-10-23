@@ -6,15 +6,15 @@ const authCard = (title, sub, body, foot = "") => `<div class="auth-wrap"><div c
 </div></div></div>`;
 
 function pageSignIn() {
-  return authCard("Sign in to BuildOS", "", form("signIn", `<div class="stack">
+  return authCard("Sign in to Setout", "", form("signIn", `<div class="stack">
     <label class="field"><span>Email</span><input name="email" type="email" class="input" autocomplete="email" autofocus></label>
     <label class="field"><span>Password</span><input name="password" type="password" class="input" autocomplete="current-password"></label>
     <button class="btn btn-primary btn-lg">Sign in</button></div>`),
-  `<a class="link" href="#/forgot">Forgot your password?</a><br>New to BuildOS? <a class="link" href="#/signup">Create an account</a>`);
+  `<a class="link" href="#/forgot">Forgot your password?</a><br>New to Setout? <a class="link" href="#/signup">Create an account</a>`);
 }
 
 function pageSignUp() {
-  return authCard("Create your account", "If your company already uses BuildOS, sign up with the email your admin invited — you'll join automatically.", form("signUp", `<div class="stack">
+  return authCard("Create your account", "If your company already uses Setout, sign up with the email your admin invited — you'll join automatically.", form("signUp", `<div class="stack">
     <label class="field"><span>Full name</span><input name="full_name" class="input" autocomplete="name"></label>
     <label class="field"><span>Work email</span><input name="email" type="email" class="input" autocomplete="email"></label>
     <label class="field"><span>Password <span class="muted">(at least 8 characters)</span></span><input name="password" type="password" class="input" autocomplete="new-password" minlength="8"></label>

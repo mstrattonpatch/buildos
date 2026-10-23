@@ -1,6 +1,6 @@
 "use strict";
 /* =====================================================================
-   BuildOS — shared helpers, display rules and the sample dataset.
+   Setout — shared helpers, display rules and the sample dataset.
    Data lives in Supabase (see data.js). The rules here only decide what
    to show; the database functions enforce every change.
    Money is stored in cents.

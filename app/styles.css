@@ -1,7 +1,8 @@
-/* BuildOS design tokens — from "Interface & visual identity v0.1".
+/* Setout design tokens — from "Interface & visual identity v0.1".
    Borders, not shadows, separate cards; shadow is reserved for floating UI. */
 :root {
   --forest: #182e27;
+  --mint: #7fc4a5;      /* Peg mint: the set-out point in the mark */
   --forest-2: #21403a;
   --green: #27815f;
   --green-text: #1f6b4d;

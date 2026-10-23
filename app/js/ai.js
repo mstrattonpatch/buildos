@@ -2,7 +2,7 @@
 // 1. "Read with AI" on upload forms: the document goes to the "ai" Edge Function, which returns the values it can read.
 //    They're filled into the form and highlighted. Nothing is saved until the person checks them and presses save.
 // 2. Scan a document (#/app/scan): read any document, then open the right form with it filled in.
-// 3. Help chat: a question box on every page that knows BuildOS's pages and the person's role.
+// 3. Help chat: a question box on every page that knows Setout's pages and the person's role.
 // The AI key lives in Supabase (Edge Function secret), never in this code.
 
 // In the demo nothing calls the AI: document reading is hidden and Help answers from a fixed list (DEMO_FAQ).
@@ -53,7 +53,7 @@ async function aiRead(file, expect) {
     options: { credential_types: CREDENTIAL_TYPES, insurance_types: INSURANCE_TYPES, categories: DOC_CATEGORIES, company_doc_kinds: COMPANY_DOC_KINDS } });
 }
 
-// ---- matching what was read to records in BuildOS
+// ---- matching what was read to records in Setout
 const norm = (s) => String(s ?? "").toLowerCase().replace(/\b(pty|ltd|limited|p\/l|the|australia|aust)\b/g, "").replace(/[^a-z0-9]/g, "");
 function closest(v, list) {
   if (!v) return null;
@@ -190,7 +190,7 @@ function pageScan(u) {
       ${SCAN.file ? `<p class="small muted">Chosen: <b>${esc(SCAN.file.name)}</b> (${Math.max(1, Math.round(SCAN.file.size / 1024))} KB)</p>` : ""}
       <div><button class="btn btn-primary" type="button" data-scan-read${SCAN.busy ? " disabled aria-busy=\"true\"" : ""}>${icon("sparkle", 15)} ${SCAN.busy ? "Reading…" : "Read with AI"}</button></div>
       ${SCAN.error ? `<div class="ai-note ai-error" role="alert">${icon("alert", 15)} ${esc(SCAN.error)}</div>` : ""}
-      <p class="small muted">The file is sent to the AI service to be read and isn't kept there. It's only saved in BuildOS when you save the form.</p></div>
+      <p class="small muted">The file is sent to the AI service to be read and isn't kept there. It's only saved in Setout when you save the form.</p></div>
     </section>
     <section class="card card-pad"><h2 style="margin-bottom:12px">2. Check and send it where it belongs</h2>
       ${r ? `<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:6px"><b>Looks like a ${DOC_TYPE_LABEL[r.doc_type] || "document"}</b>${badge(r.confidence === "high" ? "approved" : r.confidence === "low" ? "expiring" : "pending", `${r.confidence} confidence`)}</div>
@@ -249,10 +249,10 @@ const DEMO_FAQ = [
   ["How do workers upload their white card?", "Open the worker under [People & contractors](#/app/people) and press **Create link**. Send them the link — they can upload photos of their tickets from their phone without an account. Uploads wait for the office to check them before they count."],
   ["How does site sign-in work?", "Print the QR poster from the project's [Site access](#/app/projects/{p}/safety/access) page and put it at the gate. Workers scan it with their phone camera and sign in with their worker code; visitors fill in a short form. Anyone missing a white card, induction or required ticket is stopped. The [muster list](#/app/projects/{p}/workforce/muster) shows who's on site."],
   ["How do I approve timesheets?", "Open [Timesheets](#/app/timesheets), check the week's hours, select them and press **Approve**. Approved hours can be processed and exported as a payroll CSV split into ordinary and overtime."],
-  ["How do I make a progress claim?", "On the project's [Claims](#/app/projects/{p}/commercial/claims) page press **New claim**, enter the value to date for each contract item and approved variation, and BuildOS works out this period's amount and retention. Print the claim document to send it."],
+  ["How do I make a progress claim?", "On the project's [Claims](#/app/projects/{p}/commercial/claims) page press **New claim**, enter the value to date for each contract item and approved variation, and Setout works out this period's amount and retention. Print the claim document to send it."],
   ["Can subcontractors see my margin?", "No. Subcontractor admins only see their own company's defects, ITPs, SWMS, timesheets and documents. Budgets, costs, variations' commercial detail and claims are only visible to directors and project managers."],
   ["Does it work without signal?", "Yes. The [site app](#/site) keeps working: defects, inspections, diary entries, notes, hours, receipts and finished tasks are saved on the phone and sent when it's back online — see the [Outbox](#/site/outbox). Approvals always need a connection."],
-  ["What can the AI do in the full app?", "In the full app, **Read with AI** fills in forms from photos and PDFs of receipts, supplier invoices, licences, insurance certificates and drawings, and **Help** answers any question about BuildOS. Both are switched off in this demo."],
+  ["What can the AI do in the full app?", "In the full app, **Read with AI** fills in forms from photos and PDFs of receipts, supplier invoices, licences, insurance certificates and drawings, and **Help** answers any question about Setout. Both are switched off in this demo."],
 ];
 
 const HELP_STARTERS = ["How do I enter a supplier invoice?", "Where do I release a hold point?", "How do workers upload their white card?", "Something isn't saving — what do I check?"];
@@ -260,8 +260,8 @@ const HELP_STARTERS = ["How do I enter a supplier invoice?", "Where do I release
 function helpPanelHtml() {
   if (DEMO) return demoHelpHtml();
   const msgs = HELP.messages.map((m) => `<div class="help-msg ${m.role}">${m.role === "user" ? esc(m.content) : helpMarkdown(m.content)}</div>`).join("");
-  return `<div class="help-head"><b>${icon("sparkle", 15)} Ask BuildOS</b><span class="spacer"></span>${HELP.messages.length ? '<button type="button" class="link small" data-help-clear>New chat</button>' : ""}<button type="button" class="icon-btn" data-help-toggle aria-label="Close help">${icon("x", 16)}</button></div>
-    <div class="help-list" id="help-list" aria-live="polite">${msgs || `<p class="small muted">Ask how to do something in BuildOS, or where to find it. I know the pages and what your role can do.</p><div class="help-starters">${HELP_STARTERS.map((q) => `<button type="button" class="chip" data-help-ask="${esc(q)}">${esc(q)}</button>`).join("")}</div>`}
+  return `<div class="help-head"><b>${icon("sparkle", 15)} Ask Setout</b><span class="spacer"></span>${HELP.messages.length ? '<button type="button" class="link small" data-help-clear>New chat</button>' : ""}<button type="button" class="icon-btn" data-help-toggle aria-label="Close help">${icon("x", 16)}</button></div>
+    <div class="help-list" id="help-list" aria-live="polite">${msgs || `<p class="small muted">Ask how to do something in Setout, or where to find it. I know the pages and what your role can do.</p><div class="help-starters">${HELP_STARTERS.map((q) => `<button type="button" class="chip" data-help-ask="${esc(q)}">${esc(q)}</button>`).join("")}</div>`}
     ${HELP.busy ? '<div class="help-msg assistant muted">Thinking…</div>' : ""}</div>
     <form class="help-form" data-help-form><label class="sr-only" for="help-q">Your question</label><textarea id="help-q" name="q" rows="1" class="input" placeholder="${navigator.onLine ? "Ask a question…" : "Help needs a connection"}" maxlength="2000"${HELP.busy || !navigator.onLine ? " disabled" : ""}></textarea><button class="btn btn-primary" ${HELP.busy || !navigator.onLine ? "disabled" : ""}>Ask</button></form>
     <p class="help-foot">AI answers can be wrong — check before acting on anything important.</p>`;
@@ -270,7 +270,7 @@ function helpPanelHtml() {
 function demoHelpHtml() {
   const msgs = HELP.messages.map((m) => `<div class="help-msg ${m.role}">${m.role === "user" ? esc(m.content) : helpMarkdown(m.content)}</div>`).join("");
   return `<div class="help-head"><b>${icon("sparkle", 15)} Common questions</b><span class="spacer"></span>${HELP.messages.length ? '<button type="button" class="link small" data-help-clear>Clear</button>' : ""}<button type="button" class="icon-btn" data-help-toggle aria-label="Close help">${icon("x", 16)}</button></div>
-    <div class="help-list" id="help-list" aria-live="polite">${msgs || '<p class="small muted">Pick a question to see how it works in BuildOS.</p>'}</div>
+    <div class="help-list" id="help-list" aria-live="polite">${msgs || '<p class="small muted">Pick a question to see how it works in Setout.</p>'}</div>
     <div class="help-starters help-faq">${DEMO_FAQ.map(([q], i) => `<button type="button" class="chip" data-help-faq="${i}">${esc(q)}</button>`).join("")}</div>
     <p class="help-foot">Demo: answers are written in advance. In the full app you can ask anything.</p>`;
 }
@@ -283,15 +283,15 @@ function renderHelp() {
   const onSite = location.hash.startsWith("#/site");
   root.className = `help-root${onSite ? " on-site" : ""}`;
   root.innerHTML = HELP.open
-    ? `<section class="help-panel" role="dialog" aria-label="Ask BuildOS">${helpPanelHtml()}</section>`
-    : `<button type="button" class="help-fab" data-help-toggle aria-label="Ask BuildOS for help">${icon("sparkle", 18)}<span>Help</span></button>`;
+    ? `<section class="help-panel" role="dialog" aria-label="Ask Setout">${helpPanelHtml()}</section>`
+    : `<button type="button" class="help-fab" data-help-toggle aria-label="Ask Setout for help">${icon("sparkle", 18)}<span>Help</span></button>`;
   const list = document.getElementById("help-list");
   if (list) list.scrollTop = list.scrollHeight;
 }
 
 function helpContext(u) {
   const { path } = parseRoute();
-  return { name: u.name, company: DB.org.name, role: ROLE_LABEL[u.role], permissions: GRANTS[u.role] || [], page: path, page_title: document.title.replace(/ · BuildOS$/, ""),
+  return { name: u.name, company: DB.org.name, role: ROLE_LABEL[u.role], permissions: GRANTS[u.role] || [], page: path, page_title: document.title.replace(/ · Setout$/, ""),
     site_app: path.startsWith("/site"), today: todayYmd(), projects: listProjects(u).map((p) => ({ id: p.id, name: p.name })) };
 }
 

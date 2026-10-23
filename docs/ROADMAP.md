@@ -1,4 +1,4 @@
-# BuildOS roadmap
+# Setout roadmap
 
 Features are being brought across from the earlier single-file BuildOS
 build (a claude.ai artifact that stored data per browser) into this app,

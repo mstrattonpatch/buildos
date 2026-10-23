@@ -155,7 +155,7 @@ async function chat(d: Deps, b: ChatBody) {
     ],
     messages: turns,
   });
-  if (res.stop_reason === "refusal") return { result: { reply: "Sorry, I can't help with that one. Try asking about a BuildOS feature or page." }, usage: res.usage, docType: null };
+  if (res.stop_reason === "refusal") return { result: { reply: "Sorry, I can't help with that one. Try asking about a Setout feature or page." }, usage: res.usage, docType: null };
   const reply = res.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("").trim();
   return { result: { reply: reply || "Sorry, I didn't catch that. Could you ask again?" }, usage: res.usage, docType: null };
 }
@@ -165,7 +165,7 @@ class UserError extends Error {}
 
 function apiErrorMessage(e: unknown) {
   if (e instanceof UserError) return e.message;
-  if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return "The AI key isn't valid. Ask whoever set up BuildOS to check the ANTHROPIC_API_KEY secret in Supabase.";
+  if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return "The AI key isn't valid. Ask whoever set up Setout to check the ANTHROPIC_API_KEY secret in Supabase.";
   if (e instanceof Anthropic.RateLimitError) return "The AI is busy right now. Please try again in a minute.";
   if (e instanceof Anthropic.BadRequestError) return "The AI couldn't process that file. Try a clearer photo or a PDF.";
   if (e instanceof Anthropic.APIConnectionError) return "Couldn't reach the AI service. Please try again.";

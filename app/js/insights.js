@@ -265,7 +265,7 @@ function exportInsights() {
   const t = document.querySelector("[data-matrix]");
   if (!t) return;
   const rows = [...t.querySelectorAll("tr")].map((tr) => [...tr.children].map((c) => c.textContent.replace(/[▲▼]/g, "").trim()));
-  downloadCsv(`BuildOS-insights-${INS.tab}-${INS.from}-to-${INS.to}.csv`, rows);
+  downloadCsv(`Setout-insights-${INS.tab}-${INS.from}-to-${INS.to}.csv`, rows);
 }
 
 /** Live mode: reload the company's data every 30 s while the page is open and visible, then redraw the visuals. */

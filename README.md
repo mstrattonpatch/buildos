@@ -1,4 +1,6 @@
-# BuildOS (working name)
+# Setout
+
+*Previously developed under the working name BuildOS; the repository, web address (`/buildos/`) and internal code names keep that name.*
 
 One connected construction platform: quality, programme, workforce & safety, and commercial, all sharing one project record.
 
@@ -160,7 +162,7 @@ Contractors (or the site team on their behalf) submit a Safe Work Method Stateme
 - **Scan a document** (*Company → Scan a document*): upload any of those documents, check what was read, pick the project, worker or company (matched for you where possible), and the right form opens with the details and the file filled in.
 - **Help** (button at the bottom right of every page): ask how to do something and get short steps with links to the right page. It knows the pages, the person's role and their projects. It can't see or change records.
 - **Limits and records:** 40 documents and 80 questions per person per hour, 1,000 calls per company per day; every call is logged (*Team & roles → AI help* shows the last 30 days). Directors and PMs can switch AI help off for the company.
-- **Privacy:** files go to the AI service to be read and aren't stored there; they're only saved in BuildOS when the form is saved.
+- **Privacy:** files go to the AI service to be read and aren't stored there; they're only saved in Setout when the form is saved.
 
 **Setting it up (once):**
 

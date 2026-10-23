@@ -1,4 +1,4 @@
-// BuildOS demo backend: the real database (every migration in supabase/migrations) running inside the
+// Setout demo backend: the real database (every migration in supabase/migrations) running inside the
 // visitor's browser with PGlite, behind a stand-in for the Supabase API. The real app code talks to it
 // through supabase-js, exactly as it talks to Supabase, so every feature appears in the demo automatically.
 // Nothing leaves the browser. Data is kept in this browser (IndexedDB) until "Reset demo".

@@ -6,13 +6,13 @@ window.BUILDOS_DEMO = { fetch: backend.demoFetch, fileUrl: backend.fileUrl };
 window.BUILDOS_CONFIG = { supabaseUrl: backend.API, supabaseKey: "demo" };
 
 const root = document.getElementById("root");
-const loading = (msg) => { root.innerHTML = `<div class="demo-loading" role="status"><div class="demo-spinner"></div><b>Opening the BuildOS demo</b><span>${msg}</span></div>`; };
+const loading = (msg) => { root.innerHTML = `<div class="demo-loading" role="status"><div class="demo-spinner"></div><b>Opening the Setout demo</b><span>${msg}</span></div>`; };
 const loadScript = (src) => new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error(`Couldn't load ${src}`)); document.body.appendChild(s); });
 const appScripts = (names) => names.reduce((p, n) => p.then(() => loadScript(`../app/js/${n}.js`)), Promise.resolve());
 
 function picker() {
   return new Promise((resolve) => {
-    root.innerHTML = `<div class="demo-pick"><h1>Explore BuildOS</h1><p>A sample building company with four live projects. Pick who you'd like to be — you can switch at any time from the bar at the top. Nothing you do here is saved anywhere except this browser.</p>
+    root.innerHTML = `<div class="demo-pick"><h1>Explore Setout</h1><p>A sample building company with four live projects. Pick who you'd like to be — you can switch at any time from the bar at the top. Nothing you do here is saved anywhere except this browser.</p>
       <div class="demo-roles">${DEMO_PEOPLE.map((p) => `<button type="button" class="demo-role" data-email="${p.email}"><b>${p.title.split(" · ")[0]}</b><span class="demo-name">${p.name}</span><span class="demo-blurb">${p.blurb}</span></button>`).join("")}</div></div>`;
     root.addEventListener("click", (e) => { const b = e.target.closest("[data-email]"); if (b) resolve(b.dataset.email); });
   });
